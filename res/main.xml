@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Stations>
+    <lineName>5</lineName>
+    <staCount>26</staCount>
+    <StaInfo>
+        <idx>1</idx>
+        <name>站1</name>
+        <longitude>30</longitude>
+        <latitude>120</latitude>
+    </StaInfo>
+    <StaInfo>
+        <idx>2</idx>
+        <name>站2</name>
+        <longitude>30</longitude>
+        <latitude>120</latitude>
+    </StaInfo>
+    <StaInfo>
+        <idx>3</idx>
+        <name>站3</name>
+        <longitude>30</longitude>
+        <latitude>120</latitude>
+    </StaInfo>
+</Stations>

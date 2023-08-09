@@ -1,0 +1,114 @@
+package com.wave;
+
+public class ActivityThread {
+    private String TAG = "ActivityThread.";
+    final H mH = new H();
+    String className = "com.wave.packages.launcher.Launcher";
+
+    public static void main(String[] args) {
+        Looper.prepareMainLooper();
+        long startSeq = 0;
+        ActivityThread thread = new ActivityThread();
+        thread.attach(false, startSeq);
+        Looper.loop();
+
+    }
+
+    private void attach(boolean system, long startSeq) {
+        sendMessage(H.BIND_APPLICATION, null);
+
+    }
+
+    void sendMessage(int what, Object obj) {
+        sendMessage(what, obj, 0, 0, false);
+    }
+
+    private void sendMessage(int what, Object obj, int arg1, int arg2, boolean async) {
+        Message msg = Message.obtain();
+        msg.what = what;
+        msg.obj = obj;
+        msg.arg1 = arg1;
+        msg.arg2 = arg2;
+        mH.sendMessage(msg);
+
+    }
+
+    private void handleBindApplication() {
+        Log.d(TAG, "handleBindApplication");
+//        此处简化了实际流程
+        sendMessage(H.EXECUTE_TRANSACTION, null);
+    }
+
+    public Activity handleLaunchActivity(ActivityClientRecord r) {
+        final Activity a = performLaunchActivity(r, null);
+        return a;
+    }
+
+    private Activity performLaunchActivity(ActivityClientRecord r, Intent customIntent) {
+        Log.d(TAG, "performLaunchActivity");
+        ContextImpl appContext = createBaseContextForActivity(r);
+        Activity activity = null;
+        try {
+            activity = newActivity(r.className);
+        } catch (Exception e) {
+
+        }
+        if (activity != null) {
+            Window window = null;
+            activity.attach(appContext, this, null,  window );
+            activity.performCreate();
+
+        }
+        return activity;
+    }
+
+    private ContextImpl createBaseContextForActivity(ActivityClientRecord r) {
+        final int displayId=0;
+        ContextImpl appContext = ContextImpl.createActivityContext(
+                this, r.packageInfo, r.activityInfo, r.token, displayId, r.overrideConfig);
+        return appContext;
+    }
+
+    public Activity newActivity(String className) {
+        Log.d(TAG,"newActivity " + className);
+        try {
+            Class<?> clazz = Class.forName(className);
+            Activity activity = (Activity) clazz.newInstance();
+            return activity;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    class H extends Handler {
+        public static final int BIND_APPLICATION = 110;
+        public static final int EXECUTE_TRANSACTION = 159;
+
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case BIND_APPLICATION:
+                    handleBindApplication();
+                    break;
+                case EXECUTE_TRANSACTION:
+                    ActivityClientRecord r = new ActivityClientRecord(className);
+                    handleLaunchActivity(r);
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    public static final class ActivityClientRecord {
+        public String packageInfo;
+        String activityInfo;
+        public String token;
+        String className;
+        Configuration overrideConfig;
+        public ActivityClientRecord(String className){
+            this.className = className;
+        }
+
+    }
+}
