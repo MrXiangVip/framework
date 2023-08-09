@@ -26,7 +26,12 @@ public class PhoneWindow extends  Window {
         mLayoutInflater.inflate(layoutResID, mContentParent);
 
     }
-
+    public final  View getDecorView() {
+        if (mDecor == null ) {
+            installDecor();
+        }
+        return mDecor;
+    }
     private void installDecor() {
         if (mDecor == null) {
             mDecor = generateDecor(-1);

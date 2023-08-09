@@ -4,7 +4,7 @@ public class ActivityThread {
     private String TAG = "ActivityThread.";
     final H mH = new H();
     String className = "com.wave.packages.launcher.Launcher";
-
+    ActivityClientRecord r;
     public static void main(String[] args) {
         Looper.prepareMainLooper();
         long startSeq = 0;
@@ -62,6 +62,25 @@ public class ActivityThread {
         return activity;
     }
 
+    public void handleResumeActivity(ActivityClientRecord r,String reason){
+        performResumeActivity(r, reason);
+        final Activity a = r.activity;
+        boolean willBeVisible = true;
+        if( willBeVisible ){
+            r.window = r.activity.getWindow();
+            View decor = r.window.getDecorView();
+//            decor.setVisibility(View.INVISIBLE);
+            ViewManager wm = a.getWindowManager();
+            WindowManager.LayoutParams l = null;
+            a.mDecor = decor;
+            wm.addView(decor, l);
+
+        }
+    }
+    public ActivityClientRecord performResumeActivity(ActivityClientRecord r, String reason) {
+        r.activity.onResume();
+        return  r;
+    }
     private ContextImpl createBaseContextForActivity(ActivityClientRecord r) {
         final int displayId=0;
         ContextImpl appContext = ContextImpl.createActivityContext(
@@ -91,8 +110,9 @@ public class ActivityThread {
                     handleBindApplication();
                     break;
                 case EXECUTE_TRANSACTION:
-                    ActivityClientRecord r = new ActivityClientRecord(className);
-                    handleLaunchActivity(r);
+                    r = new ActivityClientRecord(className);
+                    r.activity =handleLaunchActivity(r);
+                    handleResumeActivity(r,"RESUME_ACTIVITY");
                     break;
                 default:
                     break;
@@ -106,6 +126,8 @@ public class ActivityThread {
         public String token;
         String className;
         Configuration overrideConfig;
+        Activity activity;
+        Window window;
         public ActivityClientRecord(String className){
             this.className = className;
         }
