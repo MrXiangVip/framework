@@ -14,4 +14,13 @@ public class DecorView extends  FrameLayout {
         mWindow = phoneWindow;
 
     }
+
+    public void draw(Canvas canvas) {
+        super.draw(canvas);
+
+    }
+
+    public void onDraw(Canvas c) {
+        super.onDraw(c);
+    }
 }

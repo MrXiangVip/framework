@@ -17,7 +17,10 @@ public final class WindowManagerGlobal {
                         int display, Window parentWindow, int userId) {
         Log.d(TAG, "addView");
         ViewRootImpl root;
-        root = new ViewRootImpl(view.getContext(), display);
+        View panelParentView = null;
+        final WindowManager.LayoutParams wparams = (WindowManager.LayoutParams) params;
 
+        root = new ViewRootImpl(view.getContext(), display);
+        root.setView( view, wparams, panelParentView, userId);
     }
 }

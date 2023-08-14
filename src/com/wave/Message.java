@@ -17,4 +17,13 @@ public final class Message {
     public static Message obtain() {
         return new Message();
     }
+
+    public static Message obtain(Handler h, int what, Object obj) {
+        Message m = obtain();
+        m.target = h;
+        m.what = what;
+        m.obj = obj;
+
+        return m;
+    }
 }

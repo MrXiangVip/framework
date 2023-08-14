@@ -41,4 +41,10 @@ public final class Looper {
 
         }
     }
+
+    public static Looper getMainLooper() {
+        synchronized (Looper.class) {
+            return sMainLooper;
+        }
+    }
 }

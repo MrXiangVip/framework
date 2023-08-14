@@ -79,6 +79,9 @@ public class Handler {
             handleMessage(msg);
         }
     }
+    public final Message obtainMessage(int what,  Object obj) {
+        return Message.obtain(this, what, obj);
+    }
 
     private static void handleCallback(Message message) {
         message.callback.run();
@@ -87,4 +90,6 @@ public class Handler {
         boolean handleMessage( Message msg);
 
     }
+
+
 }

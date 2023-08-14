@@ -82,6 +82,20 @@ public abstract class ViewGroup extends View {
             throw new IndexOutOfBoundsException("index=" + index + " count=" + count);
         }
     }
+    protected void dispatchDraw(Canvas canvas) {
+        final int childrenCount = mChildrenCount;
+        final View[] children = mChildren;
+        final long drawingTime = 0;
+
+        for (int i = 0; i < childrenCount; i++) {
+
+            View child = children[i];
+            drawChild(canvas, child, drawingTime);
+        }
+    }
+    protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
+        return child.draw(canvas, this, drawingTime);
+    }
 
     public LayoutParams generateLayoutParams(AttributeSet attrs) {
         return new LayoutParams(getContext(), attrs);
@@ -95,6 +109,14 @@ public abstract class ViewGroup extends View {
         public int height;
         public LayoutParams(Context c, AttributeSet attrs) {
 
+        }
+
+        public LayoutParams(int width, int height) {
+            this.width = width;
+            this.height = height;
+        }
+
+        LayoutParams() {
         }
     }
 }
