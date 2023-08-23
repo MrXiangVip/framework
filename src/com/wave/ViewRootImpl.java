@@ -65,7 +65,6 @@ public class ViewRootImpl implements  ViewParent {
 
     private void performTraversals() {
         Log.d(TAG, "performTraversals");
-        final View host = mView;
         WindowManager.LayoutParams lp = mWindowAttributes;
 
         int desiredWindowWidth;
@@ -79,7 +78,6 @@ public class ViewRootImpl implements  ViewParent {
         performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);
         performLayout(lp, desiredWindowWidth, desiredWindowHeight);
         performDraw();
-
 
     }
 

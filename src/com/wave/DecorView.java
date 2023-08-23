@@ -1,7 +1,11 @@
 package com.wave;
 
+
+import static com.wave.ViewGroup.LayoutParams.MATCH_PARENT;
+
 public class DecorView extends  FrameLayout {
     private PhoneWindow mWindow;
+    ViewGroup mContentRoot;
 
     DecorView(Context context, int featureId, PhoneWindow window,
               LayoutParams params) {
@@ -9,9 +13,24 @@ public class DecorView extends  FrameLayout {
         setWindow(window);
 
     }
+    void onResourcesLoaded(LayoutInflater inflater, int layoutResource) {
+        final View root = new FrameLayout( getContext());
+        addView(root, 0, new ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        mContentRoot = (ViewGroup) root;
 
+    }
     void setWindow(PhoneWindow phoneWindow) {
         mWindow = phoneWindow;
+
+    }
+
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+
+    }
+
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
 
     }
 

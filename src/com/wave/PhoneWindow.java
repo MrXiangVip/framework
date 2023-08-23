@@ -42,7 +42,8 @@ public class PhoneWindow extends  Window {
         }
     }
     protected ViewGroup generateLayout(DecorView decor) {
-        ViewGroup contentParent =null;
+        mDecor.onResourcesLoaded(mLayoutInflater, -1);
+        ViewGroup contentParent = mDecor.mContentRoot;
         return  contentParent;
     }
     protected DecorView generateDecor(int featureId) {

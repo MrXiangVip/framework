@@ -40,6 +40,7 @@ public abstract class ViewGroup extends View {
         addViewInner(child, index, params, false);
 
     }
+
     private void addViewInner(View child, int index, LayoutParams params,
                               boolean preventRequestLayout) {
         if (preventRequestLayout) {
@@ -81,6 +82,45 @@ public abstract class ViewGroup extends View {
         } else {
             throw new IndexOutOfBoundsException("index=" + index + " count=" + count);
         }
+    }
+
+    public int getChildCount() {
+        return mChildrenCount;
+    }
+
+    public View getChildAt(int index) {
+        if (index < 0 || index >= mChildrenCount) {
+            return null;
+        }
+        return mChildren[index];
+    }
+    protected void measureChildWithMargins(View child,
+                                           int parentWidthMeasureSpec, int widthUsed,
+                                           int parentHeightMeasureSpec, int heightUsed) {
+        final int childWidthMeasureSpec = getChildMeasureSpec(parentWidthMeasureSpec, 0, 0);
+        final int childHeightMeasureSpec = getChildMeasureSpec(parentHeightMeasureSpec, 0, 0);
+        child.measure(childWidthMeasureSpec, childHeightMeasureSpec);
+
+    }
+    public static int getChildMeasureSpec(int spec, int padding, int childDimension) {
+        int specMode = MeasureSpec.getMode(spec);
+        int specSize = MeasureSpec.getSize(spec);
+        int resultSize = 0;
+        int resultMode = 0;
+        switch (specMode) {
+            case MeasureSpec.EXACTLY:
+                break;
+            case MeasureSpec.AT_MOST:
+                break;
+            case MeasureSpec.UNSPECIFIED:
+                break;
+        }
+        return MeasureSpec.makeMeasureSpec(resultSize, resultMode);
+    }
+
+    public final void layout(int l, int t, int r, int b) {
+
+        super.layout(l, t, r, b);
     }
     protected void dispatchDraw(Canvas canvas) {
         final int childrenCount = mChildrenCount;

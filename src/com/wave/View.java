@@ -6,6 +6,8 @@ public class View {
     protected ViewGroup.LayoutParams mLayoutParams;
     int mMeasuredWidth;
     int mMeasuredHeight;
+    private int mMinWidth;
+    private int mMinHeight;
 
     public static final int MEASURED_SIZE_MASK = 0x00ffffff;
 
@@ -40,8 +42,46 @@ public class View {
         return mContext;
     }
     public final void measure(int widthMeasureSpec, int heightMeasureSpec) {
+        onMeasure(widthMeasureSpec, heightMeasureSpec);
 
     }
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        setMeasuredDimension(getDefaultSize(getSuggestedMinimumWidth(), widthMeasureSpec),
+                getDefaultSize(getSuggestedMinimumHeight(), heightMeasureSpec));
+    }
+    protected final void setMeasuredDimension(int measuredWidth, int measuredHeight) {
+        setMeasuredDimensionRaw(measuredWidth, measuredHeight);
+
+    }
+    public static int getDefaultSize(int size, int measureSpec) {
+        int result = size;
+        int specMode = MeasureSpec.getMode(measureSpec);
+        int specSize = MeasureSpec.getSize(measureSpec);
+
+        switch (specMode) {
+            case MeasureSpec.UNSPECIFIED:
+                result = size;
+                break;
+            case MeasureSpec.AT_MOST:
+            case MeasureSpec.EXACTLY:
+                result = specSize;
+                break;
+        }
+        return result;
+    }
+
+    private void setMeasuredDimensionRaw(int measuredWidth, int measuredHeight) {
+        mMeasuredWidth = measuredWidth;
+        mMeasuredHeight = measuredHeight;
+    }
+    protected int getSuggestedMinimumWidth() {
+        return  mMinWidth ;
+    }
+    protected int getSuggestedMinimumHeight() {
+        return  mMinHeight ;
+
+    }
+
     public void layout(int l, int t, int r, int b) {
         boolean changed=true;
         onLayout(changed, l, t, r, b);
@@ -96,6 +136,14 @@ public class View {
                                            int mode) {
 
                 return (size & ~MODE_MASK) | (mode & MODE_MASK);
+        }
+
+        public static int getSize(int measureSpec) {
+            return (measureSpec & ~MODE_MASK);
+        }
+        public static int getMode(int measureSpec) {
+            //noinspection ResourceType
+            return (measureSpec & MODE_MASK);
         }
     }
 }
