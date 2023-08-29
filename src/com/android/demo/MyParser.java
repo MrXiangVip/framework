@@ -1,4 +1,4 @@
-package com.android;
+package com.android.demo;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserFactory;

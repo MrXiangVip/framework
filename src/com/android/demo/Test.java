@@ -1,4 +1,4 @@
-package com.android;
+package com.android.demo;
 
 import java.io.File;
 import java.lang.management.ManagementFactory;

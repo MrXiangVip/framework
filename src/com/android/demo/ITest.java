@@ -1,4 +1,4 @@
-package com.android;
+package com.android.demo;
 
 public interface ITest {
 
