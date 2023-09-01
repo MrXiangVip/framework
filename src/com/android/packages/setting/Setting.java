@@ -1,6 +1,6 @@
 package com.android.packages.setting;
 
-import com.android.Activity;
+import com.android.app.Activity;
 
 public class Setting extends Activity {
     @Override

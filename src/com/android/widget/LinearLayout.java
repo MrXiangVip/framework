@@ -1,9 +1,9 @@
 package com.android.widget;
 
-import com.android.AttributeSet;
-import com.android.Context;
-import com.android.View;
-import com.android.ViewGroup;
+import com.android.util.AttributeSet;
+import com.android.content.Context;
+import com.android.view.View;
+import com.android.view.ViewGroup;
 
 public class LinearLayout extends ViewGroup {
     private int mOrientation;

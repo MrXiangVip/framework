@@ -1,7 +1,7 @@
 package com.android.widget;
 
-import com.android.AttributeSet;
-import com.android.Context;
+import com.android.util.AttributeSet;
+import com.android.content.Context;
 
 public class Button extends TextView {
     public Button(Context context) {

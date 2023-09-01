@@ -1,9 +1,9 @@
 package com.android.widget;
 
-import com.android.AttributeSet;
-import com.android.Context;
-import com.android.Log;
-import com.android.View;
+import com.android.util.AttributeSet;
+import com.android.content.Context;
+import com.android.util.Log;
+import com.android.view.View;
 
 public class TextView extends View {
 

@@ -1,7 +1,7 @@
 package com.android.packages.launcher;
 
-import com.android.Activity;
-import com.android.Log;
+import com.android.app.Activity;
+import com.android.util.Log;
 
 public class Launcher extends Activity {
     private	String  apps[]={"设置","图库","日历",
@@ -11,7 +11,7 @@ public class Launcher extends Activity {
 
     public  String className[]={"com.packages.Settings","com.packages.Picture","com.android.Calander",
             "com.android.Clock","com.android.Files","com.android.Telephone",
-            "com.android.Message","com.android.Camera","com.android.Video"
+            "com.android.os.Message","com.android.Camera","com.android.Video"
     };
     private String TAG="Launcher.";
 
