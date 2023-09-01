@@ -161,6 +161,7 @@ public abstract class LayoutInflater {
         Class<? extends View> clazz = null;
         Constructor<? extends View> constructor;
         try {
+            Log.d(TAG, "prefix: "+prefix  +" "+ "name: "+name);
             clazz = Class.forName(prefix != null ? (prefix + name) : name).asSubclass(View.class);;
             constructor = clazz.getConstructor(mConstructorSignature);
             constructor.setAccessible(true);

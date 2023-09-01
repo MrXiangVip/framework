@@ -1,3 +1,6 @@
+/*
+* 源码路径 : frameworks/base/core/java/android/os/MessageQueue.java
+* */
 package com.android.os;
 
 import com.android.util.Log;
@@ -26,7 +29,7 @@ public final class MessageQueue implements Queue {
 
             while (queue.size() == 0) {
                 try {
-                    System.out.println("等待消息 wait here");
+                    Log.d("等待消息 wait here");
 
                     queue.wait();
                 } catch (Exception e) {

@@ -1,3 +1,6 @@
+/*
+* 源码路径: frameworks/base/core/java/android/os/Handler.java
+* */
 package com.android.os;
 
 import com.android.util.Log;

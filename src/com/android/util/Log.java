@@ -33,30 +33,54 @@ public final class Log {
      * Priority constant for the println method.
      */
     public static final int ASSERT = 7;
-
+    public static int v(String msg) {
+        System.out.println(SDF.format(System.currentTimeMillis())+" " + msg);
+        return  0;
+    }
     public static int v( String tag,  String msg) {
         System.out.println(tag +" "+msg);
         return  0;
     }
 
+    public static int d(String msg) {
+        System.out.println(SDF.format(System.currentTimeMillis())+" " + msg);
+        return  0;
+    }
     public static int d( String tag,  String msg) {
         System.out.println(SDF.format(System.currentTimeMillis())+" "+ tag + msg);
         return 0;
     }
 
+    public static int i(String msg) {
+        System.out.println(SDF.format(System.currentTimeMillis())+" " + msg);
+        return  0;
+    }
     public static int i( String tag,  String msg) {
         System.out.println( tag + msg);
         return 0;
     }
 
+    public static int w(String msg) {
+        System.out.println(SDF.format(System.currentTimeMillis())+" " + msg);
+        return  0;
+    }
     public static int w( String tag,  String msg) {
         System.out.println( tag + msg);
         return 0;
     }
 
+    public static int e(String msg) {
+        System.out.println(SDF.format(System.currentTimeMillis())+" " + msg);
+        return  0;
+    }
     public static int e( String tag,  String msg) {
         System.out.println( tag + msg);
         return 0;
+    }
+
+    public static int a(String msg) {
+        System.out.println(SDF.format(System.currentTimeMillis())+" " + msg);
+        return  0;
     }
     public static int a( String tag,  String msg) {
         System.out.println( tag + msg);

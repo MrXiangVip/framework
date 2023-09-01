@@ -12,13 +12,21 @@ import com.android.view.Window;
 import com.android.view.WindowManager;
 
 public class ActivityThread {
-    private String TAG = "ActivityThread.";
+    private static String TAG = "ActivityThread.";
     final H mH = new H();
-    String className = "com.android.packages.launcher.Launcher";
+//    String className = "com.android.packages.launcher.Launcher";
+    static String className = null;
     ActivityClientRecord r;
-    public static void main(String[] args) {
+    static long startSeq = 0;
+
+    public static void main(String[] argv) {
+        if (argv != null) {
+            for (int i=0; i < argv.length; ++i) {
+                Log.d(TAG, i + " "+argv[i]);
+            }
+        }
+        className = argv[0];
         Looper.prepareMainLooper();
-        long startSeq = 0;
         ActivityThread thread = new ActivityThread();
         thread.attach(false, startSeq);
         Looper.loop();
