@@ -21,7 +21,10 @@ echo "编译 java 部分"
 javac       com/android/ZygoteInit.java
 javac       com/android/server/SystemServer.java
 javac       com/android/app/ActivityThread.java
-javac       com/android/packages/launcher/Launcher.java
+javac       com/packages/launcher/Launcher.java
+javac       com/android/widget/Button.java
+javac       com/android/widget/LinearLayout.java
+javac       com/android/widget/TextView.java
 
 echo "执行.."
 ./app_process

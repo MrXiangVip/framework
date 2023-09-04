@@ -22,7 +22,7 @@ public class ActivityManagerService {
     boolean startHomeActivityLocked( String reason) {
         Log.d("startHomeActivityLocked\n");
         if( true ){
-            startActivity("com.android.packages.launcher.Launcher");
+            startActivity("com.packages.launcher.Launcher");
         }
         return true;
     }

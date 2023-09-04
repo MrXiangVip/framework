@@ -1,5 +1,6 @@
 package com.android.app;
 
+import com.android.am.ActivityManagerService;
 import com.android.content.Context;
 import com.android.policy.PhoneWindow;
 import com.android.res.Configuration;
@@ -8,6 +9,8 @@ import com.android.util.Log;
 
 public class Activity extends ContextThemeWrapper {
     private static Activity activity;
+
+    private ActivityManagerService  ams;
     private Window mWindow;
     private WindowManager mWindowManager;
     View mDecor = null;
@@ -42,6 +45,7 @@ public class Activity extends ContextThemeWrapper {
         mWindow.setWindowManager( new WindowManagerImpl(context),  null, false);
         mWindowManager = mWindow.getWindowManager();
 
+        ams = ActivityManagerService.getInstance();
     }
 
     public final void performCreate() {
@@ -55,4 +59,10 @@ public class Activity extends ContextThemeWrapper {
     protected void onResume() {
         Log.d(TAG, "onResume");
     }
+
+    public void startActivity(String className){
+        System.out.println("startActivity "+className);
+        ams.startActivity( className );
+    }
+    
 }

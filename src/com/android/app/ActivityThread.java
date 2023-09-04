@@ -14,18 +14,23 @@ import com.android.view.WindowManager;
 public class ActivityThread {
     private static String TAG = "ActivityThread.";
     final H mH = new H();
-//    String className = "com.android.packages.launcher.Launcher";
-    static String className = null;
+//    String className = "com.packages.launcher.Launcher";
+    static String className ;
+    static String defaultLauncher ="com.packages.launcher.Launcher";
     ActivityClientRecord r;
     static long startSeq = 0;
 
     public static void main(String[] argv) {
-        if (argv != null) {
+
+        if( argv.length ==0 ){
+            className = defaultLauncher;
+        }else{
             for (int i=0; i < argv.length; ++i) {
                 Log.d(TAG, i + " "+argv[i]);
             }
+            className = argv[0];
         }
-        className = argv[0];
+        Log.d(TAG, "className "+className);
         Looper.prepareMainLooper();
         ActivityThread thread = new ActivityThread();
         thread.attach(false, startSeq);

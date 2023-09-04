@@ -11,6 +11,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import com.android.widget.*;
 
 public abstract class LayoutInflater {
     protected final Context mContext;
