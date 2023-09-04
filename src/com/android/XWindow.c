@@ -66,7 +66,7 @@ int createXWindow( ){
 
 // 创建系统进程
 JNIEXPORT jint JNICALL Java_com_android_wm_XWindow_nativeCreateAWindow (JNIEnv *env, jobject obj){
-    printf("Java_com_android_Zygote_nativeForkSystemServer \n");
+    printf("Java_com_android_wm_XWindow_nativeCreateAWindow \n");
     return  createXWindow( );
 
 }
