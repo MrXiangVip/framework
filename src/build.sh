@@ -3,13 +3,18 @@
 VPATH=$(pwd)
 echo ${VPATH}
 javah -jni com.android.os.Zygote
-echo "编译动态库"
+echo "编译android动态库"
 cd ${VPATH}/com/android
 gcc -fPIC  -I/usr/lib/jvm/java-8-openjdk-amd64/include  -I/usr/lib/jvm/java-8-openjdk-amd64/include/linux  -I${VPATH} -shared -o libandroid.so  Zygote.c
 echo "导出动态库路径 $(pwd)"
 export LD_LIBRARY_PATH=$(pwd)/:$LD_LIBRARY_PATH
 # 图方便可以将libandroid.so 拷贝到 /usr/lib/x86_64-linux-gnu/jni
 
+cd ${VPATH}
+javah -jni com.android.wm.XWindow
+echo "编译window动态库"
+cd ${VPATH}/com/android
+gcc -fPIC  -I/usr/lib/jvm/java-8-openjdk-amd64/include  -I/usr/lib/jvm/java-8-openjdk-amd64/include/linux  -I${VPATH} -shared -o libwindow.so  XWindow.c -lX11
 
 cd ${VPATH}
 echo $(pwd)
