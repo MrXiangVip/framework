@@ -13,6 +13,22 @@ public class ContextWrapper extends Context {
         return mBase.getResources();
     }
 
+    @Override
+    public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter) {
+        return mBase.registerReceiver(receiver, filter);
+
+    }
+
+    @Override
+    public ComponentName startService(Intent service) {
+        return mBase.startService(service);
+    }
+
+    @Override
+    public ContentResolver getContentResolver() {
+        return  mBase.getContentResolver();
+    }
+
     protected void attachBaseContext(Context base) {
         if (mBase != null) {
             throw new IllegalStateException("Base context already set");
@@ -23,5 +39,7 @@ public class ContextWrapper extends Context {
     public Context getBaseContext() {
         return mBase;
     }
+
+
 
 }
