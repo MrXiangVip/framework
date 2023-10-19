@@ -13,7 +13,7 @@ import java.lang.reflect.Modifier;
 public class RuntimeInit {
 
 
-    private static final String TAG ="RuntimeInit.";
+    private static final String TAG ="RuntimeInit. ";
 
     public static Runnable applicationInit(String className, String[] argv, ClassLoader classLoader) {
         return findStaticMain(className, argv, classLoader);

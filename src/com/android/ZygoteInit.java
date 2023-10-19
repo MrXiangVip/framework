@@ -104,7 +104,7 @@ public class ZygoteInit{
     }
 
     public static final Runnable childZygoteInit(String[] args) {
-        Log.d("childZygoteInit  这里启动 activitythread "+args);
+        Log.d("childZygoteInit  这里启动 activitythread "+args[0]);
 //        return new MethodAndArgsCaller("com.android.app.ActivityThread", className);
 
         return RuntimeInit.findStaticMain("com.android.app.ActivityThread", args, null);

@@ -1,6 +1,7 @@
 package com.android.pm;
 
 import com.android.content.Context;
+import com.android.util.Log;
 
 import java.io.File;
 import java.lang.reflect.Array;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 public class PackageManagerService implements PackageSender {
+    private static final String TAG = "PackageManagerService. ";
     private final List<ScanPartition> mDirsToScanAsSystem;
     public static final String APK_FILE_EXTENSION = ".apk";
 
@@ -39,7 +41,7 @@ public class PackageManagerService implements PackageSender {
 
     public static PackageManagerService main(Context context, Installer installer,
                                              boolean factoryTest, boolean onlyCore) {
-
+        Log.d(TAG, "main");
         PackageManagerService m = new PackageManagerService(onlyCore, factoryTest);
 
         return m;

@@ -12,7 +12,7 @@ import com.android.view.Window;
 import com.android.view.WindowManager;
 
 public class ActivityThread {
-    private static String TAG = "ActivityThread.";
+    private static String TAG = "ActivityThread. ";
     final H mH = new H();
 //    String className = "com.packages.launcher.Launcher";
     static String className ;
@@ -20,6 +20,7 @@ public class ActivityThread {
     ActivityClientRecord r;
     static long startSeq = 0;
     private ContextImpl mSystemContext;
+    boolean mSystemThread = false;
 
     public static void main(String[] argv) {
 
@@ -39,6 +40,7 @@ public class ActivityThread {
 
     }
     public static ActivityThread systemMain() {
+        Log.d(TAG, "systemMain");
         ActivityThread thread = new ActivityThread();
         thread.attach(true, 0);
         return thread;
@@ -53,7 +55,13 @@ public class ActivityThread {
     }
 
     private void attach(boolean system, long startSeq) {
-        sendMessage(H.BIND_APPLICATION, null);
+        mSystemThread = system;
+        if( !system ){
+            sendMessage(H.BIND_APPLICATION, null);
+            Log.d(TAG, "in application");
+        }else{
+            Log.d(TAG, "in systemserver");
+        }
 
     }
 
@@ -127,7 +135,7 @@ public class ActivityThread {
     }
 
     public Activity newActivity(String className) {
-        Log.d(TAG,"newActivity " + className);
+        Log.d(TAG,"newActivity className " + className);
         try {
             Class<?> clazz = Class.forName(className);
             Activity activity = (Activity) clazz.newInstance();

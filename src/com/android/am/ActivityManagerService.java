@@ -3,9 +3,12 @@ package com.android.am;
 import com.android.util.Log;
 import com.android.os.Process;
 import com.android.os.Process.*;
+import com.android.wm.ActivityTaskManagerService;
+
 public class ActivityManagerService {
 
     private static ActivityManagerService  ams;
+    public ActivityTaskManagerService mActivityTaskManager;
 
     public static ActivityManagerService getInstance( ){
         if (ams == null) {
