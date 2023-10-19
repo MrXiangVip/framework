@@ -19,6 +19,7 @@ public class ActivityThread {
     static String defaultLauncher ="com.packages.launcher.Launcher";
     ActivityClientRecord r;
     static long startSeq = 0;
+    private ContextImpl mSystemContext;
 
     public static void main(String[] argv) {
 
@@ -36,6 +37,19 @@ public class ActivityThread {
         thread.attach(false, startSeq);
         Looper.loop();
 
+    }
+    public static ActivityThread systemMain() {
+        ActivityThread thread = new ActivityThread();
+        thread.attach(true, 0);
+        return thread;
+    }
+    public ContextImpl getSystemContext() {
+        synchronized (this) {
+            if (mSystemContext == null) {
+                mSystemContext = ContextImpl.createSystemContext(this);
+            }
+            return mSystemContext;
+        }
     }
 
     private void attach(boolean system, long startSeq) {

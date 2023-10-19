@@ -48,6 +48,10 @@ public class ContextImpl extends Context {
         return  context;
     }
 
-
-
+    static ContextImpl createSystemContext(ActivityThread mainThread) {
+        String packageInfo=null;
+        ContextImpl context = new ContextImpl(null, mainThread, packageInfo, null, null, null, null,
+                0, null, null);
+        return  context;
+    }
 }
