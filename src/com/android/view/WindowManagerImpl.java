@@ -23,4 +23,14 @@ public final  class WindowManagerImpl implements WindowManager {
         mGlobal.addView(view, params, 0, mParentWindow,
                 0);
     }
+
+    @Override
+    public void updateViewLayout(View view, ViewGroup.LayoutParams params) {
+
+    }
+
+    @Override
+    public void removeView(View view) {
+
+    }
 }

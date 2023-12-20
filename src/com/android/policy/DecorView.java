@@ -8,6 +8,8 @@ import com.android.view.LayoutInflater;
 import com.android.view.ViewGroup;
 import com.android.widget.FrameLayout;
 
+import java.io.File;
+
 import static com.android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
 public class DecorView extends FrameLayout {
@@ -20,12 +22,12 @@ public class DecorView extends FrameLayout {
         setWindow(window);
 
     }
-    void onResourcesLoaded(LayoutInflater inflater, int layoutResource) {
-        final View root = new FrameLayout( getContext());
+    void onResourcesLoaded(LayoutInflater inflater, File file) {
+        final View root = inflater.inflate(file, null);
         addView(root, 0, new ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT));
         mContentRoot = (ViewGroup) root;
-
     }
+	
     void setWindow(PhoneWindow phoneWindow) {
         mWindow = phoneWindow;
 

@@ -7,11 +7,16 @@ import com.android.content.Context;
 import com.android.util.Log;
 import com.android.view.LayoutInflater;
 
+import java.io.File;
+
 public class PhoneWindow extends Window {
+    private String TAG="PhoneWindow.";
     private DecorView mDecor;
     private LayoutInflater mLayoutInflater;
     ViewGroup mContentParent;
-    private String TAG="PhoneWindow.";
+
+    String DIR="/home/xshx/IdeaProjects/untitled/res/layout";
+    String FileName="activity_main.xml";
 
     public PhoneWindow(Context context) {
         super(context);
@@ -22,13 +27,13 @@ public class PhoneWindow extends Window {
         this(context);
 
     }
-    public void setContentView(int layoutResID) {
-        Log.d(TAG, "setContentView "+layoutResID);
+	
+    public void setContentView(File file) {
+        Log.d(TAG, "setContentView ");
         if( mContentParent ==null ){
             installDecor();
         }
-
-        mLayoutInflater.inflate(layoutResID, mContentParent);
+        mLayoutInflater.inflate(file, mContentParent);
 
     }
     public final View getDecorView() {
@@ -47,9 +52,12 @@ public class PhoneWindow extends Window {
         }
     }
     protected ViewGroup generateLayout(DecorView decor) {
-        mDecor.onResourcesLoaded(mLayoutInflater, -1);
-        ViewGroup contentParent = mDecor.mContentRoot;
-        return  contentParent;
+
+        File file = new File(DIR, FileName );
+        mDecor.onResourcesLoaded(mLayoutInflater, file);
+
+
+        return  decor;
     }
     protected DecorView generateDecor(int featureId) {
         Context context;

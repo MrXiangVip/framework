@@ -5,7 +5,7 @@ import com.android.graphics.Canvas;
 import com.android.util.AttributeSet;
 import com.android.util.Log;
 
-public abstract class ViewGroup extends View {
+public abstract  class ViewGroup extends View implements ViewParent {
 
     private View[] mChildren;
 
@@ -57,6 +57,7 @@ public abstract class ViewGroup extends View {
             index = mChildrenCount;
         }
         addInArray(child, index);
+        child.mParent = this;
 
     }
     private void addInArray(View child, int index) {
@@ -162,6 +163,10 @@ public abstract class ViewGroup extends View {
         }
 
         LayoutParams() {
+        }
+        public LayoutParams(LayoutParams source) {
+            this.width = source.width;
+            this.height = source.height;
         }
     }
 }

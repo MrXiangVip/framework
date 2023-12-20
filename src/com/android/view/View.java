@@ -11,6 +11,12 @@ public class View {
     protected ViewGroup.LayoutParams mLayoutParams;
     int mMeasuredWidth;
     int mMeasuredHeight;
+    protected int mLeft;
+    protected int mRight;
+    protected int mTop;
+    protected int mBottom;
+    protected ViewParent mParent;
+	
     private int mMinWidth;
     private int mMinHeight;
 

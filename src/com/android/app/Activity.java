@@ -7,6 +7,8 @@ import com.android.res.Configuration;
 import com.android.view.*;
 import com.android.util.Log;
 
+import java.io.File;
+
 public class Activity extends ContextThemeWrapper {
     private static Activity activity;
 
@@ -14,6 +16,8 @@ public class Activity extends ContextThemeWrapper {
     private Window mWindow;
     private WindowManager mWindowManager;
     View mDecor = null;
+    /*package*/ ActivityThread mMainThread;
+
     private String TAG = "Activity.";
 
 /*    Activity() {
@@ -27,9 +31,7 @@ public class Activity extends ContextThemeWrapper {
 //        activity.setContentView(1);
 //    }
 
-    public void setContentView(int layoutResID) {
-        getWindow().setContentView(layoutResID);
-    }
+
 
     public Window getWindow() {
         return mWindow;
@@ -40,12 +42,14 @@ public class Activity extends ContextThemeWrapper {
 
     public void attach(Context context, ActivityThread aThread, Configuration config, Window window) {
         attachBaseContext(context);
+        mMainThread = aThread;
 
         mWindow = new PhoneWindow(this, window);
         mWindow.setWindowManager( new WindowManagerImpl(context),  null, false);
         mWindowManager = mWindow.getWindowManager();
 
         ams = ActivityManagerService.getInstance();
+
     }
 
     public final void performCreate() {
@@ -64,5 +68,8 @@ public class Activity extends ContextThemeWrapper {
         System.out.println("startActivity "+className);
         ams.startActivity( className );
     }
-    
+	
+    public void setContentView( File filePath) {
+        getWindow().setContentView(filePath);
+    }
 }

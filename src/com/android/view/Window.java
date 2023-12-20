@@ -1,5 +1,5 @@
 package com.android.view;
-
+import java.io.File;
 import com.android.content.Context;
 import com.android.util.Log;
 
@@ -16,7 +16,7 @@ public abstract  class Window {
     }
     public abstract View getDecorView();
 
-    public abstract void setContentView(int layoutResID);
+    public abstract void setContentView( File file);
 
     public void setWindowManager(WindowManager wm,  String appName,
                                  boolean hardwareAccelerated) {
