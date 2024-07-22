@@ -15,3 +15,9 @@ JAVA 版本： OpenJDK 1.8
 下面这个博客解释了代码流程。
 
 https://blog.csdn.net/blueheart05/article/details/135069627?spm=1001.2014.3001.5502
+
+
+运行方法：
+执行 build.sh 
+xshx@xshx:~/IdeaProjects/framework/src$ ./build.sh
+
