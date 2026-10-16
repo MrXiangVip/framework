@@ -8,7 +8,7 @@ JNIEnv* create_vm(JavaVM **jvm)
     JavaVMOption options;
     args.version = JNI_VERSION_1_8;
     args.nOptions = 1;
-    char class_path[] = "-Djava.class.path=.:../libs/xmlpull-1.1.3.1.jar:../libs/kxml2-2.3.0.jar";
+    char class_path[] = "-Djava.class.path=.:../libs/xmlpull-1.1.3.1.jar:../libs/kxml2-2.3.0.jar:../out/system/app/launcher/launcher.apk";
     options.optionString = class_path;
     args.options = &options;
     args.ignoreUnrecognized = 0;

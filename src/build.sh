@@ -1,45 +1,33 @@
-#!/bin/bash
-VPATH=$(pwd)
-echo ${VPATH}
+#!/usr/bin/env bash
+set -euo pipefail
+# Always run from src, including when invoked as bash src/build.sh.
+VPATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$VPATH"
+echo "$VPATH"
 
-# JDK配置
-JDK_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-JNI_INC="-I${JDK_HOME}/include -I${JDK_HOME}/include/linux -I${VPATH}"
+JDK_HOME="${JDK_HOME:-/usr/lib/jvm/java-8-openjdk-amd64}"
+JNI_INC=("-I${JDK_HOME}/include" "-I${JDK_HOME}/include/linux" "-I${VPATH}")
 JVM_LIB="${JDK_HOME}/jre/lib/amd64/server"
+CP=".:../libs/xmlpull-1.1.3.1.jar:../libs/kxml2-2.3.0.jar"
 
-# JNI头文件生成（javah 替换成 javac -h ，兼容新标准）
-javac -h . com/android/os/Zygote.java
-javac -h . com/android/wm/XWindow.java
+# Compile all framework sources, rather than depending on stale class files.
+echo "编译 java 部分及 JNI 头文件"
+mapfile -d '' -t FRAMEWORK_SOURCES < <(find com/android -name '*.java' -print0)
+javac -encoding UTF-8 -cp "$CP" -h . -d . "${FRAMEWORK_SOURCES[@]}"
+
+echo "单独编译打包 launcher.apk"
+bash "$VPATH/../packages/apps/launcher/build.sh"
 
 echo "编译android动态库"
-cd ${VPATH}/com/android
-gcc -fPIC ${JNI_INC} -shared -o libandroid.so  Zygote.c
-echo "导出动态库路径 $(pwd)"
-export LD_LIBRARY_PATH=$(pwd)/:${LD_LIBRARY_PATH}
+gcc -fPIC "${JNI_INC[@]}" -shared -o com/android/libandroid.so com/android/Zygote.c
+export LD_LIBRARY_PATH="$VPATH/com/android:${LD_LIBRARY_PATH:-}"
 
-cd ${VPATH}
 echo "编译window动态库"
-cd ${VPATH}/com/android
-gcc -fPIC ${JNI_INC} -shared -o libwindow.so  XWindow.c -lX11
+gcc -fPIC "${JNI_INC[@]}" -shared -o com/android/libwindow.so com/android/XWindow.c -lX11
 
-cd ${VPATH}
-echo $(pwd)
 echo "编译 app_process"
-g++ -D__int64="long long" ${JNI_INC} -o app_process app_main.cpp  -L${JVM_LIB} -ljvm
-export LD_LIBRARY_PATH=${JVM_LIB}:${LD_LIBRARY_PATH}
+g++ -D__int64="long long" "${JNI_INC[@]}" -o app_process app_main.cpp -L"$JVM_LIB" -ljvm
+export LD_LIBRARY_PATH="$JVM_LIB:$LD_LIBRARY_PATH"
 
-# 编译java部分
-echo "编译 java 部分"
-CP=".:../libs/xmlpull-1.1.3.1.jar:../libs/kxml2-2.3.0.jar"
-javac -cp ${CP} com/android/os/Zygote.java
-javac -cp ${CP} com/android/ZygoteInit.java
-javac -cp ${CP} com/android/server/SystemServer.java
-javac -cp ${CP} com/android/app/ActivityThread.java
-javac -cp ${CP} com/android/res/Resources.java
-javac -cp ${CP} com/packages/launcher/Launcher.java
-javac -cp ${CP} com/android/widget/Button.java
-javac -cp ${CP} com/android/widget/LinearLayout.java
-javac -cp ${CP} com/android/widget/TextView.java
 echo "执行 app_process，启动 SystemServer"
-# 参数：第一个参数是ANDROID_ROOT，第二个是主类
 ./app_process

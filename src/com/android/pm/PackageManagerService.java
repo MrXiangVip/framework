@@ -53,7 +53,7 @@ public class PackageManagerService implements PackageSender {
         if (configured != null && !configured.trim().isEmpty()) return new File(configured);
         File cwd = new File(System.getProperty("user.dir")).getAbsoluteFile();
         // build.sh launches from src; IDEs normally launch from the repository root.
-        return new File(cwd, "com/packages").isDirectory() ? cwd.getParentFile() : cwd;
+        return new File(cwd, "com/android").isDirectory() ? cwd.getParentFile() : cwd;
     }
 
     private void scanPackages() {
@@ -67,7 +67,12 @@ public class PackageManagerService implements PackageSender {
                         SCAN_AS_SYSTEM | SCAN_AS_PRIVILEGED, now, parser, executor);
                 scanDirTracedLI(partition.getAppFolder(), 0, SCAN_AS_SYSTEM, now, parser, executor);
             }
-            // Source packages are the install format used by the sample launcher.
+            // Standalone builds install into out/system/{priv-app,app}.
+            ScanPartition output = new ScanPartition(new File(mRoot, "out/system"));
+            scanDirTracedLI(output.getPrivAppFolder(), 0,
+                    SCAN_AS_SYSTEM | SCAN_AS_PRIVILEGED, now, parser, executor);
+            scanDirTracedLI(output.getAppFolder(), 0, SCAN_AS_SYSTEM, now, parser, executor);
+            // Retain legacy source packages after installed APKs.
             scanDirTracedLI(new File(mRoot, "src/com/packages"), 0, SCAN_AS_SYSTEM,
                     now, parser, executor);
             if (!mOnlyCore) {
@@ -108,7 +113,7 @@ public class PackageManagerService implements PackageSender {
             if (name.startsWith(".") || name.startsWith("vmdl") || name.startsWith("smdl")) continue;
             boolean directoryPackage = file.isDirectory()
                     && (new File(file, "AndroidManifest.xml").isFile()
-                        || new File(file, "base.apk").isFile());
+                        || containsApk(file));
             if (!(file.isFile() && isApkFile(file)) && !directoryPackage) continue;
             parallel.submit(file, parseFlags);
             count++;
@@ -208,6 +213,11 @@ public class PackageManagerService implements PackageSender {
         synchronized (mLock) {
             return Collections.unmodifiableMap(new LinkedHashMap<>(mScanErrors));
         }
+    }
+
+    private static boolean containsApk(File directory) {
+        File[] apks = directory.listFiles(file -> file.isFile() && isApkFile(file));
+        return apks != null && apks.length > 0;
     }
 
     public static boolean isApkFile(File file) {

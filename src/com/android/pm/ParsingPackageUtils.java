@@ -26,13 +26,13 @@ public class ParsingPackageUtils {
                         return parseManifest(input, codePath);
                     }
                 }
-                File base = new File(codePath, "base.apk");
                 File[] apks = codePath.listFiles(f -> f.isFile()
                         && PackageManagerService.isApkFile(f));
-                if (apks == null || apks.length != 1 || !base.isFile()) {
-                    throw new IOException("Expected AndroidManifest.xml or a single base.apk; splits unsupported");
+                if (apks == null || apks.length != 1) {
+                    throw new IOException("Expected AndroidManifest.xml or a single APK; splits unsupported");
                 }
-                return parseArchive(base, codePath);
+                // Accept base.apk or named standalone artifacts such as launcher.apk.
+                return parseArchive(apks[0], codePath);
             }
             if (!codePath.isFile() || !PackageManagerService.isApkFile(codePath)) {
                 throw new IOException("Not an APK or package directory");
