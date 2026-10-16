@@ -31,7 +31,7 @@ public class Launcher extends Activity {
     protected void onCreate() {
         super.onCreate();
         Log.d(TAG, "onCreate");
-        setContentView( new File(DIR, FileName) );
+        //setContentView( new File(DIR, FileName) );
         Log.d(TAG,"启动模拟器");
         XWindow.createAWindow();
 /*        JFrame frm = new JFrame("桌面");

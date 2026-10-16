@@ -1,6 +1,8 @@
 package com.android.am;
 
 import com.android.util.Log;
+import com.android.pm.PackageManagerService;
+import com.android.pm.ParsedPackage;
 import com.android.os.Process;
 import com.android.os.Process.*;
 import com.android.wm.ActivityTaskManagerService;
@@ -16,6 +18,12 @@ public class ActivityManagerService {
         }
         return ams;
     }
+    private PackageManagerService mPackageManagerService;
+
+    public void setPackageManagerService(PackageManagerService packageManagerService) {
+        mPackageManagerService = java.util.Objects.requireNonNull(packageManagerService);
+    }
+
     public void systemReady() {
 
         startHomeActivityLocked( "systemReady");
@@ -24,9 +32,15 @@ public class ActivityManagerService {
 
     boolean startHomeActivityLocked( String reason) {
         Log.d("startHomeActivityLocked\n");
-        if( true ){
-            startActivity("com.packages.launcher.Launcher");
+        if (mPackageManagerService == null) {
+            throw new IllegalStateException("PackageManagerService must be initialized before AMS");
         }
+        ParsedPackage.ActivityInfo home = mPackageManagerService.resolveHomeActivity();
+        if (home == null) {
+            Log.w("No enabled HOME activity found");
+            return false;
+        }
+        startActivity(home.getName());
         return true;
     }
     public final int startActivity( String callingPackageClass ){

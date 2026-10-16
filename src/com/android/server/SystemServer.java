@@ -55,7 +55,9 @@ public final class SystemServer {
     private void startBootstrapServices() {
         mActivityManagerService = ActivityManagerService.getInstance();
 
+        installer = new Installer();
         mPackageManagerService = PackageManagerService.main(mSystemContext, installer, false, mOnlyCore);
+        mActivityManagerService.setPackageManagerService(mPackageManagerService);
     }
 
     private void startCoreServices() {

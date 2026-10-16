@@ -3,12 +3,13 @@
 JNIEnv* create_vm(JavaVM **jvm)
 {
     printf("%s\n",__func__);
-    JNIEnv* env;
+    JNIEnv* env = NULL;
     JavaVMInitArgs args;
     JavaVMOption options;
     args.version = JNI_VERSION_1_8;
     args.nOptions = 1;
-    options.optionString ="-Djava.class.path=./";
+    char class_path[] = "-Djava.class.path=.:../libs/xmlpull-1.1.3.1.jar:../libs/kxml2-2.3.0.jar";
+    options.optionString = class_path;
     args.options = &options;
     args.ignoreUnrecognized = 0;
     int rv;

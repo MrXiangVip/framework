@@ -1,14 +1,9 @@
 package com.android.pm;
-
 import java.io.File;
-
 public class PackageParser2 {
-    private ParsingPackageUtils parsingUtils;
-
-    public ParsedPackage parsePackage(File packageFile, int flags, boolean useCaches){
-//        ParseResult<ParsingPackage> result = parsingUtils.parsePackage(input, packageFile, flags);
-//        ParsedPackage parsed = (ParsedPackage) result.getResult().hideAsParsed();
-        ParsedPackage parsed = new ParsedPackage();
-        return  parsed;
+    private final ParsingPackageUtils parsingUtils = new ParsingPackageUtils();
+    public ParsedPackage parsePackage(File packageFile, int flags, boolean useCaches) {
+        // No cache yet: rescans always read current metadata.
+        return parsingUtils.parsePackage(packageFile);
     }
 }
