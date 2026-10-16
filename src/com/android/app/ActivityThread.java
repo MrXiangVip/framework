@@ -2,6 +2,7 @@ package com.android.app;
 
 import com.android.content.Intent;
 import com.android.os.Handler;
+import com.android.os.ApplicationStartInfo;
 import com.android.os.Looper;
 import com.android.os.Message;
 import com.android.res.Configuration;
@@ -14,9 +15,8 @@ import com.android.view.WindowManager;
 public class ActivityThread {
     private static String TAG = "ActivityThread. ";
     final H mH = new H();
-//    String className = "com.packages.launcher.Launcher";
-    static String className ;
-    static String defaultLauncher ="com.packages.launcher.Launcher";
+    private ApplicationStartInfo mStartInfo;
+    private LoadedApk mLoadedApk;
     ActivityClientRecord r;
     static long startSeq = 0;
     private ContextImpl mSystemContext;
@@ -24,19 +24,22 @@ public class ActivityThread {
 
     public static void main(String[] argv) {
 
-        if( argv.length ==0 ){
-            className = defaultLauncher;
-        }else{
-            for (int i=0; i < argv.length; ++i) {
-                Log.d(TAG, i + " "+argv[i]);
-            }
-            className = argv[0];
-        }
-        Log.d(TAG, "className "+className);
+        ApplicationStartInfo info = ApplicationStartInfo.fromArgs(argv);
+        Log.d(TAG, "className " + info.activityName + " apk=" + info.apkPath);
         Looper.prepareMainLooper();
         ActivityThread thread = new ActivityThread();
-        thread.attach(false, startSeq);
-        Looper.loop();
+        thread.mStartInfo = info;
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        try {
+            thread.attach(false, startSeq);
+            Looper.loop();
+        } finally {
+            Thread.currentThread().setContextClassLoader(previous);
+            if (thread.mLoadedApk != null) {
+                try { thread.mLoadedApk.close(); }
+                catch (java.io.IOException e) { Log.w("Cannot close application APK: " + e); }
+            }
+        }
 
     }
     public static ActivityThread systemMain() {
@@ -81,8 +84,19 @@ public class ActivityThread {
 
     private void handleBindApplication() {
         Log.d(TAG, "handleBindApplication");
-//        此处简化了实际流程
+        bindApplication(mStartInfo);
         sendMessage(H.EXECUTE_TRANSACTION, null);
+    }
+
+    void bindApplication(ApplicationStartInfo info) {
+        if (mLoadedApk != null) throw new IllegalStateException("Application already bound");
+        mLoadedApk = new LoadedApk(info);
+        mStartInfo = info;
+        Thread.currentThread().setContextClassLoader(mLoadedApk.getClassLoader());
+    }
+
+    public ClassLoader getApplicationClassLoader() {
+        return mLoadedApk == null ? ActivityThread.class.getClassLoader() : mLoadedApk.getClassLoader();
     }
 
     public Activity handleLaunchActivity(ActivityClientRecord r) {
@@ -93,12 +107,7 @@ public class ActivityThread {
     private Activity performLaunchActivity(ActivityClientRecord r, Intent customIntent) {
         Log.d(TAG, "performLaunchActivity");
         ContextImpl appContext = createBaseContextForActivity(r);
-        Activity activity = null;
-        try {
-            activity = newActivity(r.className);
-        } catch (Exception e) {
-
-        }
+        Activity activity = newActivity(r.className);
         if (activity != null) {
             Window window = null;
             activity.attach(appContext, this, null,  window );
@@ -137,13 +146,13 @@ public class ActivityThread {
     public Activity newActivity(String className) {
         Log.d(TAG,"newActivity className " + className);
         try {
-            Class<?> clazz = Class.forName(className);
-            Activity activity = (Activity) clazz.newInstance();
-            return activity;
-        } catch (Exception e) {
-            e.printStackTrace();
+            if (mLoadedApk == null) throw new IllegalStateException("Application is not bound");
+            return getApplicationClassLoader().loadClass(className).asSubclass(Activity.class)
+                    .getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException | ClassCastException e) {
+            throw new IllegalStateException("Cannot instantiate Activity " + className
+                    + " from " + mLoadedApk.getApkFile(), e);
         }
-        return null;
     }
 
     class H extends Handler {
@@ -156,7 +165,8 @@ public class ActivityThread {
                     handleBindApplication();
                     break;
                 case EXECUTE_TRANSACTION:
-                    r = new ActivityClientRecord(className);
+                    r = new ActivityClientRecord(mStartInfo.activityName);
+                    r.packageInfo = mStartInfo.packageName;
                     r.activity =handleLaunchActivity(r);
                     handleResumeActivity(r,"RESUME_ACTIVITY");
                     break;

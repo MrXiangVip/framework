@@ -9,15 +9,17 @@ public final class ParsedPackage implements ParsingPackage {
     private final long versionCode;
     private final String versionName;
     private final File codePath;
+    private final File baseApkPath;
     private final boolean coreApp;
     private final List<ActivityInfo> activities;
 
     ParsedPackage(String packageName, long versionCode, String versionName, File codePath,
-                  boolean coreApp, List<ActivityInfo> activities) {
+                  File baseApkPath, boolean coreApp, List<ActivityInfo> activities) {
         this.packageName = packageName;
         this.versionCode = versionCode;
         this.versionName = versionName;
         this.codePath = codePath;
+        this.baseApkPath = baseApkPath;
         this.coreApp = coreApp;
         this.activities = Collections.unmodifiableList(new ArrayList<>(activities));
     }
@@ -25,6 +27,8 @@ public final class ParsedPackage implements ParsingPackage {
     public long getVersionCode() { return versionCode; }
     public String getVersionName() { return versionName; }
     public File getCodePath() { return codePath; }
+    /** Actual APK file, or null for a legacy source-only manifest. */
+    public File getBaseApkPath() { return baseApkPath; }
     public boolean isCoreApp() { return coreApp; }
     public List<ActivityInfo> getActivities() { return activities; }
 

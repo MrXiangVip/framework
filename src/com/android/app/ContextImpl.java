@@ -10,6 +10,11 @@ public class ContextImpl extends Context {
     private ClassLoader mClassLoader;
 
     @Override
+    public ClassLoader getClassLoader() {
+        return mClassLoader == null ? ContextImpl.class.getClassLoader() : mClassLoader;
+    }
+
+    @Override
     public Resources getResources() {
         return mResources;
     }
@@ -44,7 +49,7 @@ public class ContextImpl extends Context {
                                              Configuration overrideConfiguration) {
 
         ContextImpl context = new ContextImpl(null, mainThread, packageInfo, null,
-                activityInfo, activityToken, null, 0, null, null);
+                activityInfo, activityToken, null, 0, mainThread.getApplicationClassLoader(), null);
         return  context;
     }
 

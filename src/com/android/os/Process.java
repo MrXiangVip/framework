@@ -26,9 +26,9 @@ public class Process {
     public static final ZygoteProcess zygoteProcess =
             new ZygoteProcess(ZYGOTE_SOCKET, SECONDARY_ZYGOTE_SOCKET);
 
-    public static final ProcessStartResult start(final String processClass) {
-        Log.d(TAG,"ProcessStartResult start "+processClass);
+    public static final ProcessStartResult start(final ApplicationStartInfo info) {
+        Log.d(TAG,"ProcessStartResult start " + info.activityName + " apk=" + info.apkPath);
 
-        return zygoteProcess.start( processClass );
+        return zygoteProcess.start(info);
     }
 }

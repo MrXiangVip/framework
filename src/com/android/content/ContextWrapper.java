@@ -9,6 +9,9 @@ public class ContextWrapper extends Context {
         mBase = base;
     }
 
+    @Override
+    public ClassLoader getClassLoader() { return mBase.getClassLoader(); }
+
     public Resources getResources() {
         return mBase.getResources();
     }

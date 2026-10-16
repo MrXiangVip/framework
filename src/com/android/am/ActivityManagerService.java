@@ -4,6 +4,7 @@ import com.android.util.Log;
 import com.android.pm.PackageManagerService;
 import com.android.pm.ParsedPackage;
 import com.android.os.Process;
+import com.android.os.ApplicationStartInfo;
 import com.android.os.Process.*;
 import com.android.wm.ActivityTaskManagerService;
 
@@ -55,9 +56,22 @@ public class ActivityManagerService {
         return true;
     }
 
+    public ApplicationStartInfo getApplicationStartInfo(String activityName) {
+        if (mPackageManagerService == null) {
+            throw new IllegalStateException("PackageManagerService must be initialized before AMS");
+        }
+        ParsedPackage pkg = mPackageManagerService.getPackageForActivity(activityName);
+        if (pkg == null) throw new IllegalArgumentException("No installed enabled Activity: " + activityName);
+        if (pkg.getBaseApkPath() == null) {
+            throw new IllegalStateException("Activity has no packaged APK: " + activityName);
+        }
+        return new ApplicationStartInfo(pkg.getPackageName(), activityName,
+                pkg.getBaseApkPath().getAbsolutePath());
+    }
+
     private ProcessStartResult startProcess(String callingPackageClass ){
         Log.d("ActivityManagerService startProcess "+callingPackageClass);
-        return Process.start(callingPackageClass);
+        return Process.start(getApplicationStartInfo(callingPackageClass));
     }
 
 }

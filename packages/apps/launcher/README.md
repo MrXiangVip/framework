@@ -21,5 +21,7 @@ Only application classes, the text manifest and `res/` enter the archive.
 
 This is a JAR/ZIP package for the desktop JVM, not an installable Android APK.
 It contains Java bytecode rather than DEX, and has no Android resource table or
-Android APK signature. Runtime use requires adding it to the JVM classpath and
-configuring PMS to scan its output directory. The scripts only build the package.
+Android APK signature. PMS scans the output directory and passes the APK path
+through AMS/Zygote to ActivityThread, which loads application classes separately.
+Run src/build.sh on Linux to build and start the framework. The standalone
+application build scripts only build the package.

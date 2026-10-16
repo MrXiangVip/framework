@@ -4,6 +4,8 @@ import com.android.res.Resources;
 
 public abstract class Context {
 
+    public ClassLoader getClassLoader() { return Context.class.getClassLoader(); }
+
     public abstract Resources getResources();
 
     public abstract Intent registerReceiver( BroadcastReceiver receiver,

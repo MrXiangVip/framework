@@ -23,7 +23,7 @@ public class ParsingPackageUtils {
                 File manifest = new File(codePath, "AndroidManifest.xml");
                 if (manifest.isFile()) {
                     try (InputStream input = new FileInputStream(manifest)) {
-                        return parseManifest(input, codePath);
+                        return parseManifest(input, codePath, null);
                     }
                 }
                 File[] apks = codePath.listFiles(f -> f.isFile()
@@ -48,11 +48,11 @@ public class ParsingPackageUtils {
             ZipEntry entry = zip.getEntry("AndroidManifest.xml");
             if (entry == null) throw new IOException("Missing AndroidManifest.xml");
             try (InputStream input = zip.getInputStream(entry)) {
-                return parseManifest(input, codePath);
+                return parseManifest(input, codePath, apk.getCanonicalFile());
             }
         }
     }
-    private ParsedPackage parseManifest(InputStream input, File codePath) throws Exception {
+    private ParsedPackage parseManifest(InputStream input, File codePath, File baseApkPath) throws Exception {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         byte[] buffer = new byte[4096];
         int count;
@@ -115,7 +115,7 @@ public class ParsingPackageUtils {
             activities.add(new ParsedPackage.ActivityInfo(activityName, enabled, exported, filters));
         }
         return new ParsedPackage(name, versionCode, attr(manifest, "versionName"), codePath,
-                core, activities);
+                baseApkPath, core, activities);
     }
     private static String attr(Element element, String name) {
         return element.getAttributeNS(ANDROID, name);

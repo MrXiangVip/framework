@@ -160,6 +160,20 @@ public class PackageManagerService implements PackageSender {
         Log.w(TAG, "Skipping " + file + ": " + message);
     }
 
+    /** Find the installed package declaring an enabled Activity, without guessing its package name. */
+    public ParsedPackage getPackageForActivity(String activityName) {
+        synchronized (mLock) {
+            for (PackageSetting setting : mPackages.values()) {
+                for (ParsedPackage.ActivityInfo activity : setting.pkg.getActivities()) {
+                    if (activity.isEnabled() && activity.getName().equals(activityName)) {
+                        return setting.pkg;
+                    }
+                }
+            }
+            return null;
+        }
+    }
+
     public ParsedPackage getPackageInfo(String packageName) {
         synchronized (mLock) {
             PackageSetting setting = mPackages.get(packageName);

@@ -5,12 +5,11 @@ JNIEnv* create_vm(JavaVM **jvm)
     printf("%s\n",__func__);
     JNIEnv* env = NULL;
     JavaVMInitArgs args;
-    JavaVMOption options;
     args.version = JNI_VERSION_1_8;
-    args.nOptions = 1;
-    char class_path[] = "-Djava.class.path=.:../libs/xmlpull-1.1.3.1.jar:../libs/kxml2-2.3.0.jar:../out/system/app/launcher/launcher.apk";
-    options.optionString = class_path;
-    args.options = &options;
+    // Bootstrap JVM options come from JAVA_TOOL_OPTIONS in build.sh.
+    // Application APKs are loaded by ActivityThread after fork.
+    args.nOptions = 0;
+    args.options = NULL;
     args.ignoreUnrecognized = 0;
     int rv;
     rv = JNI_CreateJavaVM(jvm,(void**)&env, &args);
