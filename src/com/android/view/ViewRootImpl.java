@@ -1,152 +1,75 @@
 package com.android.view;
 
-import  com.android.view.View.MeasureSpec;
 import com.android.content.Context;
 import com.android.graphics.Canvas;
-import com.android.graphics.Rect;
-import com.android.util.Log;
+import com.android.wm.XWindow;
+import java.awt.image.BufferedImage;
+import java.util.Objects;
 
-public class ViewRootImpl implements ViewParent {
-
-    private String TAG = "ViewRootImpl.";
-    View mView;
-    final Choreographer mChoreographer;
-    final Rect mWinFrame; // frame given by window manager.
-    int mWidth;
-    int mHeight;
-    Rect mDirty;
-
+/** Coordinates a View tree, software frames and an X11 surface on the UI thread. */
+public class ViewRootImpl implements ViewParent, AutoCloseable {
+    private View mView;
+    private final Choreographer mChoreographer;
+    private XWindow mWindow;
+    private int mWidth = 600, mHeight = 800;
+    private boolean mTraversalScheduled, mClosed;
     public final WindowManager.LayoutParams mWindowAttributes = new WindowManager.LayoutParams();
 
-    public ViewRootImpl(Context context, int display) {
-        this(context, display,
-                false /* useSfChoreographer */);
-    }
-
-    public ViewRootImpl(Context context, int display,
-                        boolean useSfChoreographer) {
+    public ViewRootImpl(Context context, int display) { this(context, display, false); }
+    public ViewRootImpl(Context context, int display, boolean useSfChoreographer) {
         mChoreographer = Choreographer.getInstance();
-        mWinFrame = new Rect();
-
     }
-
-    public void setView(View view, WindowManager.LayoutParams attrs, View panelParentView,
-                        int userId) {
-        Log.d(TAG, "setView");
-        if (mView == null) {
-            mView = view;
-            requestLayout();
+    public void setView(View view, WindowManager.LayoutParams attrs, View panelParentView, int userId) {
+        if (mView != null) throw new IllegalStateException("ViewRoot already attached");
+        Objects.requireNonNull(view, "view");
+        if (view.mParent != null) throw new IllegalStateException("View already attached");
+        mView = view;
+        mView.mParent = this;
+        if (attrs != null) {
+            mWindowAttributes.width = attrs.width;
+            mWindowAttributes.height = attrs.height;
+            if (attrs.width > 0) mWidth = attrs.width;
+            if (attrs.height > 0) mHeight = attrs.height;
         }
+        requestLayout();
     }
-
-    public void requestLayout() {
-        Log.d(TAG, "requestLayout");
-        scheduleTraversals();
-    }
-
+    @Override public void requestLayout() { scheduleTraversals(); }
+    @Override public void invalidate() { scheduleTraversals(); }
     void scheduleTraversals() {
-        Log.d(TAG, "scheduleTraversals");
-        mChoreographer.postCallback(
-                Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable, null);
+        if (mClosed || mTraversalScheduled) return;
+        mTraversalScheduled = true;
+        mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSAL, () -> {
+            mTraversalScheduled = false;
+            if (!mClosed) performTraversals();
+        }, null);
     }
-
-    final TraversalRunnable mTraversalRunnable = new TraversalRunnable();
-
-    final class TraversalRunnable implements Runnable {
-        @Override
-        public void run() {
-            doTraversal();
-        }
-    }
-
-    void doTraversal() {
-        Log.d(TAG, "doTraversal");
-        performTraversals();
-
-    }
-
     private void performTraversals() {
-        Log.d(TAG, "performTraversals");
-        WindowManager.LayoutParams lp = mWindowAttributes;
-
-        int desiredWindowWidth;
-        int desiredWindowHeight;
-
-        desiredWindowWidth = 1200;
-        desiredWindowHeight = 800;
-
-        int childWidthMeasureSpec = getRootMeasureSpec(mWidth, lp.width);
-        int childHeightMeasureSpec = getRootMeasureSpec(mHeight, lp.height);
-        performMeasure(childWidthMeasureSpec, childHeightMeasureSpec);
-        performLayout(lp, desiredWindowWidth, desiredWindowHeight);
-        performDraw();
-
-    }
-
-    private static int getRootMeasureSpec(int windowSize, int rootDimension) {
-        int measureSpec;
-        switch (rootDimension) {
-            //匹配父容器时，测量模式为MeasureSpec.EXACTLY，测量大小直接为屏幕的大小，也就是充满真个屏幕
-            case ViewGroup.LayoutParams.MATCH_PARENT:
-                // Window can't resize. Force root view to be windowSize.
-                measureSpec = MeasureSpec.makeMeasureSpec(windowSize, MeasureSpec.EXACTLY);
-                break;
-            //包裹内容时，测量模式为MeasureSpec.AT_MOST，测量大小直接为屏幕大小，也就是充满真个屏幕
-            case ViewGroup.LayoutParams.WRAP_CONTENT:
-                // Window can resize. Set max size for root view.
-                measureSpec = MeasureSpec.makeMeasureSpec(windowSize, MeasureSpec.AT_MOST);
-                break;
-            //其他情况时，测量模式为MeasureSpec.EXACTLY，测量大小为DecorView顶层视图布局设置的大小。
-            default:
-                // Window wants to be an exact size. Force root view to be that size.
-                measureSpec = MeasureSpec.makeMeasureSpec(rootDimension, MeasureSpec.EXACTLY);
-                break;
+        if (mWindow == null) {
+            mWindow = new XWindow(mWidth, mHeight, (width, height, closed) -> {
+                if (closed) { close(); return; }
+                mWidth = Math.max(1, width); mHeight = Math.max(1, height);
+                scheduleTraversals();
+            });
         }
-        return measureSpec;
+        mWindow.present(renderToImage(mView, mWidth, mHeight));
     }
-
-    private void performMeasure(int childWidthMeasureSpec, int childHeightMeasureSpec) {
-        Log.d(TAG, "performMeasure");
-        try {
-            mView.measure(childWidthMeasureSpec, childHeightMeasureSpec);
-        } finally {
-
+    /** Also used by headless regression tests; no X11 or native library required. */
+    public static BufferedImage renderToImage(View view, int width, int height) {
+        if (width <= 0 || height <= 0) throw new IllegalArgumentException("Frame size must be positive");
+        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
+        view.layout(0, 0, width, height);
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        try (Canvas canvas = new Canvas(image)) {
+            canvas.drawColor(0xffffffff);
+            view.draw(canvas);
         }
+        return image;
     }
-
-    private void performLayout(WindowManager.LayoutParams lp, int desiredWindowWidth,
-                               int desiredWindowHeight) {
-        Log.d(TAG, "performLayout");
-        final View host = mView;
-        try {
-            host.layout(0, 0, host.getMeasuredWidth(), host.getMeasuredHeight());
-        }finally {
-        }
-
-    }
-    private void performDraw() {
-        Log.d(TAG, "performDraw");
-        final boolean fullRedrawNeeded = true;
-        try{
-            boolean canUseAsync = draw(fullRedrawNeeded);
-
-        }finally {
-
-        }
-    }
-    private boolean draw(boolean fullRedrawNeeded) {
-        Log.d(TAG, "draw ");
-        final Rect dirty = mDirty;
-
-        drawSoftware( dirty );
-        return  false;
-    }
-
-    private boolean drawSoftware(Rect dirty){
-        Log.d(TAG, "drawSoftware");
-        Canvas canvas= new Canvas();
-
-        mView.draw(canvas);
-        return  true;
+    @Override public void close() {
+        if (mClosed) return;
+        mClosed = true;
+        if (mWindow != null) mWindow.close();
+        if (mView != null) mView.mParent = null;
     }
 }

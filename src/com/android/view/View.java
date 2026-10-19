@@ -1,160 +1,93 @@
 package com.android.view;
 
-import com.android.view.ViewGroup;
 import com.android.content.Context;
 import com.android.graphics.Canvas;
 import com.android.util.AttributeSet;
 
 public class View {
-
     protected Context mContext;
     protected ViewGroup.LayoutParams mLayoutParams;
-    int mMeasuredWidth;
-    int mMeasuredHeight;
-    protected int mLeft;
-    protected int mRight;
-    protected int mTop;
-    protected int mBottom;
+    protected int mMeasuredWidth, mMeasuredHeight;
+    protected int mLeft, mTop, mRight, mBottom;
     protected ViewParent mParent;
-	
-    private int mMinWidth;
-    private int mMinHeight;
-
+    protected int mPadding;
+    protected Integer mBackground;
     public static final int MEASURED_SIZE_MASK = 0x00ffffff;
 
-    public View(Context context) {
-        mContext = context;
-
-    }
-
-    public View(Context context, AttributeSet attrs) {
-        this(context, attrs, 0);
-    }
-
-    public View(Context context, AttributeSet attrs, int defStyleAttr) {
-        this(context, attrs, defStyleAttr, 0);
-    }
-
+    public View(Context context) { this(context, null); }
+    public View(Context context, AttributeSet attrs) { this(context, attrs, 0); }
+    public View(Context context, AttributeSet attrs, int defStyleAttr) { this(context, attrs, defStyleAttr, 0); }
     public View(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        this(context);
-
-    }
-
-    public ViewGroup.LayoutParams getLayoutParams() {
-        return mLayoutParams;
-    }
-
-    public void setLayoutParams(ViewGroup.LayoutParams params) {
-        mLayoutParams = params;
-
-    }
-
-    public final Context getContext() {
-        return mContext;
-    }
-    public final void measure(int widthMeasureSpec, int heightMeasureSpec) {
-        onMeasure(widthMeasureSpec, heightMeasureSpec);
-
-    }
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        setMeasuredDimension(getDefaultSize(getSuggestedMinimumWidth(), widthMeasureSpec),
-                getDefaultSize(getSuggestedMinimumHeight(), heightMeasureSpec));
-    }
-    protected final void setMeasuredDimension(int measuredWidth, int measuredHeight) {
-        setMeasuredDimensionRaw(measuredWidth, measuredHeight);
-
-    }
-    public static int getDefaultSize(int size, int measureSpec) {
-        int result = size;
-        int specMode = MeasureSpec.getMode(measureSpec);
-        int specSize = MeasureSpec.getSize(measureSpec);
-
-        switch (specMode) {
-            case MeasureSpec.UNSPECIFIED:
-                result = size;
-                break;
-            case MeasureSpec.AT_MOST:
-            case MeasureSpec.EXACTLY:
-                result = specSize;
-                break;
+        mContext = context;
+        if (attrs != null) {
+            mPadding = attrs.dimension("padding", 0);
+            if (attrs.get("background") != null) mBackground = attrs.color("background", 0);
         }
-        return result;
     }
+    public final Context getContext() { return mContext; }
+    public ViewGroup.LayoutParams getLayoutParams() { return mLayoutParams; }
+    public void setLayoutParams(ViewGroup.LayoutParams params) { mLayoutParams = params; requestLayout(); }
+    public ViewParent getParent() { return mParent; }
+    public int getLeft() { return mLeft; }
+    public int getTop() { return mTop; }
+    public int getRight() { return mRight; }
+    public int getBottom() { return mBottom; }
+    public int getWidth() { return mRight - mLeft; }
+    public int getHeight() { return mBottom - mTop; }
+    public int getPadding() { return mPadding; }
+    public void requestLayout() { if (mParent != null) mParent.requestLayout(); }
+    public void invalidate() { if (mParent != null) mParent.invalidate(); }
 
-    private void setMeasuredDimensionRaw(int measuredWidth, int measuredHeight) {
-        mMeasuredWidth = measuredWidth;
-        mMeasuredHeight = measuredHeight;
+    public final void measure(int widthSpec, int heightSpec) { onMeasure(widthSpec, heightSpec); }
+    protected void onMeasure(int widthSpec, int heightSpec) {
+        setMeasuredDimension(resolveSize(2 * mPadding, widthSpec), resolveSize(2 * mPadding, heightSpec));
     }
-    protected int getSuggestedMinimumWidth() {
-        return  mMinWidth ;
+    protected final void setMeasuredDimension(int width, int height) {
+        mMeasuredWidth = Math.max(0, width); mMeasuredHeight = Math.max(0, height);
     }
-    protected int getSuggestedMinimumHeight() {
-        return  mMinHeight ;
-
+    public static int resolveSize(int desired, int spec) {
+        int mode = MeasureSpec.getMode(spec), size = MeasureSpec.getSize(spec);
+        return mode == MeasureSpec.EXACTLY ? size
+                : mode == MeasureSpec.AT_MOST ? Math.min(desired, size) : desired;
     }
-
+    public static int getDefaultSize(int desired, int spec) {
+        return MeasureSpec.getMode(spec) == MeasureSpec.UNSPECIFIED ? desired : MeasureSpec.getSize(spec);
+    }
+    protected int getSuggestedMinimumWidth() { return 0; }
+    protected int getSuggestedMinimumHeight() { return 0; }
+    public final int getMeasuredWidth() { return mMeasuredWidth; }
+    public final int getMeasuredHeight() { return mMeasuredHeight; }
     public void layout(int l, int t, int r, int b) {
-        boolean changed=true;
+        boolean changed = l != mLeft || t != mTop || r != mRight || b != mBottom;
+        mLeft = l; mTop = t; mRight = r; mBottom = b;
         onLayout(changed, l, t, r, b);
     }
-    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-
-    }
-    public final int getMeasuredWidth() {
-        return mMeasuredWidth & MEASURED_SIZE_MASK;
-    }
-    public final int getMeasuredHeight() {
-        return mMeasuredHeight & MEASURED_SIZE_MASK;
-    }
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {}
     public void draw(Canvas canvas) {
-        /*
-         * Draw traversal performs several drawing steps which must be executed
-         * in the appropriate order:
-         *
-         *      1. Draw the background
-         *      2. If necessary, save the canvas' layers to prepare for fading
-         *      3. Draw view's content
-         *      4. Draw children
-         *      5. If necessary, draw the fading edges and restore layers
-         *      6. Draw decorations (scrollbars for instance)
-         *      7. If necessary, draw the default focus highlight
-         */
+        if (mBackground != null) canvas.fillRect(0, 0, getWidth(), getHeight(), mBackground);
         onDraw(canvas);
-
         dispatchDraw(canvas);
-
     }
     boolean draw(Canvas canvas, ViewGroup parent, long drawingTime) {
-        boolean more = false;
-
-        return  more;
+        canvas.save();
+        try {
+            canvas.translate(mLeft, mTop);
+            canvas.clipRect(0, 0, getWidth(), getHeight());
+            draw(canvas);
+        } finally { canvas.restore(); }
+        return false;
     }
-    protected void onDraw(Canvas canvas) {
+    protected void onDraw(Canvas canvas) {}
+    protected void dispatchDraw(Canvas canvas) {}
 
-    }
-    protected void dispatchDraw(Canvas canvas) {
-
-    }
     public static class MeasureSpec {
-
         private static final int MODE_SHIFT = 30;
-        private static final int MODE_MASK  = 0x3 << MODE_SHIFT;
-        public static final int UNSPECIFIED = 0 << MODE_SHIFT;
-        public static final int EXACTLY     = 1 << MODE_SHIFT;
-        public static final int AT_MOST     = 2 << MODE_SHIFT;
-
-        public static int makeMeasureSpec( int size,
-                                           int mode) {
-
-                return (size & ~MODE_MASK) | (mode & MODE_MASK);
-        }
-
-        public static int getSize(int measureSpec) {
-            return (measureSpec & ~MODE_MASK);
-        }
-        public static int getMode(int measureSpec) {
-            //noinspection ResourceType
-            return (measureSpec & MODE_MASK);
-        }
+        private static final int MODE_MASK = 3 << MODE_SHIFT;
+        public static final int UNSPECIFIED = 0;
+        public static final int EXACTLY = 1 << MODE_SHIFT;
+        public static final int AT_MOST = 2 << MODE_SHIFT;
+        public static int makeMeasureSpec(int size, int mode) { return (size & ~MODE_MASK) | mode; }
+        public static int getSize(int spec) { return spec & ~MODE_MASK; }
+        public static int getMode(int spec) { return spec & MODE_MASK; }
     }
 }

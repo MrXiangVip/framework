@@ -46,7 +46,7 @@ public final class SystemServer {
             startOtherServices();
 
         } catch (Exception e) {
-
+            throw new IllegalStateException("SystemServer startup failed", e);
         }
         Looper.loop();
 

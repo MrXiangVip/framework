@@ -1,108 +1,45 @@
 package com.android.widget;
 
-import com.android.util.AttributeSet;
 import com.android.content.Context;
+import com.android.util.AttributeSet;
 import com.android.view.View;
 import com.android.view.ViewGroup;
 
+/** Basic linear layout; weight, margins and gravity are intentionally outside this demo. */
 public class LinearLayout extends ViewGroup {
+    public static final int HORIZONTAL = 0, VERTICAL = 1;
     private int mOrientation;
-
-    public static final int HORIZONTAL = 0;
-    public static final int VERTICAL = 1;
-
-    public LinearLayout(Context context) {
-        super(context);
+    public LinearLayout(Context context) { this(context, null); }
+    public LinearLayout(Context context, AttributeSet attrs) { this(context, attrs, 0); }
+    public LinearLayout(Context context, AttributeSet attrs, int style) { this(context, attrs, style, 0); }
+    public LinearLayout(Context context, AttributeSet attrs, int style, int res) {
+        super(context, attrs, style, res);
+        mOrientation = attrs != null && "vertical".equals(attrs.get("orientation")) ? VERTICAL : HORIZONTAL;
     }
-
-    public LinearLayout(Context context, AttributeSet attrs) {
-        super(context, attrs);
+    public void setOrientation(int orientation) {
+        if (orientation != VERTICAL && orientation != HORIZONTAL) throw new IllegalArgumentException("orientation");
+        mOrientation = orientation; requestLayout();
     }
-
-    public LinearLayout(Context context, AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
-    }
-
-    public LinearLayout(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        super(context, attrs, defStyleAttr, defStyleRes);
-    }
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        if (mOrientation == VERTICAL) {
-            measureVertical(widthMeasureSpec, heightMeasureSpec);
-        } else {
-            measureHorizontal(widthMeasureSpec, heightMeasureSpec);
+    @Override protected void onMeasure(int widthSpec, int heightSpec) {
+        int length = 0, cross = 0;
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            measureChildWithMargins(child, widthSpec, mOrientation == HORIZONTAL ? length : 0,
+                    heightSpec, mOrientation == VERTICAL ? length : 0);
+            length += mOrientation == VERTICAL ? child.getMeasuredHeight() : child.getMeasuredWidth();
+            cross = Math.max(cross, mOrientation == VERTICAL ? child.getMeasuredWidth() : child.getMeasuredHeight());
         }
+        setMeasuredDimension(resolveSize((mOrientation == VERTICAL ? cross : length) + 2 * mPadding, widthSpec),
+                resolveSize((mOrientation == VERTICAL ? length : cross) + 2 * mPadding, heightSpec));
     }
-    void measureVertical(int widthMeasureSpec, int heightMeasureSpec) {
-        final int count = getVirtualChildCount();
-        for (int i = 0; i < count; ++i) {
-            final View child = getVirtualChildAt(i);
-            final int usedHeight = 0;
-            measureChildBeforeLayout(child, i, widthMeasureSpec, 0,
-                    heightMeasureSpec, usedHeight);
+    @Override protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        int offset = mPadding;
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            int x = mOrientation == HORIZONTAL ? offset : mPadding;
+            int y = mOrientation == VERTICAL ? offset : mPadding;
+            child.layout(x, y, x + child.getMeasuredWidth(), y + child.getMeasuredHeight());
+            offset += mOrientation == VERTICAL ? child.getMeasuredHeight() : child.getMeasuredWidth();
         }
-    }
-    void measureChildBeforeLayout(View child, int childIndex,
-                                  int widthMeasureSpec, int totalWidth, int heightMeasureSpec,
-                                  int totalHeight) {
-        measureChildWithMargins(child, widthMeasureSpec, totalWidth,
-                heightMeasureSpec, totalHeight);
-    }
-
-    void measureHorizontal(int widthMeasureSpec, int heightMeasureSpec) {
-        final int count = getVirtualChildCount();
-        for (int i = 0; i < count; ++i) {
-            final View child = getVirtualChildAt(i);
-            final int usedHeight = 0;
-            measureChildBeforeLayout(child, i, widthMeasureSpec, 0,
-                    heightMeasureSpec, usedHeight);
-        }
-    }
-    protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        if (mOrientation == VERTICAL) {
-            layoutVertical(l, t, r, b);
-        } else {
-            layoutHorizontal(l, t, r, b);
-        }
-    }
-    void layoutVertical(int left, int top, int right, int bottom) {
-        int childTop=0;
-        int childLeft=0;
-        final int count = getVirtualChildCount();
-
-        for (int i = 0; i < count; i++) {
-            final View child = getVirtualChildAt(i);
-            final int childWidth = child.getMeasuredWidth();
-            final int childHeight = child.getMeasuredHeight();
-            setChildFrame(child, childLeft, childTop ,
-                    childWidth, childHeight);
-        }
-
-    }
-
-    private void setChildFrame(View child, int left, int top, int width, int height) {
-        child.layout(left, top, left + width, top + height);
-    }
-
-    void layoutHorizontal(int left, int top, int right, int bottom) {
-        int childTop=0;
-        int childLeft=0;
-        final int count = getVirtualChildCount();
-
-        for (int i = 0; i < count; i++) {
-            final View child = getVirtualChildAt(i);
-            final int childWidth = child.getMeasuredWidth();
-            final int childHeight = child.getMeasuredHeight();
-            setChildFrame(child, childLeft, childTop ,
-                    childWidth, childHeight);
-        }
-    }
-
-    int getVirtualChildCount() {
-        return getChildCount();
-    }
-
-    View getVirtualChildAt(int index) {
-        return getChildAt(index);
     }
 }

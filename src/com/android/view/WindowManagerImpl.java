@@ -31,6 +31,6 @@ public final  class WindowManagerImpl implements WindowManager {
 
     @Override
     public void removeView(View view) {
-
+        mGlobal.removeView(view);
     }
 }

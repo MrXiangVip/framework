@@ -46,9 +46,9 @@ public final class MessageQueue implements Queue {
         Log.d(TAG, "enqueueMessage ");
         msg.when = when;
 //        Message p = mMessages;
-        synchronized (this) {
-
+        synchronized (queue) {
             queue.add(msg);
+            queue.notifyAll();
         }
         return true;
     }

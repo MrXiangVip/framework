@@ -41,8 +41,10 @@ public abstract  class ViewGroup extends View implements ViewParent {
     }
 
     public void addView(View child, int index, LayoutParams params) {
-//        requestLayout();
+        if (child == null) throw new NullPointerException("child");
+        if (child.mParent != null) throw new IllegalStateException("View already has a parent");
         addViewInner(child, index, params, false);
+        requestLayout();
 
     }
 
@@ -96,6 +98,7 @@ public abstract  class ViewGroup extends View implements ViewParent {
             mChildren[i] = null;
         }
         mChildrenCount = 0;
+        requestLayout();
     }
 
     public int getChildCount() {
@@ -111,25 +114,19 @@ public abstract  class ViewGroup extends View implements ViewParent {
     protected void measureChildWithMargins(View child,
                                            int parentWidthMeasureSpec, int widthUsed,
                                            int parentHeightMeasureSpec, int heightUsed) {
-        final int childWidthMeasureSpec = getChildMeasureSpec(parentWidthMeasureSpec, 0, 0);
-        final int childHeightMeasureSpec = getChildMeasureSpec(parentHeightMeasureSpec, 0, 0);
-        child.measure(childWidthMeasureSpec, childHeightMeasureSpec);
+        LayoutParams params = child.getLayoutParams();
+        child.measure(getChildMeasureSpec(parentWidthMeasureSpec, 2 * mPadding + widthUsed, params.width),
+                getChildMeasureSpec(parentHeightMeasureSpec, 2 * mPadding + heightUsed, params.height));
 
     }
     public static int getChildMeasureSpec(int spec, int padding, int childDimension) {
-        int specMode = MeasureSpec.getMode(spec);
-        int specSize = MeasureSpec.getSize(spec);
-        int resultSize = 0;
-        int resultMode = 0;
-        switch (specMode) {
-            case MeasureSpec.EXACTLY:
-                break;
-            case MeasureSpec.AT_MOST:
-                break;
-            case MeasureSpec.UNSPECIFIED:
-                break;
-        }
-        return MeasureSpec.makeMeasureSpec(resultSize, resultMode);
+        int mode = MeasureSpec.getMode(spec);
+        int available = Math.max(0, MeasureSpec.getSize(spec) - padding);
+        if (childDimension >= 0) return MeasureSpec.makeMeasureSpec(childDimension, MeasureSpec.EXACTLY);
+        if (mode == MeasureSpec.UNSPECIFIED) return MeasureSpec.makeMeasureSpec(0, mode);
+        int childMode = childDimension == LayoutParams.MATCH_PARENT && mode == MeasureSpec.EXACTLY
+                ? MeasureSpec.EXACTLY : MeasureSpec.AT_MOST;
+        return MeasureSpec.makeMeasureSpec(available, childMode);
     }
 
     public final void layout(int l, int t, int r, int b) {
@@ -162,7 +159,8 @@ public abstract  class ViewGroup extends View implements ViewParent {
         public int width;
         public int height;
         public LayoutParams(Context c, AttributeSet attrs) {
-
+            width = attrs == null ? WRAP_CONTENT : attrs.dimension("layout_width", WRAP_CONTENT);
+            height = attrs == null ? WRAP_CONTENT : attrs.dimension("layout_height", WRAP_CONTENT);
         }
 
         public LayoutParams(int width, int height) {

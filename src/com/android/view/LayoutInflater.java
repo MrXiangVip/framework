@@ -1,225 +1,86 @@
 package com.android.view;
 
 import com.android.content.Context;
-import com.android.res.Resources;
 import com.android.util.AttributeSet;
-import com.android.util.Log;
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
+import com.android.util.XmlAttributes;
+import org.xmlpull.v1.*;
+import java.io.*;
 import java.util.Objects;
 
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
-import com.android.widget.*;
-import org.xmlpull.v1.XmlPullParserFactory;
-
+/** Inflates the plain XML resources packaged by this project's APK builder. */
 public abstract class LayoutInflater {
     protected final Context mContext;
-
-    static final Class<?>[] mConstructorSignature = new Class[] {
-            Context.class, AttributeSet.class};
-    final Object[] mConstructorArgs = new Object[2];
-
-    private String TAG="LayoutInflater.";
-    private static final String[] sClassPrefixList = {
-            "com.widget.",
-            "android.widget.",
-            "android.webkit.",
-            "android.app."
-    };
-	
-    protected LayoutInflater(Context context){
-        mContext = context;
+    protected LayoutInflater(Context context) { mContext = context; }
+    public Context getContext() { return mContext; }
+    public static LayoutInflater from(Context context) { return new PhoneLayoutInflater(context); }
+    public View inflate(String path, ViewGroup root) { return inflate(path, root, root != null); }
+    public View inflate(String path, ViewGroup root, boolean attach) {
+        Objects.requireNonNull(path, "layoutPath");
+        try (InputStream in = mContext.getClassLoader().getResourceAsStream(path)) {
+            if (in == null) throw new IllegalArgumentException("Missing layout: " + path);
+            return inflateInput(in, root, attach);
+        } catch (IOException e) { throw new IllegalArgumentException("Cannot read layout: " + path, e); }
     }
-    public Context getContext( ){
-        return mContext;
+    public View inflate(File file, ViewGroup root) { return inflate(file, root, root != null); }
+    public View inflate(File file, ViewGroup root, boolean attach) {
+        try (InputStream in = new FileInputStream(file)) { return inflateInput(in, root, attach); }
+        catch (IOException e) { throw new IllegalArgumentException("Cannot read layout: " + file, e); }
     }
-
-    public static LayoutInflater from(Context context) {
-        PhoneLayoutInflater phoneLayoutInflater = new PhoneLayoutInflater( context);
-        return  phoneLayoutInflater;
-    }
-
-    public View inflate(String layoutPath, ViewGroup root) {
-        return inflate(layoutPath, root, root != null);
-    }
-	
-    public View inflate(String layoutPath, ViewGroup root, boolean attachToRoot) {
-        Objects.requireNonNull(layoutPath, "layoutPath");
-        try (InputStream input = mContext.getClassLoader().getResourceAsStream(layoutPath)) {
-            if (input == null) throw new IllegalArgumentException("Layout resource not found: " + layoutPath);
-            return inflateInput(input, root, attachToRoot);
-        } catch (IOException | IllegalArgumentException e) {
-            throw new IllegalArgumentException("Cannot inflate APK layout " + layoutPath, e);
-        }
-    }
-
-    private View inflateInput(InputStream input, ViewGroup root, boolean attachToRoot) {
+    private View inflateInput(InputStream in, ViewGroup root, boolean attach) {
         try {
             XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
             factory.setNamespaceAware(true);
             XmlPullParser parser = factory.newPullParser();
-            parser.setInput(input, "UTF-8");
-            return inflate(parser, root, attachToRoot);
-        } catch (XmlPullParserException e) {
-            throw new IllegalArgumentException("Cannot create layout parser", e);
-        }
+            parser.setInput(in, "UTF-8");
+            return inflate(parser, root, attach);
+        } catch (XmlPullParserException e) { throw new IllegalArgumentException("Cannot parse layout", e); }
     }
-			
-    public View inflate(File file, ViewGroup root) {
-        return inflate(file, root, root != null);
-    }
-
-
-    public View inflate(File file, ViewGroup root, boolean attachToRoot) {
-
+    public View inflate(XmlPullParser parser, ViewGroup root, boolean attach) {
         try {
-            XmlPullParserFactory parserFactory = XmlPullParserFactory.newInstance();
-            XmlPullParser parser = parserFactory.newPullParser();
-            parser.setInput(new FileInputStream(file), "UTF-8");
-            return inflate(parser, root, attachToRoot);
-
-        } catch (Exception e) {
-
-        }
-        return null;
-    }
-
-
-    public View inflate(XmlPullParser parser,  ViewGroup root, boolean attachToRoot) {
-        Log.d(TAG, "inflate");
-        View result = root;
-        try{
-//            快速跳到根节点
-            advanceToRootNode(parser);
-            final String name = parser.getName();
-
-            final View temp = createViewFromTag(root, name, mContext, null);
-            rInflateChildren(parser, temp, null, true);
-            if( root == null ){
-                result = temp;
+            int type = parser.getEventType();
+            while (type != XmlPullParser.START_TAG && type != XmlPullParser.END_DOCUMENT) type = parser.next();
+            if (type != XmlPullParser.START_TAG) throw new IllegalArgumentException("Layout has no root");
+            AttributeSet attrs = new XmlAttributes(parser);
+            View view = inflateElement(parser);
+            if (root != null) view.setLayoutParams(root.generateLayoutParams(attrs));
+            while (parser.next() != XmlPullParser.END_DOCUMENT) {
+                if (parser.getEventType() == XmlPullParser.START_TAG) throw new IllegalArgumentException("Multiple layout roots");
             }
-
-        }catch (Exception e){
-            e.printStackTrace();
-        }finally {
-
-        }
-        return  result;
+            if (root != null && attach) { root.addView(view, view.getLayoutParams()); return root; }
+            return view;
+        } catch (IOException | XmlPullParserException e) { throw new IllegalArgumentException("Invalid layout", e); }
     }
-
-
-    private void advanceToRootNode(XmlPullParser parser) throws IOException, XmlPullParserException {
-        int type;
-        while ((type = parser.next()) != XmlPullParser.START_TAG &&
-                type != XmlPullParser.END_DOCUMENT) {
-            // Empty
+    private View inflateElement(XmlPullParser parser) throws IOException, XmlPullParserException {
+        String name = parser.getName();
+        AttributeSet attrs = new XmlAttributes(parser);
+        View view = name.indexOf('.') >= 0 ? createView(name, null, attrs) : onCreateView(name, attrs);
+        if (view == null) throw new IllegalArgumentException("Unknown View: " + name);
+        int depth = parser.getDepth();
+        for (;;) {
+            int type = parser.next();
+            if (type == XmlPullParser.END_DOCUMENT) throw new IllegalArgumentException("Unclosed View: " + name);
+            if (type == XmlPullParser.END_TAG && parser.getDepth() == depth) return view;
+            if (type == XmlPullParser.START_TAG) {
+                if (!(view instanceof ViewGroup)) throw new IllegalArgumentException(name + " cannot contain children");
+                ViewGroup parent = (ViewGroup) view;
+                AttributeSet childAttrs = new XmlAttributes(parser);
+                View child = inflateElement(parser);
+                parent.addView(child, parent.generateLayoutParams(childAttrs));
+            }
         }
-
     }
-
-    final void rInflateChildren(XmlPullParser parser, View parent, AttributeSet attrs,
-                                boolean finishInflate) throws XmlPullParserException, IOException {
+    protected abstract View onCreateView(String name, AttributeSet attrs);
+    public final View createView(String name, String prefix, AttributeSet attrs) {
+        return createView(mContext, name, prefix, attrs);
+    }
+    public final View createView(Context context, String name, String prefix, AttributeSet attrs) {
         try {
-            rInflate(parser, parent, parent.getContext(), attrs, finishInflate);
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
+            Class<? extends View> type = Class.forName(prefix == null ? name : prefix + name,
+                    true, context.getClassLoader()).asSubclass(View.class);
+            return type.getConstructor(Context.class, AttributeSet.class).newInstance(context, attrs);
+        } catch (ClassNotFoundException e) { return null; }
+        catch (ReflectiveOperationException | ClassCastException e) {
+            throw new IllegalArgumentException("Cannot create View: " + name, e);
         }
-    }
-
-    void rInflate(XmlPullParser parser, View parent, Context context,
-                  AttributeSet attrs, boolean finishInflate) throws IOException, XmlPullParserException, ClassNotFoundException {
-        final int depth = parser.getDepth();
-        int type;
-        while (((type = parser.next()) != XmlPullParser.END_TAG
-                || parser.getDepth() > depth)
-                && type != XmlPullParser.END_DOCUMENT) {
-            if (type != XmlPullParser.START_TAG) {
-                continue;
-            }
-            final String name = parser.getName();
-            Log.d(TAG, " rInflate  name "+name);
-            final View view = createViewFromTag(parent, name, context, attrs);
-            final ViewGroup viewGroup = (ViewGroup) parent;
-            final ViewGroup.LayoutParams params = viewGroup.generateLayoutParams(attrs);
-            rInflateChildren(parser, view, attrs, true);
-            viewGroup.addView(view, params);
-        }
-    }
-	
-    private View createViewFromTag(View parent, String name, Context context, AttributeSet attrs) throws ClassNotFoundException {
-        return createViewFromTag(parent, name, context, attrs, false);
-    }
-
-    View createViewFromTag(View parent, String name, Context context, AttributeSet attrs,
-                           boolean ignoreThemeAttr) throws ClassNotFoundException {
-        View view;
-        view = onCreateView(context, parent, name, attrs);
-
-        return  view;
-    }
-	
-    public View onCreateView( Context viewContext,  View parent,
-                              String name,  AttributeSet attrs)
-            throws ClassNotFoundException {
-        return onCreateView(parent, name, attrs);
-    }
-    protected View onCreateView(View parent, String name, AttributeSet attrs)
-            throws ClassNotFoundException {
-        return onCreateView(name, attrs);
-    }
-    protected View onCreateView(String name, AttributeSet attrs){
-        for (String prefix : sClassPrefixList) {
-            try {
-                View view = createView(name, prefix, attrs);
-                if (view != null) {
-                    return view;
-                }
-            } catch (Exception e) {
-                // In this case we want to let the base class take a crack
-                // at it.
-                return  null;
-            }
-        }
-        return  null;
-    }
-    public final View createView(String name,String prefix, AttributeSet attrs ){
-
-        return  createView( mContext, name, prefix, attrs);
-    }
-
-    public final View createView( Context viewContext,  String name,
-                                  String prefix,  AttributeSet attrs){
-        Class<? extends View> clazz = null;
-        Constructor<? extends View> constructor;
-        try{
-
-            clazz = Class.forName(prefix != null ? (prefix + name) : name).asSubclass(View.class);
-            constructor = clazz.getConstructor(mConstructorSignature);
-            mConstructorArgs[0] = viewContext;
-            Object[] args = mConstructorArgs;
-            args[1] = attrs;
-            View view = constructor.newInstance( args );
-            return  view;
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (InstantiationException e) {
-            e.printStackTrace();
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
-        } catch (InvocationTargetException e) {
-            e.printStackTrace();
-        }
-        return  null;
     }
 }

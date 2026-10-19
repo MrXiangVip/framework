@@ -9,11 +9,35 @@ extern "C" {
 #endif
 /*
  * Class:     com_android_wm_XWindow
- * Method:    nativeCreateAWindow
- * Signature: ()I
+ * Method:    nativeOpen
+ * Signature: (II)J
  */
-JNIEXPORT jint JNICALL Java_com_android_wm_XWindow_nativeCreateAWindow
-  (JNIEnv *, jclass);
+JNIEXPORT jlong JNICALL Java_com_android_wm_XWindow_nativeOpen
+  (JNIEnv *, jclass, jint, jint);
+
+/*
+ * Class:     com_android_wm_XWindow
+ * Method:    nativePoll
+ * Signature: (J)[I
+ */
+JNIEXPORT jintArray JNICALL Java_com_android_wm_XWindow_nativePoll
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     com_android_wm_XWindow
+ * Method:    nativePresent
+ * Signature: (J[III)V
+ */
+JNIEXPORT void JNICALL Java_com_android_wm_XWindow_nativePresent
+  (JNIEnv *, jclass, jlong, jintArray, jint, jint);
+
+/*
+ * Class:     com_android_wm_XWindow
+ * Method:    nativeClose
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_com_android_wm_XWindow_nativeClose
+  (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus
 }

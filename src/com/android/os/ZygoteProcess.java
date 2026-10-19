@@ -41,7 +41,7 @@ public class ZygoteProcess {
                 output.flush();
                 DataInputStream input = new DataInputStream(socket.getInputStream());
                 int pid = input.readInt();
-                if (pid <= 0) throw new IOException("Zygote fork failed: " + pid);
+                if (pid <= 0) throw new IOException("Zygote process start failed: " + pid);
                 ProcessStartResult result = new ProcessStartResult();
                 result.pid = pid;
                 return result;

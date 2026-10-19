@@ -6,6 +6,7 @@ package com.android;
 import com.android.os.RuntimeInit;
 import com.android.os.Zygote;
 import com.android.os.ZygoteServer;
+import com.android.os.DesktopProcess;
 import com.android.util.Log;
 
 import java.lang.Thread;
@@ -74,6 +75,25 @@ public class ZygoteInit{
         final Runnable caller;
 		ZygoteServer zygoteServer = new ZygoteServer();
 		zygoteServer.registerServerSocketFromEnv(socketName);
+        String processMode = System.getProperty("framework.process.mode", "spawn");
+        if (!"spawn".equals(processMode) && !"fork".equals(processMode)) {
+            throw new IllegalArgumentException("Unknown framework.process.mode: " + processMode);
+        }
+        if ("spawn".equals(processMode)) {
+            Log.d("Desktop process mode: fresh JVM (HotSpot); raw fork disabled");
+            try (DesktopProcess processes = new DesktopProcess()) {
+                try {
+                    processes.start("com.android.server.SystemServer");
+                    zygoteServer.runSelectLoop(abiList);
+                } catch (java.io.IOException e) {
+                    throw new IllegalStateException("Cannot start SystemServer", e);
+                } finally {
+                    zygoteServer.closeServerSocket();
+                }
+            }
+            return;
+        }
+        Log.w("Experimental raw fork mode: HotSpot children may hang before Java resumes");
         preload();
 // 		进程重命名为 zygote
 //        OS.Prctl("zygote");

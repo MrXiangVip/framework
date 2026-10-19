@@ -27,6 +27,37 @@ public class ZygoteServer {
     }
 
     public Runnable runSelectLoop(String abiList) {
+        if (!"fork".equals(System.getProperty("framework.process.mode", "spawn"))) {
+            return runSpawnLoop();
+        }
+        return runForkLoop();
+    }
+
+    private Runnable runSpawnLoop() {
+        try (DesktopProcess processes = new DesktopProcess()) {
+            while (true) {
+                try (Socket client = mServerSocket.accept()) {
+                    DataOutputStream output = new DataOutputStream(client.getOutputStream());
+                    try {
+                        ApplicationStartInfo info = ApplicationStartInfo.readFrom(
+                                new DataInputStream(client.getInputStream()));
+                        Log.d("Zygote spawn " + info.activityName + " apk=" + info.apkPath);
+                        int pid = processes.start("com.android.app.ActivityThread", info.toArgs());
+                        output.writeInt(pid);
+                    } catch (IOException | IllegalArgumentException e) {
+                        Log.w("Zygote spawn failed: " + e);
+                        output.writeInt(-1);
+                    }
+                    output.flush();
+                } catch (IOException e) {
+                    if (mServerSocket == null || mServerSocket.isClosed()) return null;
+                    Log.w("Zygote request failed: " + e);
+                }
+            }
+        }
+    }
+
+    private Runnable runForkLoop() {
         while (true) {
             try (Socket client = mServerSocket.accept()) {
                 ApplicationStartInfo info = ApplicationStartInfo.readFrom(
