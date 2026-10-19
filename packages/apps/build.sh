@@ -27,7 +27,7 @@ done
 
 if "$COMPILE_FRAMEWORK"; then
     mkdir -p "$FRAMEWORK_CLASSES"
-    mapfile -d '' -t sources < <(find "$REPO_ROOT/src/com/android" -name '*.java' -print0)
+    mapfile -d '' -t sources < <(find "$REPO_ROOT/base/com/android" -name '*.java' -print0)
     javac -encoding UTF-8 -source 8 -target 8 -cp "$REPO_ROOT/libs/*" -d "$FRAMEWORK_CLASSES" "${sources[@]}"
 fi
 [[ -f "$FRAMEWORK_CLASSES/com/android/app/Activity.class" ]] \

@@ -73,7 +73,7 @@ public class PackageManagerService implements PackageSender {
                     SCAN_AS_SYSTEM | SCAN_AS_PRIVILEGED, now, parser, executor);
             scanDirTracedLI(output.getAppFolder(), 0, SCAN_AS_SYSTEM, now, parser, executor);
             // Retain legacy source packages after installed APKs.
-            scanDirTracedLI(new File(mRoot, "src/com/packages"), 0, SCAN_AS_SYSTEM,
+            scanDirTracedLI(new File(mRoot, "base/com/packages"), 0, SCAN_AS_SYSTEM,
                     now, parser, executor);
             if (!mOnlyCore) {
                 scanDirTracedLI(new File(mRoot, "data/app"), 0, 0, now, parser, executor);

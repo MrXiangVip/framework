@@ -23,5 +23,5 @@ This is a JAR/ZIP package for the desktop JVM, not an installable Android APK.
 It contains Java bytecode rather than DEX, and has no Android resource table or
 Android APK signature. PMS scans the output directory and passes the APK path
 through AMS/Zygote to ActivityThread, which loads application classes separately.
-Run src/build.sh on Linux to build all packages/apps applications and start the framework. The standalone
+Run build.sh on Linux to build all packages/apps applications and start the framework. The standalone
 application build scripts only build the package.

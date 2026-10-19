@@ -1,6 +1,6 @@
 # Application builds
 
-`src/build.sh` automatically discovers and packages all direct subdirectories of
+`build.sh` automatically discovers and packages all direct subdirectories of
 `packages/apps` that contain `AndroidManifest.xml`. The already compiled framework
 is reused. Each application must provide `src/`; `res/` is included when present.
 
