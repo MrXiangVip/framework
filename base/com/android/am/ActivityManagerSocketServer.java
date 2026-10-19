@@ -27,9 +27,16 @@ public final class ActivityManagerSocketServer implements AutoCloseable {
                 DataOutputStream output = new DataOutputStream(client.getOutputStream());
                 try {
                     DataInputStream input = new DataInputStream(client.getInputStream());
-                    if (input.readInt() != 1) throw new IOException("Unsupported ActivityManager protocol");
-                    service.startActivity(input.readUTF());
-                    output.writeInt(0);
+                    int operation = input.readInt();
+                    if (operation == 1) {
+                        service.startActivity(input.readUTF());
+                        output.writeInt(0);
+                    } else if (operation == 2) {
+                        java.util.List<com.android.pm.LauncherActivityInfo> entries = service.getLauncherActivities();
+                        output.writeInt(0);
+                        output.writeInt(entries.size());
+                        for (com.android.pm.LauncherActivityInfo entry : entries) entry.writeTo(output);
+                    } else throw new IOException("Unsupported ActivityManager protocol");
                 } catch (IOException | RuntimeException e) {
                     output.writeInt(1);
                     String message = String.valueOf(e.getMessage());

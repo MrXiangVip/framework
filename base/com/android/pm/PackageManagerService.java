@@ -218,6 +218,27 @@ public class PackageManagerService implements PackageSender {
         }
     }
 
+    /** Desktop entries are declared components, never inferred from directory or class names. */
+    public List<LauncherActivityInfo> getLauncherActivities() {
+        synchronized (mLock) {
+            List<LauncherActivityInfo> result = new ArrayList<>();
+            for (PackageSetting setting : mPackages.values()) {
+                ParsedPackage pkg = setting.pkg;
+                if (pkg.getBaseApkPath() == null) continue;
+                for (ParsedPackage.ActivityInfo activity : pkg.getActivities()) {
+                    if (activity.matches(ACTION_MAIN, CATEGORY_LAUNCHER)
+                            && !activity.matches(ACTION_MAIN, CATEGORY_HOME)) {
+                        result.add(new LauncherActivityInfo(pkg.getPackageName(), activity.getName(),
+                                activity.getLabel(), activity.getIconPath(), pkg.getBaseApkPath().getAbsolutePath()));
+                    }
+                }
+            }
+            result.sort(Comparator.comparing((LauncherActivityInfo entry) -> entry.packageName)
+                    .thenComparing(entry -> entry.activityName));
+            return Collections.unmodifiableList(result);
+        }
+    }
+
     public ParsedPackage.ActivityInfo resolveHomeActivity() {
         List<ParsedPackage.ActivityInfo> homes = queryIntentActivities(ACTION_MAIN, CATEGORY_HOME);
         return homes.isEmpty() ? null : homes.get(0);

@@ -33,3 +33,10 @@ The existing launcher/build.sh and launcher/build.ps1 remain single-app entry
 points. Adding another app requires no build-script changes: create a directory
 with its manifest and Java sources, then run the normal build again. Removing an
 app directory does not uninstall an existing APK under out/system/app.
+
+Launcher automatically shows enabled, exported Activities declaring
+`android.intent.action.MAIN` + `android.intent.category.LAUNCHER`, after rebuilding
+and restarting the framework. Set a literal `android:label` and optional
+`android:icon="res/drawable/icon.png"` on `<application>` or `<activity>`.
+No Launcher changes are required. More than nine entries are paginated.
+See [desktop discovery](../../docs/launcher-grid.md) for a complete manifest example.

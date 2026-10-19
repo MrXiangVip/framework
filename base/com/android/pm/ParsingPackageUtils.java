@@ -112,7 +112,14 @@ public class ParsingPackageUtils {
             }
             boolean enabled = appEnabled && bool(attr(activity, "enabled"), true);
             boolean exported = bool(attr(activity, "exported"), !declaredFilters.isEmpty());
-            activities.add(new ParsedPackage.ActivityInfo(activityName, enabled, exported, filters));
+            String label = attr(activity, "label");
+            if (label.isEmpty()) label = attr(app, "label");
+            // This framework packages text XML and literal labels, without an Android resource table.
+            if (label.isEmpty() || label.startsWith("@")) label = name.substring(name.lastIndexOf('.') + 1);
+            String icon = attr(activity, "icon");
+            if (icon.isEmpty()) icon = attr(app, "icon");
+            if (label.length() > 512 || icon.length() > 1024) throw new IOException("Label or icon path too long");
+            activities.add(new ParsedPackage.ActivityInfo(activityName, enabled, exported, filters, label, icon));
         }
         return new ParsedPackage(name, versionCode, attr(manifest, "versionName"), codePath,
                 baseApkPath, core, activities);

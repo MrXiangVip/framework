@@ -56,6 +56,11 @@ public class ActivityManagerService {
         return true;
     }
 
+    public java.util.List<com.android.pm.LauncherActivityInfo> getLauncherActivities() {
+        if (mPackageManagerService == null) throw new IllegalStateException("PackageManagerService is not initialized");
+        return mPackageManagerService.getLauncherActivities();
+    }
+
     public ApplicationStartInfo getApplicationStartInfo(String activityName) {
         if (mPackageManagerService == null) {
             throw new IllegalStateException("PackageManagerService must be initialized before AMS");

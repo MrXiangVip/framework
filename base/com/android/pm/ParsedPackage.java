@@ -33,17 +33,21 @@ public final class ParsedPackage implements ParsingPackage {
     public List<ActivityInfo> getActivities() { return activities; }
 
     public static final class ActivityInfo {
-        private final String name;
+        private final String name, label, iconPath;
         private final boolean enabled;
         private final boolean exported;
         private final List<IntentInfo> filters;
-        ActivityInfo(String name, boolean enabled, boolean exported, List<IntentInfo> filters) {
+        ActivityInfo(String name, boolean enabled, boolean exported, List<IntentInfo> filters, String label, String iconPath) {
             this.name = name;
+            this.label = label;
+            this.iconPath = iconPath;
             this.enabled = enabled;
             this.exported = exported;
             this.filters = Collections.unmodifiableList(new ArrayList<>(filters));
         }
         public String getName() { return name; }
+        public String getLabel() { return label; }
+        public String getIconPath() { return iconPath; }
         public boolean isEnabled() { return enabled; }
         public boolean isExported() { return exported; }
         public List<IntentInfo> getIntentFilters() { return filters; }
