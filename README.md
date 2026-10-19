@@ -21,3 +21,18 @@ https://blog.csdn.net/blueheart05/article/details/135069627?spm=1001.2014.3001.5
 执行 build.sh 
 xshx@xshx:~/IdeaProjects/framework$ ./build.sh
 
+
+![launcher-preview.png](out/launcher-preview.png)
+
+点击日历
+
+![img.png](img.png)
+
+点击相机
+
+![camera-preview.png](out/camera-preview.png)
+
+点击时钟
+
+![img_1.png](img_1.png)
+都能分别进入应用
