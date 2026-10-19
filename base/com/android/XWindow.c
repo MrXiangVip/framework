@@ -106,6 +106,20 @@ JNIEXPORT jintArray JNICALL Java_com_android_wm_XWindow_nativePoll
             s->text_length = event.xkey.state & (ControlMask | Mod1Mask) ? 0 : length;
             if (symbol != NoSymbol) { kind = 8; x = (int)symbol; y = (int)event.xkey.state; }
         }
+        if (event.type == KeyRelease) {
+            /* Traditional X11 auto-repeat emits release/press pairs; the key remains held. */
+            int repeat = 0;
+            if (XPending(s->display)) {
+                XEvent next;
+                XPeekEvent(s->display, &next);
+                repeat = next.type == KeyPress && next.xkey.keycode == event.xkey.keycode
+                    && next.xkey.time == event.xkey.time;
+            }
+            if (!repeat) {
+                KeySym symbol = XLookupKeysym(&event.xkey, 0);
+                if (symbol != NoSymbol) { kind = 9; x = (int)symbol; y = (int)event.xkey.state; }
+            }
+        }
         if (event.type == Expose) { kind = 1; x = s->width; y = s->height; }
         if (event.type == ConfigureNotify) {
             s->width = event.xconfigure.width; s->height = event.xconfigure.height;

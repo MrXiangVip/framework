@@ -35,8 +35,8 @@ public final class XWindow implements AutoCloseable {
                     else if (kind == 2) {
                         close();
                         listener.onEvent(x, y, true);
-                    } else if (kind == 7 || kind == 8) {
-                        listener.onKeyInput(new KeyEvent(kind == 7 ? KeyEvent.TEXT : KeyEvent.DOWN, x, y));
+                    } else if (kind == 7 || kind == 8 || kind == 9) {
+                        listener.onKeyInput(new KeyEvent(kind == 7 ? KeyEvent.TEXT : kind == 8 ? KeyEvent.DOWN : KeyEvent.UP, x, y));
                     } else {
                         int action = kind == 3 ? MotionEvent.ACTION_DOWN : kind == 4 ? MotionEvent.ACTION_UP
                                 : kind == 5 ? MotionEvent.ACTION_MOVE : MotionEvent.ACTION_CANCEL;

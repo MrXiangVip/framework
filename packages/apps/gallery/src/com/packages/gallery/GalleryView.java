@@ -270,6 +270,7 @@ public class GalleryView extends ViewGroup {
                 if ((all ? 0 : text.length()) + inserted.length() > 4096) return true;
                 if (all) set(""); text = text.substring(0, cursor) + inserted + text.substring(cursor); cursor += inserted.length(); return true;
             }
+            if (event.getType() != KeyEvent.DOWN) return false;
             if ((event.getModifiers() & KeyEvent.CONTROL) != 0 && (key == 'a' || key == 'A')) { all = true; return true; }
             if (key == KeyEvent.HOME) cursor = 0;
             else if (key == KeyEvent.END) cursor = text.length();

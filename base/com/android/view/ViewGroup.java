@@ -106,6 +106,14 @@ public abstract  class ViewGroup extends View implements ViewParent {
         return super.dispatchKeyEvent(event);
     }
     @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        // Focus loss/closure also cancels keyboard-driven child state without an active pointer target.
+        if (event.getAction() == MotionEvent.ACTION_CANCEL && mTouchTarget == null) {
+            for (int i = 0; i < mChildrenCount; i++) {
+                View child = mChildren[i];
+                child.dispatchTouchEvent(event.offset(-child.getLeft(), -child.getTop()));
+            }
+            return super.dispatchTouchEvent(event);
+        }
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
             if (mTouchTarget != null) mTouchTarget.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
             mTouchTarget = null;
