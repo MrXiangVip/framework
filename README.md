@@ -26,7 +26,7 @@ xshx@xshx:~/IdeaProjects/framework$ ./build.sh
 
 点击日历
 
-![img.png](img.png)
+![calendar-preview.png](out/calendar-preview.png)
 
 点击相机
 
@@ -34,5 +34,6 @@ xshx@xshx:~/IdeaProjects/framework$ ./build.sh
 
 点击时钟
 
-![img_1.png](img_1.png)
+![clock-preview.png](out/clock-preview.png)
+
 都能分别进入应用
