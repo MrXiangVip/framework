@@ -10,6 +10,7 @@ import java.awt.font.FontRenderContext;
 public class TextView extends View {
     protected String mText = "";
     protected int mTextSize = 20, mTextColor = 0xff202124;
+    private boolean centerText;
     private static final FontRenderContext FONT_CONTEXT = new FontRenderContext(null, true, true);
     public TextView(Context context) { this(context, null); }
     public TextView(Context context, AttributeSet attrs) { this(context, attrs, 0); }
@@ -17,6 +18,7 @@ public class TextView extends View {
     public TextView(Context context, AttributeSet attrs, int style, int res) {
         super(context, attrs, style, res);
         if (attrs != null) {
+            centerText = "center".equals(attrs.get("gravity"));
             if (attrs.get("text") != null) mText = attrs.get("text");
             mTextSize = Math.max(1, attrs.dimension("textSize", mTextSize));
             mTextColor = attrs.color("textColor", mTextColor);
@@ -31,6 +33,13 @@ public class TextView extends View {
                 resolveSize(mTextSize + 8 + 2 * mPadding, heightSpec));
     }
     @Override protected void onDraw(Canvas canvas) {
-        canvas.drawText(mText, mPadding, mPadding + mTextSize, mTextSize, mTextColor);
+        int x = mPadding, baseline = mPadding + mTextSize;
+        if (centerText) {
+            Font font = new Font(Font.SANS_SERIF, Font.PLAIN, mTextSize);
+            java.awt.font.LineMetrics metrics = font.getLineMetrics(mText, FONT_CONTEXT);
+            x = (getWidth() - (int) Math.ceil(font.getStringBounds(mText, FONT_CONTEXT).getWidth())) / 2;
+            baseline = Math.round((getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
+        }
+        canvas.drawText(mText, x, baseline, mTextSize, mTextColor);
     }
 }

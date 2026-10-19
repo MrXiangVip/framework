@@ -8,6 +8,7 @@ import com.android.util.Log;
 public abstract  class ViewGroup extends View implements ViewParent {
 
     private View[] mChildren;
+    private View mTouchTarget;
 
     private int mChildrenCount;
     private static final int ARRAY_INITIAL_CAPACITY = 12;
@@ -92,7 +93,43 @@ public abstract  class ViewGroup extends View implements ViewParent {
         }
     }
 
+    @Override public View findViewById(String id) {
+        View found = super.findViewById(id);
+        for (int i = 0; found == null && i < mChildrenCount; i++) found = mChildren[i].findViewById(id);
+        return found;
+    }
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        for (int i = 0; i < mChildrenCount; i++) {
+            View child = mChildren[i];
+            if (child.getWidth() > 0 && child.getHeight() > 0 && child.dispatchKeyEvent(event)) return true;
+        }
+        return super.dispatchKeyEvent(event);
+    }
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            if (mTouchTarget != null) mTouchTarget.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
+            mTouchTarget = null;
+            for (int i = mChildrenCount - 1; i >= 0; i--) {
+                View child = mChildren[i];
+                int x = event.getX() - child.getLeft(), y = event.getY() - child.getTop();
+                if (x >= 0 && y >= 0 && x < child.getWidth() && y < child.getHeight()
+                        && child.dispatchTouchEvent(event.offset(-child.getLeft(), -child.getTop()))) {
+                    mTouchTarget = child;
+                    return true;
+                }
+            }
+        } else if (mTouchTarget != null) {
+            View target = mTouchTarget;
+            if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL)
+                mTouchTarget = null;
+            return target.dispatchTouchEvent(event.offset(-target.getLeft(), -target.getTop()));
+        }
+        return super.dispatchTouchEvent(event);
+    }
+
     public void removeAllViews() {
+        if (mTouchTarget != null) mTouchTarget.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
+        mTouchTarget = null;
         for (int i = 0; i < mChildrenCount; i++) {
             mChildren[i].mParent = null;
             mChildren[i] = null;

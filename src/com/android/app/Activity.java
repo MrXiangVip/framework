@@ -1,18 +1,16 @@
 package com.android.app;
 
-import com.android.am.ActivityManagerService;
 import com.android.content.Context;
 import com.android.policy.PhoneWindow;
 import com.android.res.Configuration;
 import com.android.view.*;
 import com.android.util.Log;
-
+import com.android.am.ActivityManagerClient;
 import java.io.File;
 
 public class Activity extends ContextThemeWrapper {
     private static Activity activity;
 
-    private ActivityManagerService  ams;
     private Window mWindow;
     private WindowManager mWindowManager;
     View mDecor = null;
@@ -33,6 +31,8 @@ public class Activity extends ContextThemeWrapper {
 
 
 
+    public View findViewById(String id) { return getWindow().getDecorView().findViewById(id); }
+
     public Window getWindow() {
         return mWindow;
     }
@@ -48,7 +48,6 @@ public class Activity extends ContextThemeWrapper {
         mWindow.setWindowManager( new WindowManagerImpl(context),  null, false);
         mWindowManager = mWindow.getWindowManager();
 
-        ams = ActivityManagerService.getInstance();
 
     }
 
@@ -66,7 +65,7 @@ public class Activity extends ContextThemeWrapper {
 
     public void startActivity(String className){
         System.out.println("startActivity "+className);
-        ams.startActivity( className );
+        ActivityManagerClient.startActivity(className);
     }
 	
     /** Resource path relative to the application APK, e.g. res/layout/activity_main.xml. */

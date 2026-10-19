@@ -17,8 +17,8 @@ echo "编译 java 部分及 JNI 头文件"
 mapfile -d '' -t FRAMEWORK_SOURCES < <(find com/android -name '*.java' -print0)
 javac -encoding UTF-8 -cp "$CP" -h . -d "$FRAMEWORK_CLASSES" "${FRAMEWORK_SOURCES[@]}"
 
-echo "单独编译打包 launcher.apk"
-bash "$VPATH/../packages/apps/launcher/build.sh"
+echo "Build all applications in packages/apps"
+bash "$VPATH/../packages/apps/build.sh" --framework-classes "$FRAMEWORK_CLASSES"
 
 echo "编译android动态库"
 gcc -fPIC "${JNI_INC[@]}" -shared -o com/android/libandroid.so com/android/Zygote.c

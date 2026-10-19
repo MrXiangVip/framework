@@ -15,6 +15,7 @@ public class Button extends TextView {
     }
     @Override protected void onDraw(Canvas canvas) {
         canvas.strokeRect(0, 0, getWidth(), getHeight(), 0xff8c99a8);
+        if (isPressed()) canvas.fillRect(1, 1, getWidth() - 2, getHeight() - 2, 0xffc9d8ec);
         super.onDraw(canvas);
     }
 }

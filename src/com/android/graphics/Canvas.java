@@ -41,6 +41,11 @@ public class Canvas implements AutoCloseable {
         graphics.setColor(new Color(color, true));
         graphics.drawRect(x, y, Math.max(0, width - 1), Math.max(0, height - 1));
     }
+    public void drawImage(BufferedImage bitmap, int x, int y, int width, int height) {
+        if (width <= 0 || height <= 0) return;
+        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        graphics.drawImage(bitmap, x, y, width, height, null);
+    }
     public void drawText(String text, int x, int baseline, int size, int color) {
         graphics.setColor(new Color(color, true));
         graphics.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, size));

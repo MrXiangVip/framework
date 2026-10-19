@@ -12,6 +12,10 @@ public class View {
     protected ViewParent mParent;
     protected int mPadding;
     protected Integer mBackground;
+    private String mId;
+    private OnClickListener mClickListener;
+    private boolean mPressed;
+    public interface OnClickListener { void onClick(View view); }
     public static final int MEASURED_SIZE_MASK = 0x00ffffff;
 
     public View(Context context) { this(context, null); }
@@ -20,11 +24,48 @@ public class View {
     public View(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         mContext = context;
         if (attrs != null) {
+            mId = normalizeId(attrs.get("id"));
             mPadding = attrs.dimension("padding", 0);
             if (attrs.get("background") != null) mBackground = attrs.color("background", 0);
         }
     }
     public final Context getContext() { return mContext; }
+    private static String normalizeId(String id) {
+        if (id == null) return null;
+        return id.startsWith("@+id/") ? id.substring(5) : id.startsWith("@id/") ? id.substring(4) : id;
+    }
+    public String getId() { return mId; }
+    public void setId(String id) { mId = normalizeId(id); }
+    public View findViewById(String id) {
+        return mId != null && mId.equals(normalizeId(id)) ? this : null;
+    }
+    public void setOnClickListener(OnClickListener listener) { mClickListener = listener; }
+    public boolean performClick() {
+        if (mClickListener == null) return false;
+        mClickListener.onClick(this);
+        return true;
+    }
+    public boolean isPressed() { return mPressed; }
+    public boolean dispatchKeyEvent(KeyEvent event) { return false; }
+    public boolean dispatchTouchEvent(MotionEvent event) { return onTouchEvent(event); }
+    protected boolean onTouchEvent(MotionEvent event) {
+        if (mClickListener == null) return false;
+        boolean inside = event.getX() >= 0 && event.getY() >= 0
+                && event.getX() < getWidth() && event.getY() < getHeight();
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN: mPressed = inside; invalidate(); return inside;
+            case MotionEvent.ACTION_MOVE:
+                if (!inside && mPressed) { mPressed = false; invalidate(); }
+                return true;
+            case MotionEvent.ACTION_UP:
+                boolean click = mPressed && inside;
+                mPressed = false; invalidate();
+                if (click) performClick();
+                return true;
+            case MotionEvent.ACTION_CANCEL: mPressed = false; invalidate(); return true;
+            default: return false;
+        }
+    }
     public ViewGroup.LayoutParams getLayoutParams() { return mLayoutParams; }
     public void setLayoutParams(ViewGroup.LayoutParams params) { mLayoutParams = params; requestLayout(); }
     public ViewParent getParent() { return mParent; }

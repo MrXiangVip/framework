@@ -35,7 +35,7 @@ public class ZygoteProcess {
 
     public final ProcessStartResult start(ApplicationStartInfo info) {
         synchronized (mLock) {
-            try (Socket socket = new Socket("localhost", 10000)) {
+            try (Socket socket = new Socket("localhost", Integer.getInteger("framework.zygote.port", 10000))) {
                 DataOutputStream output = new DataOutputStream(socket.getOutputStream());
                 info.writeTo(output);
                 output.flush();

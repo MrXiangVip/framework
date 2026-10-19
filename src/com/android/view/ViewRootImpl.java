@@ -45,10 +45,22 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     }
     private void performTraversals() {
         if (mWindow == null) {
-            mWindow = new XWindow(mWidth, mHeight, (width, height, closed) -> {
-                if (closed) { close(); return; }
-                mWidth = Math.max(1, width); mHeight = Math.max(1, height);
-                scheduleTraversals();
+            mWindow = new XWindow(mWidth, mHeight, new XWindow.Listener() {
+                @Override public void onEvent(int width, int height, boolean closed) {
+                    if (closed) { WindowManagerGlobal.getInstance().removeView(mView); close(); return; }
+                    mWidth = Math.max(1, width); mHeight = Math.max(1, height);
+                    scheduleTraversals();
+                }
+                @Override public void onKeyInput(KeyEvent event) { mView.dispatchKeyEvent(event); }
+                @Override public void onInput(MotionEvent event) {
+                    // A resize and press may arrive in the same native batch.
+                    if (mView.getWidth() != mWidth || mView.getHeight() != mHeight) {
+                        mView.measure(View.MeasureSpec.makeMeasureSpec(mWidth, View.MeasureSpec.EXACTLY),
+                                View.MeasureSpec.makeMeasureSpec(mHeight, View.MeasureSpec.EXACTLY));
+                        mView.layout(0, 0, mWidth, mHeight);
+                    }
+                    mView.dispatchTouchEvent(event);
+                }
             });
         }
         mWindow.present(renderToImage(mView, mWidth, mHeight));
@@ -70,6 +82,9 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
         if (mClosed) return;
         mClosed = true;
         if (mWindow != null) mWindow.close();
-        if (mView != null) mView.mParent = null;
+        if (mView != null) {
+            mView.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
+            mView.mParent = null;
+        }
     }
 }

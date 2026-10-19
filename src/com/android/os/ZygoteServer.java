@@ -19,7 +19,7 @@ public class ZygoteServer {
         Log.d("registerServerSocketFromEnv " + socketName);
         if (mServerSocket == null) {
             try {
-                mServerSocket = new ServerSocket(10000);
+                mServerSocket = new ServerSocket(Integer.getInteger("framework.zygote.port", 10000));
             } catch (IOException e) {
                 throw new IllegalStateException("Cannot open Zygote socket", e);
             }

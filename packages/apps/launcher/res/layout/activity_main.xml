@@ -1,31 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<GridLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:screenOrientation="portrait">
-
-    <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:screenOrientation="horizontal">
-        <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="horizontal!"/>
-        <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/app_name"
-        />
-    </LinearLayout>
-    <TextView
+    android:id="@+id/apps"
+    android:columnCount="3"
+    android:spacing="12dp"
+    android:padding="24dp"
+    android:background="#ffffff">
+    <ImageButton
+        android:id="@+id/calendar"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="portrait!"/>
-    <Button
-        android:id="@+id/portrait"
-        android:layout_width="match_parent"
+        android:src="res/drawable/calendar.png"/>
+    <ImageButton
+        android:id="@+id/camera"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/app_name"
-        />
-</LinearLayout>
+        android:src="res/drawable/camera.png"/>
+    <ImageButton
+        android:id="@+id/clock"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="res/drawable/clock.png"/>
+    <ImageButton
+        android:id="@+id/contact"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="res/drawable/contact.png"/>
+    <ImageButton
+        android:id="@+id/filebrowser"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="res/drawable/filebrowser.png"/>
+    <ImageButton
+        android:id="@+id/gallery"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="res/drawable/gallery.png"/>
+    <ImageButton
+        android:id="@+id/messager"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="res/drawable/messager.png"/>
+    <ImageButton
+        android:id="@+id/settings"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="res/drawable/settings.png"/>
+    <ImageButton
+        android:id="@+id/video"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="res/drawable/video.png"/>
+</GridLayout>

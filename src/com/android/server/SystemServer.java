@@ -19,6 +19,7 @@ public final class SystemServer {
     private static String TAG = "SystemServer.";
     private ActivityManagerService mActivityManagerService;
     private PackageManagerService mPackageManagerService;
+    private com.android.am.ActivityManagerSocketServer mActivityServer;
     private WindowManagerService wm = null;
 
     private Context mSystemContext;
@@ -67,6 +68,11 @@ public final class SystemServer {
     private void startOtherServices() {
         final Context context = mSystemContext;
 
+        try {
+            mActivityServer = new com.android.am.ActivityManagerSocketServer(mActivityManagerService);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Cannot publish ActivityManager service", e);
+        }
         mActivityManagerService.systemReady();
         WindowManagerService wm = null;
         wm = WindowManagerService.main(context, inputManager, !mFirstBoot, mOnlyCore,
