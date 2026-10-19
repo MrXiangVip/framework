@@ -9,10 +9,15 @@ import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Objects;
+
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 import com.android.widget.*;
 import org.xmlpull.v1.XmlPullParserFactory;
 
@@ -43,6 +48,32 @@ public abstract class LayoutInflater {
         return  phoneLayoutInflater;
     }
 
+    public View inflate(String layoutPath, ViewGroup root) {
+        return inflate(layoutPath, root, root != null);
+    }
+	
+    public View inflate(String layoutPath, ViewGroup root, boolean attachToRoot) {
+        Objects.requireNonNull(layoutPath, "layoutPath");
+        try (InputStream input = mContext.getClassLoader().getResourceAsStream(layoutPath)) {
+            if (input == null) throw new IllegalArgumentException("Layout resource not found: " + layoutPath);
+            return inflateInput(input, root, attachToRoot);
+        } catch (IOException | IllegalArgumentException e) {
+            throw new IllegalArgumentException("Cannot inflate APK layout " + layoutPath, e);
+        }
+    }
+
+    private View inflateInput(InputStream input, ViewGroup root, boolean attachToRoot) {
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            factory.setNamespaceAware(true);
+            XmlPullParser parser = factory.newPullParser();
+            parser.setInput(input, "UTF-8");
+            return inflate(parser, root, attachToRoot);
+        } catch (XmlPullParserException e) {
+            throw new IllegalArgumentException("Cannot create layout parser", e);
+        }
+    }
+			
     public View inflate(File file, ViewGroup root) {
         return inflate(file, root, root != null);
     }

@@ -4,11 +4,9 @@ package com.android.policy;
 import com.android.content.Context;
 import com.android.graphics.Canvas;
 import com.android.view.View;
-import com.android.view.LayoutInflater;
 import com.android.view.ViewGroup;
 import com.android.widget.FrameLayout;
 
-import java.io.File;
 
 import static com.android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
@@ -22,10 +20,12 @@ public class DecorView extends FrameLayout {
         setWindow(window);
 
     }
-    void onResourcesLoaded(LayoutInflater inflater, File file) {
-        final View root = inflater.inflate(file, null);
-        addView(root, 0, new ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT));
-        mContentRoot = (ViewGroup) root;
+    ViewGroup createContentRoot() {
+        if (mContentRoot == null) {
+            mContentRoot = new FrameLayout(getContext());
+            addView(mContentRoot, 0, new ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        }
+        return mContentRoot;
     }
 	
     void setWindow(PhoneWindow phoneWindow) {

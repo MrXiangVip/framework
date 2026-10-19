@@ -1,22 +1,17 @@
 package com.android.policy;
 
+import com.android.content.Context;
+import com.android.view.LayoutInflater;
 import com.android.view.View;
 import com.android.view.ViewGroup;
 import com.android.view.Window;
-import com.android.content.Context;
-import com.android.util.Log;
-import com.android.view.LayoutInflater;
-
 import java.io.File;
+import java.util.Objects;
 
 public class PhoneWindow extends Window {
-    private String TAG="PhoneWindow.";
     private DecorView mDecor;
-    private LayoutInflater mLayoutInflater;
-    ViewGroup mContentParent;
-
-    String DIR="/home/xshx/IdeaProjects/untitled/res/layout";
-    String FileName="activity_main.xml";
+    private final LayoutInflater mLayoutInflater;
+    private ViewGroup mContentParent;
 
     public PhoneWindow(Context context) {
         super(context);
@@ -27,41 +22,43 @@ public class PhoneWindow extends Window {
         this(context);
 
     }
-	
-    public void setContentView(File file) {
-        Log.d(TAG, "setContentView ");
-        if( mContentParent ==null ){
-            installDecor();
-        }
-        mLayoutInflater.inflate(file, mContentParent);
 
+    @Override public void setContentView(String layoutPath) {
+        installDecor();
+        // Inflate before replacing content: a bad layout must not erase the old View tree.
+        setContentView(mLayoutInflater.inflate(layoutPath, mContentParent, false));
     }
-    public final View getDecorView() {
-        if (mDecor == null ) {
-            installDecor();
+
+    @Override public void setContentView(File file) {
+        installDecor();
+        setContentView(mLayoutInflater.inflate(file, mContentParent, false));
+    }
+
+    @Override public void setContentView(View view) {
+        Objects.requireNonNull(view, "content view");
+        installDecor();
+        mContentParent.removeAllViews();
+        ViewGroup.LayoutParams params = view.getLayoutParams();
+        if (params == null) {
+            params = new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         }
+        mContentParent.addView(view, params);
+    }
+
+    @Override public final View getDecorView() {
+        installDecor();
         return mDecor;
     }
     private void installDecor() {
-        if (mDecor == null) {
-            mDecor = generateDecor(-1);
-
-        }
-        if( mContentParent == null ){
-            mContentParent = generateLayout(mDecor);
-        }
+        if (mDecor == null) mDecor = generateDecor(-1);
+        if (mContentParent == null) mContentParent = generateLayout(mDecor);
     }
+
     protected ViewGroup generateLayout(DecorView decor) {
-
-        File file = new File(DIR, FileName );
-        mDecor.onResourcesLoaded(mLayoutInflater, file);
-
-
-        return  decor;
+        return decor.createContentRoot();
     }
     protected DecorView generateDecor(int featureId) {
-        Context context;
-        context = getContext();
-        return new DecorView(context, featureId, this, null);
+        return new DecorView(getContext(), featureId, this, null);
     }
 }

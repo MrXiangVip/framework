@@ -90,6 +90,14 @@ public abstract  class ViewGroup extends View implements ViewParent {
         }
     }
 
+    public void removeAllViews() {
+        for (int i = 0; i < mChildrenCount; i++) {
+            mChildren[i].mParent = null;
+            mChildren[i] = null;
+        }
+        mChildrenCount = 0;
+    }
+
     public int getChildCount() {
         return mChildrenCount;
     }

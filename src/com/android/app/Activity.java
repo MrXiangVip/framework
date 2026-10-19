@@ -69,6 +69,15 @@ public class Activity extends ContextThemeWrapper {
         ams.startActivity( className );
     }
 	
+    /** Resource path relative to the application APK, e.g. res/layout/activity_main.xml. */
+    public void setContentView(String layoutPath) {
+        getWindow().setContentView(layoutPath);
+    }
+
+    public void setContentView(View view) {
+        getWindow().setContentView(view);
+    }
+
     public void setContentView( File filePath) {
         getWindow().setContentView(filePath);
     }

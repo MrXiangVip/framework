@@ -7,14 +7,12 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
 
 import com.android.app.Activity;
 import com.android.wm.XWindow;
 
 public class Launcher extends Activity {
-    String DIR="/home/xshx/IdeaProjects/untitled/res/layout";
-    String FileName="activity_main.xml";
+    String FileName="res/layout/activity_main.xml";
 
     private	String  apps[]={"设置","图库","日历",
             "时钟","文件","通话",
@@ -31,7 +29,7 @@ public class Launcher extends Activity {
     protected void onCreate() {
         super.onCreate();
         Log.d(TAG, "onCreate");
-//        setContentView( new File(DIR, FileName) );
+        setContentView(FileName);
         Log.d(TAG,"启动模拟器");
         XWindow.createAWindow();
 /*        JFrame frm = new JFrame("桌面");
@@ -52,7 +50,7 @@ public class Launcher extends Activity {
             frm.add(btn[i]);
         }
         frm.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frm.setVisible(true);
-        Log.d(TAG,"显示模拟器");*/
+        frm.setVisible(true);*/
+        Log.d(TAG,"显示模拟器");
     }
 }

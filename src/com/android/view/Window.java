@@ -16,6 +16,8 @@ public abstract  class Window {
     }
     public abstract View getDecorView();
 
+    public abstract void setContentView(String layoutPath);
+    public abstract void setContentView(View view);
     public abstract void setContentView( File file);
 
     public void setWindowManager(WindowManager wm,  String appName,
