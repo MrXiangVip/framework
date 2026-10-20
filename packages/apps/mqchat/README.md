@@ -1,120 +1,90 @@
-# MQChat
+# MQChat：基于 MQTT 的 UUID 私聊
 
-基于本仓库 Java / X11 框架的 MQTT 聊天应用，入口 `com.packages.mqchat.MainActivity`。
-无需账户、独立聊天后端或额外 JAR，使用 EMQX 免费公共服务器。
+本应用运行在此仓库的桌面 Java 框架中，支持 Windows / WSL；APK 是包含 Java 类、资源和原生 SQLite 库的应用包。
 
-## 开始聊天
+## 使用
 
-1. 重启框架，从桌面打开 **MQChat**。
-2. 填写昵称；将默认 Topic 改为你和对方约定的完整频道名，例如 `mqchat/room/your-room-2026`。
-3. 双方填写**完全相同、区分大小写**的 Topic，并点击“连接频道”。
-4. 状态变为在线后发送消息。支持同一频道内的多个客户端，昵称相同也能区分发送者。
+1. 启动 MQChat，点击右上角「连接」。默认使用 `broker.emqx.io:8883`，开启 TLS 与服务器证书校验。
+2. 底部点击「我的」查看圆形头像、昵称与 13 位展示码。点击「编辑资料」修改昵称、查看完整 UUID；头像栏输入图片完整路径，点击「保存资料」。PNG / JPEG 会自动裁剪压缩为 64×64 图片。
+3. 双方至少连接一次以发布展示码目录。在「通讯录」点击右上方「添加好友」，输入对方展示码或完整 UUID，再点击「发送好友申请」。申请会保留在服务器，对方上线后可收到。
+4. 对方打开申请，选择同意或拒绝。同意后双方保存好友，自动订阅好友状态与共同私聊 Topic。点击好友进入对话。
+5. Enter 发送；Shift + Enter 换行。离线消息先存入 SQLite，重连后每 10 秒重试；收到对方回执后显示「已送达」。MQTT PUBACK 只显示「已发送」，不当作对方已经收到。
 
-默认服务器：`broker.emqx.io:8883`，TLS、MQTT 3.1.1、匿名连接。
-服务器信息来源：[EMQX 官方公共 MQTT 服务](https://www.emqx.com/zh/mqtt/public-mqtt5-broker)。
-公共频道可被其他订阅者访问；TLS 保护传输，不提供频道访问权限或端到端加密。
+通讯录支持按昵称、展示码或 UUID 搜索，点击联系人进入私聊或处理好友申请。顶部「连接 / 断开」控制 MQTT 连接，底部「通讯录 / 我的」切换页面。当前 UUID 账号没有密码登录，参考图中的第二个资料菜单用作「编辑资料」。
 
-- Enter：发送；Shift+Enter：换行。
-- Tab：切换输入框；Ctrl+A：全选；方向键 / Home / End：移动光标。
-- 支持中文、emoji，以及按完整 Unicode 字符删除。
-- 聊天记录可拖动滚动，或使用“较早”“最新”、Page Up / Page Down。
-- 连接期间昵称和 Topic 锁定。先断开，再修改并重新连接。
-- 网络中断后自动按 1–20 秒间隔重连、重新订阅；窗口关闭后释放连接。
+昵称、头像、UUID 和密钥重启后保持不变。联系人包括「待对方同意」「新好友申请」「已成为好友」「已拒绝」状态。
 
-## 消息与范围
+## 数据和换设备
 
-- 发布和订阅使用同一个精确 Topic，不接受 `+`、`#` 和共享订阅。
-- 发布 QoS 1、retain=false，订阅 QoS 1；启用 MQTT clean session。
-- 自己发出的消息先显示“发送中”，收到服务器 PUBACK 后显示“已发布”。这表示服务器确认接收，**不是对方送达或已读回执**。
-- 收到本客户端的消息回环和重复消息 ID 时，不重复显示气泡。
-- 断网时不接收新的发送任务，输入保留；已提交但未获得确认的消息标记“未确认”，不自动重发，以避免意外重复。
-- 本次会话最多保留 300 条消息，重启不保存；切换 Topic 清空原频道消息。没有离线消息补发和历史同步。
-- 单条消息最多 2000 个 Unicode 字符，昵称最多 24 个；发送队列及未确认消息总计最多 64 条。
-- 拒绝超限、非法 UTF-8 或损坏的应用消息，忽略 retained 消息；接收事件队列有容量限制。
+默认数据库位置：`~/.mqchat/mqchat.sqlite`。可用 JVM 属性 `framework.mqchat.dataDir` 为不同账号指定独立目录。
 
-发送数据为 UTF-8、换行分隔的版本化信封：
+在「我的 → 备份迁移」填写 `.sqlite` 文件路径，点击「导出备份」。新设备打开相同页面，填写备份路径，点击「导入备份」，再点击「确认恢复」。
 
-```text
-MQCHAT/1
-<message UUID>
-<sender UUID>
-<Unix timestamp in milliseconds>
-<Base64(UTF-8 nickname)>
-<Base64(UTF-8 message body)>
-```
+备份包含自己的 UUID、身份密钥、昵称头像、好友和申请、聊天记录、待发送消息。恢复会断开网络并替换当前账号资料；校验完成后在同一 SQLite 事务中恢复，失败时保留原数据。恢复后点击连接即可重新订阅好友并继续发送待送达消息。换设备时停止旧设备登录，同一身份使用固定 MQTT Client ID，不能同时运行两个副本。
 
-也能接收 MQTTX 等客户端发布的普通 UTF-8 文本，显示为“MQTT 用户”。
-身份字段用于界面区分，不进行身份认证。
+备份通过 SQLite `VACUUM INTO` 生成一致快照，临时文件完成后再原子替换目标文件。导出文件包含私钥，应自行保管；Linux 上数据库和导出备份限制为当前用户读写。导入支持最多 128 MB、5,000 个联系人、20,000 条消息与 5,000 条待发送记录。
+
+WSL 中请填写 Linux 路径，例如 `/home/用户名/avatar.png`、`/mnt/c/Users/用户名/backup.sqlite`。
+
+## Topic 与协议
+
+命名空间：`mqchat/p2p/v2/`。所有发布均使用 QoS 1。
+
+| Topic 后缀 | 用途 | Retain |
+| --- | --- | --- |
+| `directory/{展示码}` | 展示码到 UUID、昵称、头像、公钥的资料映射 | 是 |
+| `users/{UUID}/status` | 在线 / 离线、心跳与当前连接会话 | 是 |
+| `users/{接收方UUID}/inbox/{发送方UUID}` | 好友申请、同意、拒绝；按发送方分别保留，避免多人申请互相覆盖 | 是 |
+| `chat/{SHA256(排序后的双方UUID)}` | 双方共同订阅的私聊消息与送达回执 | 否 |
+
+展示码由 UUID 的 SHA-256 前 65 位编码为 13 位 Crockford Base32，排除易混淆字母。收到目录信息时重新计算展示码，完整 UUID 寻址同时校验 UUID。65 位摘要并非数学上无碰撞的全局注册服务；如果已有好友的公钥不匹配，会拒绝替换资料。
+
+上线发布 retained 状态，10 秒更新一次；连接声明 retained 离线遗嘱，异常退出也能通知好友。45 秒无新心跳视为离线。旧连接的遗嘱按连接会话区分，避免覆盖新连接的在线状态。每次重连重新订阅本人的申请收件箱、好友状态和已接受好友的私聊 Topic，并重新发布资料与未完成的申请/接受结果。
+
+消息使用带版本的二进制信封，包含消息 UUID、双方 UUID、请求关联 ID、时间、资料和 RSA 签名。私聊正文用随机 AES-128-GCM 密钥加密，密钥通过接收方 RSA-2048 OAEP-SHA256 公钥封装。接收方验证已保存的好友公钥、目标 UUID 和 Topic；聊天按消息 UUID 在 SQLite 去重。第三方即使订阅相同公共 Topic，也不能用自己的私钥解密正文。
+
+公共服务器上的展示码、个人资料和状态仍是公开元数据。首次添加使用目录提供的公钥，后续固定该公钥；这不是中心化实名认证，也没有实现前向保密。服务器 retained 数据不代替本地 SQLite 备份。
+
+## 实现
+
+- `PeerProtocol.java`：身份、展示码、Topic 派生、签名和加密。
+- `PeerMqtt.java`：多 Topic / 单层通配符订阅、QoS 1、遗嘱、重连、TLS。
+- `PeerStore.java`：真实 SQLite 表、好友公钥固定、消息去重、持久发送队列与备份恢复。
+- `PeerSession.java`：申请 / 同意 / 拒绝、资料发现、在线状态、心跳、私聊送达状态机。
+- `PeerView.java`：好友与申请列表、个人资料、头像、私聊、备份迁移。
+- `ChatText.java` 与 `res/fonts`：内置 CJK / Emoji 字体，保持中文输入和显示。
+
+旧的公共频道界面保留为 `legacy_channel.xml` 和 `ChatView.java`，新应用入口使用 `PeerView`。
 
 ## 构建
-
-仓库根目录执行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File packages/apps/build.ps1 mqchat
 ```
 
-Linux：
-
-```sh
+```bash
 bash packages/apps/build.sh mqchat
+# 或重新构建并启动整个框架
+bash build.sh
 ```
 
-产物：`out/system/app/mqchat/mqchat.apk`，桌面自动发现应用，无需修改 Launcher。
-本仓库 APK 是 Java 类和资源的归档，供自有框架运行；不是手机 Android 的 DEX APK。
-原生窗口依赖项目原有的 Linux / X11 环境，无界面测试可在 Windows 上运行。
+产物：`out/system/app/mqchat/mqchat.apk`。应用的 `libs/*.jar` 会解包到 APK，包含 Windows / Linux SQLite 原生库；运行时无需额外安装 sqlite3 或配置 JDBC classpath。依赖版本、来源与校验值见 `libs/README.md`。
 
-## 配置服务器
+WSL 中文输入需要 Fcitx5：`sudo apt install fcitx5 fcitx5-chinese-addons`。框架启动脚本已自动设置 XIM 并启动 X11 模式输入法；点击输入框按 Ctrl + Space 切换拼音。
 
-默认使用 EMQX TLS。可通过应用 JVM 属性切换到自建或测试服务器：
+## 验证
 
-```text
--Dframework.mqchat.host=broker.emqx.io
--Dframework.mqchat.port=8883
--Dframework.mqchat.tls=true
-```
-
-TLS 使用 JVM 默认信任库并验证服务器证书及主机名。普通 TCP 测试可设置 `tls=false`、`port=1883`。
-
-## 实现
-
-- `ChatView`：输入、连接控制、消息气泡、滚动和窗口生命周期。
-- `MqttClient`：独立网络线程、TLS、CONNECT / SUBSCRIBE / PUBLISH / PUBACK、心跳、超时和重连。
-- `ChatMessage`：消息封装、验证、发送者区分和普通 MQTT 文本兼容。
-
-网络不在 UI 线程执行，回调投递到框架 Handler；切换频道、手动断开后，过期连接回调不会修改当前界面。
-实现依据：[OASIS MQTT 3.1.1 规范](https://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html)。
-
-## 测试
-
-先构建应用，再执行以下 PowerShell 命令：
+模型集成测试使用三个临时账号和真实 MQTT Broker，覆盖身份持久化、双向好友申请、离线申请、昵称头像、状态遗嘱、加密、双向私聊、送达回执、离线重试、去重、密钥固定、备份及带待发送消息的设备迁移。
 
 ```powershell
-javac -encoding UTF-8 -cp 'out/framework/classes;libs/*' -d out/mqchat-tests packages/apps/mqchat/src/com/packages/mqchat/MqttClient.java packages/apps/mqchat/src/com/packages/mqchat/ChatMessage.java tests/com/packages/mqchat/MqttClientTest.java tests/com/android/app/MqchatTest.java
-java -cp 'out/mqchat-tests;out/framework/classes;libs/*' com.packages.mqchat.MqttClientTest
-java '-Djava.awt.headless=true' -cp 'out/mqchat-tests;out/framework/classes;libs/*' com.android.app.MqchatTest
+javac -encoding UTF-8 -source 8 -target 8 -cp 'out/system/app/mqchat/mqchat.apk;out/framework/classes;libs/*' -d out/mqchat-peer-tests tests/com/packages/mqchat/PeerSessionTest.java
+# 本机 MQTT Broker 默认 127.0.0.1:18887，可设置 -Dtest.broker=... -Dtest.port=...
+java '-Djava.awt.headless=true' -cp 'out/mqchat-peer-tests;out/system/app/mqchat/mqchat.apk;out/framework/classes;libs/*' com.packages.mqchat.PeerSessionTest
+# 在默认 EMQX TLS 公共服务器测试随机临时账号
+java '-Djava.awt.headless=true' -cp 'out/mqchat-peer-tests;out/system/app/mqchat/mqchat.apk;out/framework/classes;libs/*' com.packages.mqchat.PeerSessionTest public
+
+javac -encoding UTF-8 -source 8 -target 8 -cp 'out/framework/classes;libs/*' -d out/mqchat-peer-ui-tests tests/com/android/app/MqchatPeerViewTest.java
+java '-Djava.awt.headless=true' -cp 'out/mqchat-peer-ui-tests;out/framework/classes;libs/*' com.android.app.MqchatPeerViewTest
 ```
 
-31 项协议与模型检查、28 项实际 APK / UI 检查通过。
-测试使用独立编码的本地 broker，验证真实 socket 收发、topic 隔离、PUBACK、断线重连、Unicode、重复消息、输入、窗口缩放和关闭。
-
-可选公共 EMQX 集成测试，使用随机 UUID Topic 和合成测试文本：
-
-```powershell
-java -cp 'out/mqchat-tests;out/framework/classes;libs/*' com.packages.mqchat.MqttClientTest public
-```
-
-9 项真实 EMQX TLS 连接与双向 Unicode 收发检查通过。
-预览：`out/mqchat-preview.png`、`out/mqchat-narrow-preview.png`、`out/mqchat-wide-preview.png`。
-
-## 字体与中文显示
-
-APK 内置 Noto Sans CJK SC 和 Noto Emoji 字体，不依赖运行主机安装中文字库。
-界面标签、输入框、光标测量及消息气泡使用同一套字体回退与测量，避免中文缺字、表情方框和光标错位。
-常用表情以单色显示；未涵盖所有新版 emoji 组合。消息传输继续使用严格 UTF-8。
-字体来源及许可证保存在 res/fonts/README.md、OFL-CJK.txt 和 OFL-Emoji.txt。
-
-字体回归检查：
-
-    javac -encoding UTF-8 -cp 'out/framework/classes;libs/*' -d out/mqchat-font-tests tests/com/packages/mqchat/ChatTextTest.java
-    java '-Djava.awt.headless=true' -cp 'out/mqchat-font-tests;out/framework/classes;libs/*' com.packages.mqchat.ChatTextTest
+Linux / WSL 将 classpath 的分隔符 `;` 改为 `:`。界面测试从真实 APK 加载全部 SQLite 依赖，验证 12 项操作并生成好友、资料、备份、私聊的 600 / 360 像素宽预览。

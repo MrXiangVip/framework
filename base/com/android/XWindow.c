@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <locale.h>
+#include <X11/keysym.h>
 
 typedef struct {
     Display *display;
@@ -16,10 +17,52 @@ typedef struct {
     Atom delete_window;
     XIM input_method;
     XIC input_context;
-    unsigned char text[4096];
+    unsigned char *text;
+    int text_capacity, focused, im_registered;
     int text_length, text_offset, text_utf8;
     int width, height, destroyed, closing;
 } XSurface;
+
+static const long window_events = ExposureMask | StructureNotifyMask | ButtonPressMask
+    | ButtonReleaseMask | PointerMotionMask | FocusChangeMask | KeyPressMask | KeyReleaseMask;
+
+static void input_method_destroyed(XIM method, XPointer client, XPointer data) {
+    (void)method; (void)data;
+    XSurface *s = (XSurface *)client;
+    s->input_context = NULL;
+    s->input_method = NULL;
+}
+
+static void open_input_method(Display *display, XPointer client, XPointer data) {
+    (void)data;
+    XSurface *s = (XSurface *)client;
+    if (s->closing || s->input_method) return;
+    XIM method = XOpenIM(display, NULL, NULL, NULL);
+    if (!method) return;
+    XIMStyles *styles = NULL;
+    XIC context = NULL;
+    const XIMStyle wanted[] = { XIMPreeditNothing | XIMStatusNothing, XIMPreeditNone | XIMStatusNone };
+    if (!XGetIMValues(method, XNQueryInputStyle, &styles, NULL) && styles) {
+        for (unsigned int i = 0; i < sizeof(wanted) / sizeof(wanted[0]) && !context; i++) {
+            for (unsigned short j = 0; j < styles->count_styles; j++) {
+                if (styles->supported_styles[j] != wanted[i]) continue;
+                context = XCreateIC(method, XNInputStyle, wanted[i], XNClientWindow, s->window,
+                    XNFocusWindow, s->window, NULL);
+                break;
+            }
+        }
+        XFree(styles);
+    }
+    if (!context) { XCloseIM(method); return; }
+    s->input_method = method;
+    s->input_context = context;
+    XIMCallback destroyed = { (XPointer)s, input_method_destroyed };
+    XSetIMValues(method, XNDestroyCallback, &destroyed, NULL);
+    long filter_events = 0;
+    XGetICValues(context, XNFilterEvents, &filter_events, NULL);
+    XSelectInput(display, s->window, window_events | filter_events);
+    if (s->focused) XSetICFocus(context);
+}
 
 static void fail(JNIEnv *env, const char *message) {
     jclass type = (*env)->FindClass(env, "java/lang/IllegalStateException");
@@ -36,6 +79,9 @@ JNIEXPORT jlong JNICALL Java_com_android_wm_XWindow_nativeOpen
     if (!s) { fail(env, "Cannot allocate X11 surface"); return 0; }
     s->display = XOpenDisplay(NULL);
     if (!s->display) { free(s); fail(env, "Cannot open X11 display; check DISPLAY"); return 0; }
+    s->text_capacity = 4096;
+    s->text = malloc((size_t)s->text_capacity);
+    if (!s->text) { XCloseDisplay(s->display); free(s); fail(env, "Cannot allocate input buffer"); return 0; }
     int screen = DefaultScreen(s->display);
     s->width = width; s->height = height;
     s->window = XCreateSimpleWindow(s->display, RootWindow(s->display, screen),
@@ -45,7 +91,7 @@ JNIEXPORT jlong JNICALL Java_com_android_wm_XWindow_nativeOpen
     s->delete_window = XInternAtom(s->display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(s->display, s->window, &s->delete_window, 1);
     XStoreName(s->display, s->window, "Launcher - framework View tree");
-    XSelectInput(s->display, s->window, ExposureMask | StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | FocusChangeMask | KeyPressMask | KeyReleaseMask);
+    XSelectInput(s->display, s->window, window_events);
     /* Let window managers and integration checks associate the window with its application process. */
     unsigned long pid = (unsigned long)getpid();
     Atom pid_property = XInternAtom(s->display, "_NET_WM_PID", False);
@@ -53,10 +99,9 @@ JNIEXPORT jlong JNICALL Java_com_android_wm_XWindow_nativeOpen
         PropModeReplace, (unsigned char *)&pid, 1);
     setlocale(LC_CTYPE, "");
     XSetLocaleModifiers("");
-    s->input_method = XOpenIM(s->display, NULL, NULL, NULL);
-    if (s->input_method) s->input_context = XCreateIC(s->input_method,
-        XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
-        XNClientWindow, s->window, XNFocusWindow, s->window, NULL);
+    s->im_registered = XRegisterIMInstantiateCallback(s->display, NULL, NULL, NULL,
+        open_input_method, (XPointer)s);
+    open_input_method(s->display, (XPointer)s, NULL);
     XMapWindow(s->display, s->window);
     XFlush(s->display);
     return (jlong)(intptr_t)s;
@@ -89,9 +134,9 @@ JNIEXPORT jintArray JNICALL Java_com_android_wm_XWindow_nativePoll
         XEvent event;
         int kind = 0, x = 0, y = 0;
         XNextEvent(s->display, &event);
-        if (XFilterEvent(&event, s->window)) continue;
-        if (event.type == FocusIn && s->input_context) XSetICFocus(s->input_context);
-        if (event.type == FocusOut && s->input_context) XUnsetICFocus(s->input_context);
+        if (event.type == FocusIn) { s->focused = 1; if (s->input_context) XSetICFocus(s->input_context); }
+        if (event.type == FocusOut) { s->focused = 0; if (s->input_context) XUnsetICFocus(s->input_context); }
+        if (XFilterEvent(&event, None)) continue;
         if (event.type == KeyPress) {
             KeySym symbol = NoSymbol;
             int length;
@@ -99,9 +144,20 @@ JNIEXPORT jintArray JNICALL Java_com_android_wm_XWindow_nativePoll
             if (s->input_context) {
                 Status status;
                 length = Xutf8LookupString(s->input_context, &event.xkey,
-                    (char *)s->text, sizeof(s->text), &symbol, &status);
-                if (status == XBufferOverflow) length = 0;
-            } else length = XLookupString(&event.xkey, (char *)s->text, sizeof(s->text), &symbol, NULL);
+                    (char *)s->text, s->text_capacity, &symbol, &status);
+                if (status == XBufferOverflow && length > 0 && length <= 1024 * 1024) {
+                    unsigned char *grown = realloc(s->text, (size_t)length + 1);
+                    if (grown) {
+                        s->text = grown; s->text_capacity = length + 1;
+                        length = Xutf8LookupString(s->input_context, &event.xkey,
+                            (char *)s->text, s->text_capacity, &symbol, &status);
+                    }
+                }
+                if (status != XLookupChars && status != XLookupBoth) length = 0;
+                if (status != XLookupKeySym && status != XLookupBoth) symbol = NoSymbol;
+                /* A committed string is text, not an Enter command to send a chat. */
+                if (length > 0 && symbol == XK_Return && !(length == 1 && (s->text[0] == '\r' || s->text[0] == '\n'))) symbol = NoSymbol;
+            } else length = XLookupString(&event.xkey, (char *)s->text, s->text_capacity, &symbol, NULL);
             s->text_offset = 0;
             s->text_length = event.xkey.state & (ControlMask | Mod1Mask) ? 0 : length;
             if (symbol != NoSymbol) { kind = 8; x = (int)symbol; y = (int)event.xkey.state; }
@@ -185,10 +241,14 @@ JNIEXPORT void JNICALL Java_com_android_wm_XWindow_nativeClose
   (JNIEnv *env, jclass type, jlong handle) {
     (void)env; (void)type;
     XSurface *s = (XSurface *)(intptr_t)handle;
+    s->closing = 1;
+    if (s->im_registered) XUnregisterIMInstantiateCallback(s->display, NULL, NULL, NULL,
+        open_input_method, (XPointer)s);
     if (s->input_context) XDestroyIC(s->input_context);
     if (s->input_method) XCloseIM(s->input_method);
     XFreeGC(s->display, s->gc);
     if (!s->destroyed) XDestroyWindow(s->display, s->window);
     XCloseDisplay(s->display);
+    free(s->text);
     free(s);
 }

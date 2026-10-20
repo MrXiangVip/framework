@@ -45,11 +45,31 @@ for name in "${APP_NAMES[@]}"; do
     # A fresh directory prevents deleted or renamed classes from entering the next APK.
     BUILD_TMP="$(mktemp -d "$REPO_ROOT/out/apps/$name.XXXXXX")"
     mkdir -p "$BUILD_TMP/classes" "$(dirname -- "$apk")"
-    javac -encoding UTF-8 -source 8 -target 8 -cp "$FRAMEWORK_CLASSES:$REPO_ROOT/libs/*" \
+    javac -encoding UTF-8 -source 8 -target 8 -cp "$FRAMEWORK_CLASSES:$REPO_ROOT/libs/*:$app_dir/libs/*" \
         -sourcepath "$app_dir/src" -d "$BUILD_TMP/classes" "${sources[@]}"
+    if [[ -d "$app_dir/libs" ]]; then
+        for dependency in "$app_dir/libs/"*.jar; do
+            [[ -f "$dependency" ]] || continue
+            (cd "$BUILD_TMP/classes" && jar xf "$dependency")
+        done
+        rm -f -- "$BUILD_TMP/classes/META-INF/MANIFEST.MF" "$BUILD_TMP/classes/"module-info.class
+        find "$BUILD_TMP/classes/META-INF" -type f \( -name '*.SF' -o -name '*.RSA' -o -name '*.DSA' \) -delete
+    fi
     entries=(-C "$BUILD_TMP/classes" . -C "$app_dir" AndroidManifest.xml)
     if [[ -d "$app_dir/res" ]]; then entries+=(-C "$app_dir" res); fi
     jar cf "$BUILD_TMP/$name.apk" "${entries[@]}"
+    # Validate declared runtime resources before replacing the installed package.
+    if [[ -f "$app_dir/required-apk-entries.txt" ]]; then
+        jar tf "$BUILD_TMP/$name.apk" > "$BUILD_TMP/apk-entries.txt"
+        while IFS= read -r entry || [[ -n "$entry" ]]; do
+            entry="${entry%$'\r'}"
+            [[ -n "$entry" ]] || continue
+            if ! grep -Fxq -- "$entry" "$BUILD_TMP/apk-entries.txt"; then
+                echo "Incomplete APK $name: missing $entry. Check $app_dir/libs dependencies." >&2
+                exit 1
+            fi
+        done < "$app_dir/required-apk-entries.txt"
+    fi
     mv -f -- "$BUILD_TMP/$name.apk" "$apk"
     cleanup
     BUILD_TMP=''

@@ -1,0 +1,5 @@
+org/sqlite/JDBC.class
+org/sqlite/native/Linux/x86_64/libsqlitejdbc.so
+org/sqlite/native/Windows/x86_64/sqlitejdbc.dll
+org/slf4j/LoggerFactory.class
+org/slf4j/nop/NOPServiceProvider.class

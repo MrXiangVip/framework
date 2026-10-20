@@ -122,7 +122,7 @@ public class ChatView extends ViewGroup {
         lifecycle.scheduleAtFixedRate(new TimerTask(){public void run(){post(()->{if(!attached()){disconnect();lifecycle.cancel();lifecycle=null;}});}},1000,1000);
     }
     @Override public boolean dispatchTouchEvent(MotionEvent event){
-        if(event.getAction()==MotionEvent.ACTION_CANCEL){focused=null;invalidate();}
+        // Keep the text field focused across input-method/candidate-window focus changes.
         return super.dispatchTouchEvent(event);
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event){
