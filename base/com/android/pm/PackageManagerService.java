@@ -52,7 +52,7 @@ public class PackageManagerService implements PackageSender {
         String configured = System.getProperty("framework.root");
         if (configured != null && !configured.trim().isEmpty()) return new File(configured);
         File cwd = new File(System.getProperty("user.dir")).getAbsoluteFile();
-        // build.sh launches from src; IDEs normally launch from the repository root.
+        // build.sh launches from base; IDEs normally launch from the repository root.
         return new File(cwd, "com/android").isDirectory() ? cwd.getParentFile() : cwd;
     }
 
