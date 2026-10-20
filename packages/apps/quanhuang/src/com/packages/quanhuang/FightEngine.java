@@ -19,6 +19,9 @@ public final class FightEngine {
     }
     public static final class Fighter {
         double x, height, velocity, stun, attackTime, flash;
+        double impactTime, impactX, impactY;
+        int impactFacing, impactPower;
+        boolean impactGuarded;
         int health = 100, energy = 40, facing, attackFacing, wins;
         boolean guard, connected;
         Move move;
@@ -62,6 +65,7 @@ public final class FightEngine {
     }
     private void reset(Fighter fighter, double x, int facing) {
         fighter.x = x; fighter.facing = facing; fighter.height = fighter.velocity = fighter.stun = fighter.flash = 0;
+        fighter.impactTime = 0;
         fighter.health = 100; fighter.energy = 40; fighter.move = null; fighter.guard = false; fighter.connected = false;
     }
     private void beginRound() {
@@ -94,6 +98,9 @@ public final class FightEngine {
         while (accumulator + 1e-9 >= 1.0 / 60) { tick(1.0 / 60); accumulator -= 1.0 / 60; }
     }
     private void tick(double dt) {
+        // Presentation lifetimes follow simulation time, including KO, and freeze on pause.
+        player.impactTime = Math.max(0, player.impactTime - dt);
+        enemy.impactTime = Math.max(0, enemy.impactTime - dt);
         if (state == State.MATCH_OVER) return;
         if (state != State.FIGHT) {
             stateTime -= dt;
@@ -173,6 +180,12 @@ public final class FightEngine {
         target.health = Math.max(0, target.health - amount);
         target.energy = Math.min(100, target.energy + (guarded ? 4 : 8));
         attacker.energy = Math.min(100, attacker.energy + (guarded ? 3 : 9));
+        target.impactTime = .24;
+        target.impactX = target.x - attacker.attackFacing * 22;
+        target.impactY = 540 - target.height - 106;
+        target.impactFacing = attacker.attackFacing;
+        target.impactPower = amount;
+        target.impactGuarded = guarded;
         target.flash = .15;
         target.stun = guarded ? .08 : .21;
         if (!guarded) { target.move = null; target.x = Math.max(65, Math.min(655, target.x + attacker.attackFacing * 14)); }

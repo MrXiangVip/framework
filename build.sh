@@ -37,5 +37,7 @@ export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Djava.awt.he
 
 if [[ "${1:-}" == "--build-only" ]]; then exit 0; fi
 
+source "$BASE_DIR/input-method.sh"
+
 echo "Start app_process / SystemServer"
 exec "$BASE_DIR/app_process"

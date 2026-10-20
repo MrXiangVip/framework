@@ -29,6 +29,8 @@ public final class FightAudio implements AutoCloseable {
     private final Object control = new Object();
     private volatile boolean muted, paused, closed, unavailable;
     private volatile long generation;
+    private long retryAfter;
+    private static final long RETRY_DELAY_NANOS = TimeUnit.SECONDS.toNanos(1);
     private Thread worker;
 
     public FightAudio() {
@@ -45,11 +47,19 @@ public final class FightAudio implements AutoCloseable {
         synchronized (control) { if (paused != value) { paused = value; clearLocked(); } }
     }
     public void clear() { synchronized (control) { clearLocked(); } }
-    private void clearLocked() { generation++; queue.clear(); }
+    private void clearLocked() {
+        generation++; queue.clear();
+        // Explicit restart/mute controls allow an immediate new device attempt.
+        if (unavailable && worker == null) { unavailable = false; retryAfter = 0; }
+    }
     public void play(FightEngine.Sound sound) {
         Objects.requireNonNull(sound);
         synchronized (control) {
-            if (closed || muted || paused || unavailable) return;
+            if (closed || muted || paused) return;
+            if (unavailable) {
+                if (worker != null || System.nanoTime() - retryAfter < 0) return;
+                unavailable = false;
+            }
             if (!queue.offer(new Cue(sound, generation))) {
                 queue.poll(); queue.offer(new Cue(sound, generation));
             }
@@ -115,12 +125,27 @@ public final class FightAudio implements AutoCloseable {
                 }
             }
         } catch (Exception e) {
-            if (!closed) { unavailable = true; Log.w("Quanhuang sound unavailable: " + e.getClass().getSimpleName()); }
+            synchronized (control) {
+                if (!closed) {
+                    unavailable = true;
+                    retryAfter = System.nanoTime() + RETRY_DELAY_NANOS;
+                    clearFailedCues();
+                    Log.w("Quanhuang sound unavailable; will retry: " + e);
+                }
+            }
         } finally {
-            if (output != null) {
-                try { output.flush(); } finally { output.close(); }
+            try {
+                if (output != null) {
+                    try { output.flush(); } finally { output.close(); }
+                }
+            } finally {
+                synchronized (control) { worker = null; }
             }
         }
+    }
+    private void clearFailedCues() {
+        generation++;
+        queue.clear();
     }
     private static Output openDevice() throws Exception {
         AudioFormat format = new AudioFormat(SoundBank.RATE, 16, 1, true, false);

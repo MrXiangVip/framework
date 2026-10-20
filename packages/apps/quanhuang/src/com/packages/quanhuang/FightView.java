@@ -6,16 +6,21 @@ import com.android.os.Handler;
 import com.android.util.AttributeSet;
 import com.android.view.*;
 import java.awt.*;
-import java.awt.geom.*;
+import java.io.IOException;
+import java.io.InputStream;
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Original vector arena and fighters, rendered through the framework's software/X11 surface. */
+/** Sprite fighters and arena, rendered through the framework's software/X11 surface. */
 public class FightView extends View {
     private final FightEngine game = new FightEngine();
     private final FightAudio audio = new FightAudio();
+    private static final int FRAME_WIDTH = 128, FRAME_HEIGHT = 192;
+    private static final int SHEET_COLUMNS = 6, SHEET_ROWS = 5;
+    private final BufferedImage sparkSheet, ironSheet;
     private BufferedImage frame;
     private Timer timer;
     private long lastTick;
@@ -28,7 +33,7 @@ public class FightView extends View {
         if (!attached()) { stopTimer(); return true; }
         long now = System.nanoTime();
         double dt = Math.min(.1, (now - lastTick) / 1e9); lastTick = now;
-        animation += dt;
+        if (!game.isPaused()) animation += dt;
         syncControls();
         game.update(dt); invalidate();
         return true;
@@ -42,7 +47,98 @@ public class FightView extends View {
 
     public FightView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        sparkSheet = loadSheet(context, "spark_sheet");
+        ironSheet = loadSheet(context, "iron_sheet");
         game.setSoundListener(sound -> { if (attached()) audio.play(sound); });
+    }
+    private static BufferedImage loadSheet(Context context, String name) {
+        // Prefer transparent PNGs; the supplied assets currently use JPEG.
+        for (String extension : new String[]{".png", ".jpeg"}) {
+            String path = "res/drawable/" + name + extension;
+            try (InputStream stream = context.getClassLoader().getResourceAsStream(path)) {
+                if (stream == null) continue;
+                BufferedImage sheet = ImageIO.read(stream);
+                if (sheet == null || sheet.getWidth() < SHEET_COLUMNS || sheet.getHeight() < SHEET_ROWS)
+                    throw new IOException("Invalid sprite sheet");
+                return extension.equals(".jpeg") ? removeSheetBackground(sheet) : sheet;
+            } catch (IOException e) {
+                throw new IllegalArgumentException("Cannot load sprite sheet: " + path, e);
+            }
+        }
+        throw new IllegalArgumentException("Missing sprite sheet: " + name);
+    }
+    /**
+     * JPEG exports contain a baked checkerboard. Remove only neutral light pixels
+     * reachable from each cell's boundary, leaving enclosed hair/shoe whites intact.
+     * Run once at load time, never in the render loop. Transparent PNGs bypass this.
+     */
+    private static BufferedImage removeSheetBackground(BufferedImage source) {
+        int width = source.getWidth(), height = source.getHeight();
+        BufferedImage result = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        int[] pixels = source.getRGB(0, 0, width, height, null, 0, width);
+        // Close tiny JPEG gaps in the ink outlines before flooding. Without this,
+        // background can leak into white hair and white shoes.
+        boolean[] outline = new boolean[pixels.length];
+        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+            if (isBackground(pixels[y * width + x])) continue;
+            for (int dy = -3; dy <= 3; dy++) for (int dx = -3; dx <= 3; dx++) {
+                int nx = x + dx, ny = y + dy;
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height)
+                    outline[ny * width + nx] = true;
+            }
+        }
+        for (int row = 0; row < SHEET_ROWS; row++) {
+            for (int column = 0; column < SHEET_COLUMNS; column++) {
+                int left = column * width / SHEET_COLUMNS, right = (column + 1) * width / SHEET_COLUMNS;
+                int top = row * height / SHEET_ROWS, bottom = (row + 1) * height / SHEET_ROWS;
+                int[] queue = new int[(right - left) * (bottom - top)];
+                int tail = 0;
+                for (int x = left; x < right; x++) {
+                    tail = enqueueBackground(pixels, outline, queue, tail, top * width + x);
+                    tail = enqueueBackground(pixels, outline, queue, tail, (bottom - 1) * width + x);
+                }
+                for (int y = top; y < bottom; y++) {
+                    tail = enqueueBackground(pixels, outline, queue, tail, y * width + left);
+                    tail = enqueueBackground(pixels, outline, queue, tail, y * width + right - 1);
+                }
+                for (int head = 0; head < tail; head++) {
+                    int index = queue[head], x = index % width, y = index / width;
+                    if (x > left) tail = enqueueBackground(pixels, outline, queue, tail, index - 1);
+                    if (x + 1 < right) tail = enqueueBackground(pixels, outline, queue, tail, index + 1);
+                    if (y > top) tail = enqueueBackground(pixels, outline, queue, tail, index - width);
+                    if (y + 1 < bottom) tail = enqueueBackground(pixels, outline, queue, tail, index + width);
+                }
+            }
+        }
+        // Remove the temporary outer outline padding without flooding through it.
+        int[] flooded = pixels.clone();
+        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+            int index = y * width + x;
+            if (!outline[index] || !isBackground(flooded[index])) continue;
+            boolean exterior = false;
+            for (int dy = -3; dy <= 3 && !exterior; dy++) for (int dx = -3; dx <= 3; dx++) {
+                int nx = x + dx, ny = y + dy;
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height && flooded[ny * width + nx] == 0) {
+                    exterior = true; break;
+                }
+            }
+            if (exterior) pixels[index] = 0;
+        }
+        result.setRGB(0, 0, width, height, pixels, 0, width);
+        return result;
+    }
+    private static boolean isBackground(int color) {
+        if ((color >>> 24) == 0) return false;
+        int red = (color >>> 16) & 255, green = (color >>> 8) & 255, blue = color & 255;
+        int min = Math.min(red, Math.min(green, blue)), max = Math.max(red, Math.max(green, blue));
+        return min >= 165 && max - min <= 30;
+    }
+    private static int enqueueBackground(int[] pixels, boolean[] outline, int[] queue, int tail, int index) {
+        if (!outline[index] && isBackground(pixels[index])) {
+            pixels[index] = 0;
+            queue[tail++] = index;
+        }
+        return tail;
     }
     public boolean isSoundMuted() { return audio.isMuted(); }
     public void setSoundMuted(boolean muted) {
@@ -145,8 +241,20 @@ public class FightView extends View {
             g.translate(offsetX(), offsetY()); g.scale(scale(), scale());
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            stage(g);
-            fighter(g, game.getPlayer(), true); fighter(g, game.getEnemy(), false);
+            Graphics2D arena = (Graphics2D) g.create();
+            try {
+                arena.clipRect(0, 166, 720, 454);
+                double remaining = Math.max(game.getPlayer().impactTime, game.getEnemy().impactTime);
+                if (remaining > 0) {
+                    double elapsed = .24 - remaining;
+                    double strength = Math.max(shakeStrength(game.getPlayer()), shakeStrength(game.getEnemy()));
+                    arena.translate(Math.sin(elapsed * 145) * strength, Math.sin(elapsed * 193) * strength * .55);
+                }
+                stage(arena);
+                fighter(arena, game.getPlayer(), true); fighter(arena, game.getEnemy(), false);
+                impact(arena, game.getPlayer()); impact(arena, game.getEnemy());
+            } finally { arena.dispose(); }
+
             hud(g);
             controls(g);
             if (game.isPaused()) overlay(g, "PAUSED", "P or II to resume");
@@ -205,58 +313,80 @@ public class FightView extends View {
         g.setColor(new Color(color)); g.fillRoundRect(reverse ? x + width - fill : x, y, fill, height, 5, 5);
     }
     private void fighter(Graphics2D source, FightEngine.Fighter f, boolean player) {
-        int x = (int) f.getX(), floor = 540, y = floor - (int) f.getHeight();
-        source.setColor(new Color(0, 0, 0, 85)); source.fillOval(x - 45, floor - 10, 90, 17);
+        BufferedImage sheet = player ? sparkSheet : ironSheet;
+        int row = 0, column;
+        FightEngine.Move move = f.getMove();
+        if (f.isHit() && !f.isGuarding()) {
+            row = 4; column = 0;
+        } else if (move != null) {
+            row = move == FightEngine.Move.PUNCH ? 1 : move == FightEngine.Move.KICK ? 2 : 3;
+            // Play each attack once over its windup, active and recovery phases.
+            double duration = move.windup + move.active + move.recovery;
+            column = Math.min(5, (int) (f.getAttackTime() / duration * SHEET_COLUMNS));
+        } else if (f.isGuarding()) {
+            row = 4; column = 1 + (int) (animation * 8 % 3);
+        } else if (f.getHeight() > 0 || f.velocity > 0) {
+            row = 4; column = f.velocity > 0 ? 4 : 5;
+        } else {
+            column = (int) (animation * 8 % SHEET_COLUMNS);
+        }
+
+        // Proportional source bounds also support the supplied larger JPEG sheets.
+        int sx1 = column * sheet.getWidth() / SHEET_COLUMNS;
+        int sy1 = row * sheet.getHeight() / SHEET_ROWS;
+        int sx2 = (column + 1) * sheet.getWidth() / SHEET_COLUMNS;
+        int sy2 = (row + 1) * sheet.getHeight() / SHEET_ROWS;
         Graphics2D g = (Graphics2D) source.create();
         try {
-            g.translate(x, y); g.scale(f.getFacing(), 1);
-            double bounce = f.getHeight() > 0 ? -5 : Math.sin(animation * 6 + (player ? 0 : 1)) * 2;
-            g.translate(0, bounce);
-            boolean active = f.getMove() != null;
-            double reach = active ? Math.sin(Math.min(1, f.getAttackTime() / .23) * Math.PI / 2) : 0;
-            int arm = f.getMove() == FightEngine.Move.KICK ? 0 : (int) (reach * 62);
-            int leg = f.getMove() == FightEngine.Move.KICK ? (int) (reach * 80) : 0;
-            int jacket = f.isHit() ? 0xffffff : player ? 0x2ed9d0 : 0xe96a63;
-            // Boots, bent legs and fitted jacket form a readable fighting silhouette.
-            limb(g, -13, -54, -23, -24, -29, -5, 18, 0x182032);
-            limb(g, 10, -55, 25 + leg / 2, -29 - leg / 2, 32 + leg, -6 - leg, 19, 0x243249);
-            g.setColor(new Color(0x0a101c)); g.fillRoundRect(-41, -12, 32, 14, 5, 5);
-            g.fillRoundRect(23 + leg, -12 - leg, 33, 14, 5, 5);
-            g.setColor(new Color(jacket)); g.fillPolygon(new int[]{-24,13,27,14,-22,-30}, new int[]{-126,-127,-71,-53,-57,-102}, 6);
-            g.setColor(new Color(0xf1e3cf)); g.fillPolygon(new int[]{-8,5,15,5,-9}, new int[]{-124,-126,-65,-57,-59}, 5);
-            g.setColor(new Color(0x223047)); g.fillRect(-24, -65, 43, 8);
-            limb(g, -24, -117, -39, -92, -9, -97, 14, jacket);
-            int handX = f.isGuarding() ? 27 : 34 + arm, handY = f.isGuarding() ? -140 : -111;
-            limb(g, 13, -120, 29 + arm / 2, -94 - arm / 5, handX, handY, 15, jacket);
-            g.setColor(new Color(0xf3c9a3)); g.fillOval(handX - 9, handY - 8, 19, 17);
-            g.fillOval(-17, -164, 38, 42);
-            g.setColor(new Color(player ? 0x21283d : 0xd4dbe3));
-            g.fillPolygon(new int[]{-21,-19,-9,-3,4,14,26,20,7,-6}, new int[]{-145,-168,-180,-170,-181,-171,-155,-148,-162,-149}, 10);
-            g.setColor(new Color(0x101925)); g.fillRect(13, -145, 6, 3);
-            g.setColor(new Color(player ? 0xf3b948 : 0x87deef)); g.fillRect(-17, -151, 36, 6);
-            g.fillPolygon(new int[]{-17,-52,-28}, new int[]{-148,-133,-145}, 3);
-            if (f.isGuarding()) {
-                g.setColor(new Color(0x6bdcff)); g.setStroke(new BasicStroke(4));
-                g.drawArc(-5, -165, 65, 115, -75, 150);
-            }
-            if (f.getMove() == FightEngine.Move.SPECIAL) {
-                g.setColor(new Color(95, 214, 255, 120)); g.fillOval(25, -149, 110, 90);
-                g.setColor(new Color(0xc1f8ff)); g.fillOval(52, -131, 54, 54);
-                for (int i = 0; i < 5; i++) { g.setColor(new Color(0x73dfff)); g.drawLine(-5 - i * 8, -139 + i * 13, 53, -105); }
-            }
-            if (f.isHit()) {
-                g.setColor(new Color(0xffe7a3)); g.setStroke(new BasicStroke(3));
-                for (int i = 0; i < 9; i++) {
-                    double a = i * Math.PI * 2 / 9 + animation * 2;
-                    g.drawLine((int) (Math.cos(a) * 12), -102 + (int) (Math.sin(a) * 12),
-                            (int) (Math.cos(a) * 39), -102 + (int) (Math.sin(a) * 39));
-                }
-            }
+            g.translate(f.getX(), 540 - f.getHeight());
+            // Kick frames and the fourth punch frame face left in the source.
+            // Normalize their native direction before applying combat facing.
+            int nativeFacing = row == 2 || (row == 1 && column == 3) ? -1 : 1;
+            FightEngine.Fighter opponent = player ? game.getEnemy() : game.getPlayer();
+            int facing = move != null ? f.getFacing() : opponent.getX() >= f.getX() ? 1 : -1;
+            g.scale(facing * nativeFacing, 1);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            g.drawImage(sheet, -FRAME_WIDTH / 2, -FRAME_HEIGHT, FRAME_WIDTH / 2, 0,
+                    sx1, sy1, sx2, sy2, null);
         } finally { g.dispose(); }
     }
-    private void limb(Graphics2D g, int x, int y, int jointX, int jointY, int endX, int endY, int width, int color) {
-        g.setColor(new Color(color)); g.setStroke(new BasicStroke(width, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        g.drawLine(x, y, jointX, jointY); g.drawLine(jointX, jointY, endX, endY);
+    private static double shakeStrength(FightEngine.Fighter fighter) {
+        if (fighter.impactTime <= 0) return 0;
+        double peak = fighter.impactGuarded ? 2 : fighter.impactPower >= 20 ? 9 : 5;
+        return peak * fighter.impactTime / .24;
+    }
+    /** Impact feedback is separate from the character sprites and appears only on contact. */
+    private void impact(Graphics2D source, FightEngine.Fighter fighter) {
+        if (fighter.impactTime <= 0) return;
+        double age = .24 - fighter.impactTime, fade = fighter.impactTime / .24;
+        Graphics2D g = (Graphics2D) source.create();
+        try {
+            g.translate(fighter.impactX, fighter.impactY);
+            int red = fighter.impactGuarded ? 100 : 255;
+            int green = fighter.impactGuarded ? 220 : 190;
+            int blue = fighter.impactGuarded ? 255 : 65;
+            // A short white core and colored expanding halo.
+            if (age < .09) {
+                int radius = (int) (10 + age * 150);
+                g.setColor(new Color(red, green, blue, (int) (125 * fade)));
+                g.fillOval(-radius * 2, -radius * 2, radius * 4, radius * 4);
+                g.setColor(new Color(255, 255, 240, (int) (255 * (1 - age / .09))));
+                g.fillOval(-radius, -radius, radius * 2, radius * 2);
+            }
+            // Deterministic sparks spread away from the contact point and fade.
+            g.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            int count = fighter.impactGuarded ? 7 : 12;
+            for (int i = 0; i < count; i++) {
+                double angle = i * Math.PI * 2 / count + .17;
+                double distance = 7 + age * (140 + i % 3 * 65);
+                double length = 4 + fade * 12;
+                double vx = Math.cos(angle), vy = Math.sin(angle);
+                double drift = fighter.impactFacing * age * 25;
+                g.setColor(new Color(red, green, blue, (int) (255 * fade)));
+                g.drawLine((int) (vx * distance + drift), (int) (vy * distance + age * age * 100),
+                        (int) (vx * (distance + length) + drift), (int) (vy * (distance + length) + age * age * 100));
+            }
+        } finally { g.dispose(); }
     }
     private void controls(Graphics2D g) {
         g.setColor(new Color(0x0b1425)); g.fillRect(0, 620, 720, 280);
