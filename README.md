@@ -37,3 +37,7 @@ xshx@xshx:~/IdeaProjects/framework$ ./build.sh
 ![clock-preview.png](out/clock-preview.png)
 
 都能分别进入应用
+
+Browser: [build and usage](packages/apps/browser/README.md)
+
+![browser-preview.png](out/browser-preview.png)

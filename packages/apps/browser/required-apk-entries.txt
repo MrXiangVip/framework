@@ -1,0 +1,4 @@
+res/fonts/NotoSansCJKsc-Regular.otf
+res/fonts/NotoEmoji-Regular.ttf
+res/fonts/OFL-CJK.txt
+res/fonts/OFL-Emoji.txt

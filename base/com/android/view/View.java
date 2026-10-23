@@ -49,7 +49,8 @@ public class View {
     public boolean dispatchKeyEvent(KeyEvent event) { return false; }
     public boolean dispatchTouchEvent(MotionEvent event) { return onTouchEvent(event); }
     protected boolean onTouchEvent(MotionEvent event) {
-        if (mClickListener == null) return false;
+        // Secondary mouse buttons must not trigger legacy left-click listeners.
+        if (mClickListener == null || event.getButton() != 1) return false;
         boolean inside = event.getX() >= 0 && event.getY() >= 0
                 && event.getX() < getWidth() && event.getY() < getHeight();
         switch (event.getAction()) {

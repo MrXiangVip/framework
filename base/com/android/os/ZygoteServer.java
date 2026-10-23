@@ -18,10 +18,14 @@ public class ZygoteServer {
     public void registerServerSocketFromEnv(String socketName) {
         Log.d("registerServerSocketFromEnv " + socketName);
         if (mServerSocket == null) {
+            int port = Integer.getInteger("framework.zygote.port", 10000);
             try {
-                mServerSocket = new ServerSocket(Integer.getInteger("framework.zygote.port", 10000));
+                mServerSocket = new ServerSocket(port);
+                // Confirm binding completed; the preceding log only marks the start of registration.
+                Log.d("Zygote socket listening on port " + mServerSocket.getLocalPort());
             } catch (IOException e) {
-                throw new IllegalStateException("Cannot open Zygote socket", e);
+                throw new IllegalStateException("Cannot open Zygote socket on port " + port
+                        + "; check whether another framework instance is already running", e);
             }
         }
     }

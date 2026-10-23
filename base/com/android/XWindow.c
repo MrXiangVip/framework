@@ -181,14 +181,25 @@ JNIEXPORT jintArray JNICALL Java_com_android_wm_XWindow_nativePoll
             s->width = event.xconfigure.width; s->height = event.xconfigure.height;
             kind = 1; x = s->width; y = s->height;
         }
-        if ((event.type == ButtonPress || event.type == ButtonRelease) && event.xbutton.button == Button1) {
-            kind = event.type == ButtonPress ? 3 : 4; x = event.xbutton.x; y = event.xbutton.y;
+        /* Preserve legacy left-click/drag kinds; add wheel, right button and hover. */
+        if (event.type == ButtonPress || event.type == ButtonRelease) {
+            if (event.xbutton.button == Button1) kind = event.type == ButtonPress ? 3 : 4;
+            else if (event.xbutton.button == Button3) kind = event.type == ButtonPress ? 11 : 12;
+            else if (event.type == ButtonPress && event.xbutton.button == Button4) kind = 10;
+            else if (event.type == ButtonPress && event.xbutton.button == Button5) kind = 14;
+            x = event.xbutton.x; y = event.xbutton.y;
         }
-        if (event.type == MotionNotify) { kind = 5; x = event.xmotion.x; y = event.xmotion.y; }
+        if (event.type == MotionNotify) {
+            kind = event.xmotion.state & Button3Mask ? 15 : event.xmotion.state & Button1Mask ? 5 : 13;
+            x = event.xmotion.x; y = event.xmotion.y;
+        }
         if (event.type == FocusOut) kind = 6;
         if (event.type == ClientMessage && (Atom)event.xclient.data.l[0] == s->delete_window) s->closing = 1;
         if (event.type == DestroyNotify) { s->destroyed = 1; s->closing = 1; }
         if (s->closing) { kind = 2; x = s->width; y = s->height; }
+        /* Pack pointer modifiers above the legacy kind byte; keyboard batches keep their existing format. */
+        if ((event.type == ButtonPress || event.type == ButtonRelease || event.type == MotionNotify) && kind)
+            kind |= ((event.type == MotionNotify ? event.xmotion.state : event.xbutton.state) & 0xff) << 8;
         if (kind) { values[count++] = kind; values[count++] = x; values[count++] = y; }
     }
     jintArray result = (*env)->NewIntArray(env, count);

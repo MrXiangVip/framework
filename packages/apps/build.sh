@@ -39,6 +39,11 @@ cleanup() { if [[ -n "$BUILD_TMP" ]]; then rm -rf -- "$BUILD_TMP"; fi; }
 trap cleanup EXIT
 for name in "${APP_NAMES[@]}"; do
     app_dir="$APPS_DIR/$name"
+    # Browser APK and its external Chromium host must be prepared together on Linux.
+    if [[ "$name" == "browser" ]]; then
+        echo "Prepare browser Chromium runtime"
+        bash "$app_dir/setup.sh" --ensure
+    fi
     apk="$REPO_ROOT/out/system/app/$name/$name.apk"
     mapfile -d '' -t sources < <(find "$app_dir/src" -name '*.java' -print0)
     [[ ${#sources[@]} -gt 0 ]] || { echo "No Java sources: $name" >&2; exit 1; }

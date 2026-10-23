@@ -1,0 +1,273 @@
+2026-10-23 20:57:49 ActivityThread. newActivity className com.packages.browser.MainActivity
+2026-10-23 20:57:49 Window.setWindowManager
+2026-10-23 20:57:49 Activity.onCreate
+2026-10-23 20:57:49 ViewGroup.addView com.packages.browser.BrowserView@46f7f36a
+2026-10-23 20:57:49 Choreographer.initialValue
+2026-10-23 20:57:49 Handler.enqueueMessage
+2026-10-23 20:57:49 MessageQueue.enqueueMessage 
+2026-10-23 20:57:49 Handler.dispatchMessage
+2026-10-23 20:57:49 Choreographer.handleMessage 2
+2026-10-23 20:57:49 Handler.enqueueMessage
+2026-10-23 20:57:49 MessageQueue.enqueueMessage 
+2026-10-23 20:57:49 Handler.enqueueMessage
+2026-10-23 20:57:49 MessageQueue.enqueueMessage 
+2026-10-23 20:57:49 Handler.enqueueMessage
+2026-10-23 20:57:49 MessageQueue.enqueueMessage 
+2026-10-23 20:57:49 Handler.dispatchMessage
+2026-10-23 20:57:49 Handler.dispatchMessage
+2026-10-23 20:57:49 Handler.enqueueMessage
+2026-10-23 20:57:49 MessageQueue.enqueueMessage 
+2026-10-23 20:57:49 Handler.dispatchMessage
+2026-10-23 20:57:49 Handler.dispatchMessage
+2026-10-23 20:57:49 Choreographer.handleMessage 2
+2026-10-23 20:57:49 Handler.enqueueMessage
+2026-10-23 20:57:49 MessageQueue.enqueueMessage 
+2026-10-23 20:57:49 Handler.dispatchMessage
+2026-10-23 20:57:49 等待消息 wait here
+2026-10-23 20:57:49 Handler.enqueueMessage
+2026-10-23 20:57:49 MessageQueue.enqueueMessage 
+2026-10-23 20:57:49 Handler.dispatchMessage
+2026-10-23 20:57:49 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+PASS: actual browser APK paints Chromium pixels into its framework window
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+PASS: native X11 click reaches the actual webpage DOM
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+PASS: Ctrl modifier survives native X11, View routing and CEF input
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+PASS: native right button reaches webpage contextmenu handler
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 Choreographer.handleMessage 2
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+PASS: native wheel scrolls the actual webpage
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+PASS: detaching the framework window closes its Chromium host
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:50 Handler.enqueueMessage
+2026-10-23 20:57:50 MessageQueue.enqueueMessage 
+2026-10-23 20:57:50 Handler.dispatchMessage
+2026-10-23 20:57:50 等待消息 wait here
+2026-10-23 20:57:51 Handler.enqueueMessage
+2026-10-23 20:57:51 MessageQueue.enqueueMessage 
+2026-10-23 20:57:51 Handler.dispatchMessage
+2026-10-23 20:57:51 等待消息 wait here
+2026-10-23 20:57:51 Handler.enqueueMessage
+2026-10-23 20:57:51 MessageQueue.enqueueMessage 
+2026-10-23 20:57:51 Handler.dispatchMessage
+2026-10-23 20:57:51 等待消息 wait here
+2026-10-23 20:57:51 Handler.enqueueMessage
+2026-10-23 20:57:51 MessageQueue.enqueueMessage 
+2026-10-23 20:57:51 Handler.dispatchMessage
+2026-10-23 20:57:51 等待消息 wait here
+2026-10-23 20:57:51 Handler.enqueueMessage
+2026-10-23 20:57:51 MessageQueue.enqueueMessage 
+2026-10-23 20:57:51 Handler.dispatchMessage
+2026-10-23 20:57:51 等待消息 wait here
+2026-10-23 20:57:51 Handler.enqueueMessage
+2026-10-23 20:57:51 MessageQueue.enqueueMessage 
+2026-10-23 20:57:51 Handler.dispatchMessage
+2026-10-23 20:57:51 等待消息 wait here
+2026-10-23 20:57:51 Handler.enqueueMessage
+2026-10-23 20:57:51 MessageQueue.enqueueMessage 
+2026-10-23 20:57:51 Handler.dispatchMessage
+2026-10-23 20:57:51 等待消息 wait here
+2026-10-23 20:57:51 Handler.enqueueMessage
+2026-10-23 20:57:51 MessageQueue.enqueueMessage 
+2026-10-23 20:57:51 Handler.dispatchMessage
+2026-10-23 20:57:51 等待消息 wait here
+2026-10-23 20:57:51 Handler.enqueueMessage
+2026-10-23 20:57:51 MessageQueue.enqueueMessage 
+2026-10-23 20:57:51 Handler.dispatchMessage
+2026-10-23 20:57:51 等待消息 wait here
+2026-10-23 20:57:51 Handler.enqueueMessage
+2026-10-23 20:57:51 MessageQueue.enqueueMessage 
+2026-10-23 20:57:51 Handler.dispatchMessage
+2026-10-23 20:57:51 等待消息 wait here
+2026-10-23 20:57:51 Handler.enqueueMessage
+2026-10-23 20:57:51 MessageQueue.enqueueMessage 
+2026-10-23 20:57:51 Handler.dispatchMessage
+2026-10-23 20:57:51 等待消息 wait here
+2026-10-23 20:57:52 Handler.enqueueMessage
+2026-10-23 20:57:52 MessageQueue.enqueueMessage 
+2026-10-23 20:57:52 Handler.dispatchMessage
+2026-10-23 20:57:52 等待消息 wait here
+2026-10-23 20:57:52 Handler.enqueueMessage
+2026-10-23 20:57:52 MessageQueue.enqueueMessage 
+2026-10-23 20:57:52 Handler.dispatchMessage
+2026-10-23 20:57:52 等待消息 wait here
+2026-10-23 20:57:52 Handler.enqueueMessage
+2026-10-23 20:57:52 MessageQueue.enqueueMessage 
+2026-10-23 20:57:52 Handler.dispatchMessage
+2026-10-23 20:57:52 等待消息 wait here

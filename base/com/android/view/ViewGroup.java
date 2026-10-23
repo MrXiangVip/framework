@@ -106,6 +106,16 @@ public abstract  class ViewGroup extends View implements ViewParent {
         return super.dispatchKeyEvent(event);
     }
     @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        // Hover and wheel target the pointer location without taking a click/drag capture.
+        if (event.getAction() == MotionEvent.ACTION_SCROLL || event.getAction() == MotionEvent.ACTION_HOVER) {
+            for (int i = mChildrenCount - 1; i >= 0; i--) {
+                View child = mChildren[i];
+                int x = event.getX() - child.getLeft(), y = event.getY() - child.getTop();
+                if (x >= 0 && y >= 0 && x < child.getWidth() && y < child.getHeight()
+                        && child.dispatchTouchEvent(event.offset(-child.getLeft(), -child.getTop()))) return true;
+            }
+            return super.dispatchTouchEvent(event);
+        }
         // Focus loss/closure also cancels keyboard-driven child state without an active pointer target.
         if (event.getAction() == MotionEvent.ACTION_CANCEL && mTouchTarget == null) {
             for (int i = 0; i < mChildrenCount; i++) {

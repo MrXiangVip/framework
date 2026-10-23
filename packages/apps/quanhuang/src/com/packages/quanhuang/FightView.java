@@ -10,8 +10,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Sprite fighters and arena, rendered through the framework's software/X11 surface. */
@@ -22,7 +23,7 @@ public class FightView extends View {
     private static final int SHEET_COLUMNS = 6, SHEET_ROWS = 5;
     private final BufferedImage sparkSheet, ironSheet;
     private BufferedImage frame;
-    private Timer timer;
+    private ScheduledExecutorService timer;
     private long lastTick;
     private double animation;
     private final java.util.Set<Integer> keys = new java.util.HashSet<>();
@@ -41,7 +42,7 @@ public class FightView extends View {
 
     private static final String[] IDS = {"left", "right", "jump", "guard", "punch", "kick", "special", "pause", "restart", "sound"};
     private static final String[] LABELS = {"<", ">", "JUMP", "GUARD", "PUNCH", "KICK", "BURST", "II", "R", "SFX ON"};
-    private static final String[] KEYS = {"A", "D", "W / SPACE", "L", "J", "K", "U  /  40 MP", "P", "R", "M"};
+    private static final String[] KEYS = {"A", "D", "W", "L", "J", "K", "I  /  40 MP", "P", "R", "M"};
     private static final int[][] BOXES = {{32,718,84,78},{132,718,84,78},{82,620,84,78},{240,718,98,78},
             {402,650,94,80},{510,718,94,78},{592,610,100,86},{558,26,60,44},{632,26,60,44},{450,26,94,44}};
 
@@ -156,14 +157,15 @@ public class FightView extends View {
         if (timer != null || !attached()) return;
         if (game.getState() == FightEngine.State.READY) audio.play(FightEngine.Sound.ROUND);
         lastTick = System.nanoTime();
-        timer = new Timer("quanhuang-frames", true);
-        timer.scheduleAtFixedRate(new TimerTask() {
-            @Override public void run() {
-                if (pending.compareAndSet(false, true)) ui.sendMessage(ui.obtainMessage(0, null));
-            }
-        }, 33, 33);
+        // UI scheduling runs at 60 Hz; elapsed dt drives the fixed-step engine.
+        timer = Executors.newSingleThreadScheduledExecutor(task -> {
+            Thread thread = new Thread(task, "quanhuang-frames"); thread.setDaemon(true); return thread;
+        });
+        timer.scheduleAtFixedRate(() -> {
+            if (pending.compareAndSet(false, true)) ui.sendMessage(ui.obtainMessage(0, null));
+        }, 0, 1_000_000_000L / 60, TimeUnit.NANOSECONDS);
     }
-    private void stopTimer() { if (timer != null) { timer.cancel(); timer = null; } game.releaseControls(); audio.close(); }
+    private void stopTimer() { if (timer != null) { timer.shutdownNow(); timer = null; } game.releaseControls(); audio.close(); }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         setMeasuredDimension(resolveSize(600, widthSpec), resolveSize(800, heightSpec));
     }
@@ -202,28 +204,30 @@ public class FightView extends View {
         if (event.getType() == KeyEvent.TEXT) return true;
         if (event.getType() == KeyEvent.UP) { keys.remove(key); syncControls(); invalidate(); return true; }
         if (event.getType() != KeyEvent.DOWN || !keys.add(key)) return true;
-        String command = key == 'a' || key == KeyEvent.LEFT ? "left" : key == 'd' || key == KeyEvent.RIGHT ? "right"
-                : key == 'w' || key == ' ' || key == 0xff52 ? "jump" : key == 'j' ? "punch" : key == 'k' ? "kick"
-                : key == 'u' ? "special" : key == 'l' ? "guard" : key == 'p' || key == KeyEvent.ESCAPE ? "pause"
-                : key == 'm' ? "sound" : key == 'r' || key == KeyEvent.ENTER && game.getState() == FightEngine.State.MATCH_OVER ? "restart" : "";
-        action(command); syncControls(); invalidate(); return !command.isEmpty();
+        // Exact keyboard mapping; no move selection is performed in the view.
+        String command = key == 'p' ? "pause" : key == 'r' ? "restart" : key == 'm' ? "sound" : "";
+        action(command); syncControls(); invalidate();
+        return !command.isEmpty() || "adwsljki".indexOf(key) >= 0;
     }
     private void syncControls() {
         if (game.isPaused()) { game.releaseControls(); return; }
-        boolean left = held.equals("left") || keys.contains((int) 'a') || keys.contains(KeyEvent.LEFT);
-        boolean right = held.equals("right") || keys.contains((int) 'd') || keys.contains(KeyEvent.RIGHT);
-        game.setDirection((right ? 1 : 0) - (left ? 1 : 0));
-        game.setBlocking(held.equals("guard") || keys.contains((int) 'l'));
+        // Existing touch buttons report the same physical keys as the keyboard.
+        game.setInput(down('a', "left"), down('d', "right"), down('w', "jump"),
+                down('s', "crouch"), down('l', "guard"), down('j', "punch"),
+                down('k', "kick"), down('i', "special"));
+    }
+    private boolean down(char key, String button) {
+        return keys.contains((int) key) || held.equals(button);
     }
     private void action(String command) {
         switch (command) {
             case "left": break;
             case "right": break;
-            case "jump": game.jump(); break;
+            case "jump": break;
             case "guard": break;
-            case "punch": game.attack(FightEngine.Move.PUNCH); break;
-            case "kick": game.attack(FightEngine.Move.KICK); break;
-            case "special": game.attack(FightEngine.Move.SPECIAL); break;
+            case "punch": break;
+            case "kick": break;
+            case "special": break;
             case "pause": game.togglePause(); audio.setPaused(game.isPaused()); held = ""; break;
             case "restart": audio.clear(); audio.setPaused(false); game.restart(); held = ""; break;
             case "sound": setSoundMuted(!audio.isMuted()); held = ""; break;
@@ -319,7 +323,7 @@ public class FightView extends View {
         if (f.isHit() && !f.isGuarding()) {
             row = 4; column = 0;
         } else if (move != null) {
-            row = move == FightEngine.Move.PUNCH ? 1 : move == FightEngine.Move.KICK ? 2 : 3;
+            row = move == FightEngine.Move.SPECIAL ? 3 : move.isKick() ? 2 : 1;
             // Play each attack once over its windup, active and recovery phases.
             double duration = move.windup + move.active + move.recovery;
             column = Math.min(5, (int) (f.getAttackTime() / duration * SHEET_COLUMNS));
@@ -339,6 +343,14 @@ public class FightView extends View {
         Graphics2D g = (Graphics2D) source.create();
         try {
             g.translate(f.getX(), 540 - f.getHeight());
+            // Reuse supplied sprites for crouch/roll without changing sprite assets.
+            FightEngine.FighterState state = f.getState();
+            if (state == FightEngine.FighterState.CROUCH || state == FightEngine.FighterState.GUARD_CROUCH
+                    || move == FightEngine.Move.CROUCH_LP || move == FightEngine.Move.CROUCH_LK) g.scale(1, .68);
+            if (state == FightEngine.FighterState.ROLL_LEFT || state == FightEngine.FighterState.ROLL_RIGHT) {
+                g.translate(0, -48); g.rotate((state == FightEngine.FighterState.ROLL_RIGHT ? 1 : -1)
+                        * f.actionTime / f.actionDuration * Math.PI * 2); g.scale(1, .65);
+            }
             // Kick frames and the fourth punch frame face left in the source.
             // Normalize their native direction before applying combat facing.
             int nativeFacing = row == 2 || (row == 1 && column == 3) ? -1 : 1;
@@ -393,7 +405,7 @@ public class FightView extends View {
         g.setColor(new Color(0x263e59)); g.fillRect(0, 620, 720, 2);
         text(g, "MOVE + JUMP", 170, 856, 11, 0x8ea6c2, true);
         text(g, "STRIKE + GUARD", 536, 856, 11, 0x8ea6c2, true);
-        text(g, "A D / ARROWS  MOVE     W  JUMP     J K  ATTACK     L  GUARD     U  BURST", 360, 880, 10, 0x7790af, true);
+        text(g, "A D  MOVE    W  JUMP    S  CROUCH    J K  ATTACK    L  GUARD    I  BURST", 360, 880, 10, 0x7790af, true);
         for (int i = 0; i < BOXES.length; i++) {
             int[] b = BOXES[i];
             boolean pressed = IDS[i].equals(held);

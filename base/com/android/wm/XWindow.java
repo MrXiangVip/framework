@@ -30,7 +30,7 @@ public final class XWindow implements AutoCloseable {
             @Override public void handleMessage(Message message) {
                 int[] batch = (int[]) message.obj;
                 for (int i = 0; i < batch.length && !isClosed(); i += 3) {
-                    int kind = batch[i], x = batch[i + 1], y = batch[i + 2];
+                    int modifiers = batch[i] >>> 8, kind = batch[i] & 255, x = batch[i + 1], y = batch[i + 2];
                     if (kind == 1) listener.onEvent(x, y, false);
                     else if (kind == 2) {
                         close();
@@ -39,8 +39,11 @@ public final class XWindow implements AutoCloseable {
                         listener.onKeyInput(new KeyEvent(kind == 7 ? KeyEvent.TEXT : kind == 8 ? KeyEvent.DOWN : KeyEvent.UP, x, y));
                     } else {
                         int action = kind == 3 ? MotionEvent.ACTION_DOWN : kind == 4 ? MotionEvent.ACTION_UP
-                                : kind == 5 ? MotionEvent.ACTION_MOVE : MotionEvent.ACTION_CANCEL;
-                        listener.onInput(new MotionEvent(action, x, y));
+                                : kind == 11 ? MotionEvent.ACTION_DOWN : kind == 12 ? MotionEvent.ACTION_UP
+                                : kind == 10 || kind == 14 ? MotionEvent.ACTION_SCROLL : kind == 13 ? MotionEvent.ACTION_HOVER
+                                : kind == 5 || kind == 15 ? MotionEvent.ACTION_MOVE : MotionEvent.ACTION_CANCEL;
+                        listener.onInput(new MotionEvent(action, x, y, kind == 11 || kind == 12 || kind == 15 ? 3 : 1, modifiers,
+                                kind == 10 ? 120 : kind == 14 ? -120 : 0));
                     }
                 }
             }

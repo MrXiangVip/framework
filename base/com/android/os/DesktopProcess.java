@@ -30,9 +30,13 @@ public final class DesktopProcess implements AutoCloseable {
         }
         command.add("-cp");
         command.add(System.getProperty("java.class.path"));
+        // The bootstrap monitors a private pipe: even SIGKILL of the parent releases its children.
+        command.add(DesktopProcess.class.getName());
         command.add(mainClass);
         Collections.addAll(command, args);
-        ProcessBuilder builder = new ProcessBuilder(command).inheritIO();
+        // Keep stdin private; EOF is the parent-death signal. Console output still goes to the desktop log.
+        ProcessBuilder builder = new ProcessBuilder(command)
+                .redirectOutput(ProcessBuilder.Redirect.INHERIT).redirectError(ProcessBuilder.Redirect.INHERIT);
         // JAVA_TOOL_OPTIONS may specify the parent's classpath and override -cp in a fresh launcher.
         // Required properties are supplied explicitly above, so don't replay injected JVM options.
         builder.environment().remove("JAVA_TOOL_OPTIONS");
@@ -59,6 +63,18 @@ public final class DesktopProcess implements AutoCloseable {
         return pid;
     }
 
+    /** Child bootstrap: parent death must not leave a SystemServer holding the service port. */
+    public static void main(String[] args) {
+        if (args.length == 0) throw new IllegalArgumentException("Missing desktop entry point");
+        Thread parent = new Thread(() -> {
+            try { while (System.in.read() != -1) { /* Reserved lifetime pipe; no application input. */ } }
+            catch (IOException closed) { /* Parent pipe was closed. */ }
+            System.exit(0);
+        }, "desktop-parent-watchdog");
+        parent.setDaemon(true);
+        parent.start();
+        RuntimeInit.findStaticMain(args[0], Arrays.copyOfRange(args, 1, args.length), null).run();
+    }
     private static int pidOf(java.lang.Process child) throws ReflectiveOperationException, IOException {
         long pid;
         try {

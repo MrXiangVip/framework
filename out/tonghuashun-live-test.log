@@ -1,0 +1,339 @@
+Note: /home/xshx/github/framework/base/com/android/os/MessageQueue.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Built: /home/xshx/github/framework/out/system/app/tonghuashun/tonghuashun.apk
+Built 1 applications
+PASS: 21 market/account checks
+Live provider returned 15 valid symbols; first market time=2026-10-23 16:15:00
+PASS: 33 quote parsing/update/worker checks
+2026-10-25 10:48:16 ActivityThread. newActivity className com.packages.tonghuashun.MainActivity
+2026-10-25 10:48:16 Window.setWindowManager
+2026-10-25 10:48:16 Activity.onCreate
+2026-10-25 10:48:16 ViewGroup.addView com.packages.tonghuashun.MarketView@26a1ab54
+PackageManagerService. Registered com.packages.browser from /home/xshx/github/framework/out/system/app/browser
+PackageManagerService. Registered com.packages.calendar from /home/xshx/github/framework/out/system/app/calendar
+PackageManagerService. Registered com.packages.camera from /home/xshx/github/framework/out/system/app/camera
+PackageManagerService. Registered com.packages.clock from /home/xshx/github/framework/out/system/app/clock
+PackageManagerService. Registered com.packages.contact from /home/xshx/github/framework/out/system/app/contact
+PackageManagerService. Registered com.packages.filebrowser from /home/xshx/github/framework/out/system/app/filebrowser
+PackageManagerService. Registered com.packages.gallery from /home/xshx/github/framework/out/system/app/gallery
+PackageManagerService. Registered com.packages.kof from /home/xshx/github/framework/out/system/app/kof
+PackageManagerService. Registered com.packages.launcher from /home/xshx/github/framework/out/system/app/launcher
+PackageManagerService. Registered com.packages.messager from /home/xshx/github/framework/out/system/app/messager
+PackageManagerService. Registered com.packages.mqchat from /home/xshx/github/framework/out/system/app/mqchat
+PackageManagerService. Registered com.packages.quanhuang from /home/xshx/github/framework/out/system/app/quanhuang
+PackageManagerService. Registered com.packages.settings from /home/xshx/github/framework/out/system/app/settings
+PackageManagerService. Registered com.packages.tonghuashun from /home/xshx/github/framework/out/system/app/tonghuashun
+PackageManagerService. Registered com.packages.video from /home/xshx/github/framework/out/system/app/video
+PackageManagerService. Boot scan complete: 15 packages
+PASS: 16 actual market APK/UI checks; previews: /tmp/tonghuashun-test-lt5fmclh/ui
+2026-10-25 10:48:17 ActivityThread. newActivity className com.packages.tonghuashun.MainActivity
+2026-10-25 10:48:17 Window.setWindowManager
+2026-10-25 10:48:17 Activity.onCreate
+2026-10-25 10:48:17 ViewGroup.addView com.packages.tonghuashun.MarketView@26a1ab54
+2026-10-25 10:48:17 Choreographer.initialValue
+2026-10-25 10:48:17 Handler.enqueueMessage
+2026-10-25 10:48:17 MessageQueue.enqueueMessage 
+2026-10-25 10:48:17 Handler.dispatchMessage
+2026-10-25 10:48:17 Choreographer.handleMessage 2
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Choreographer.handleMessage 2
+2026-10-25 10:48:18 等待消息 wait here
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 等待消息 wait here
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Choreographer.handleMessage 2
+2026-10-25 10:48:18 等待消息 wait here
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+PASS: native quote click opens security detail
+2026-10-25 10:48:18 等待消息 wait here
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Choreographer.handleMessage 2
+2026-10-25 10:48:18 等待消息 wait here
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+PASS: native bottom navigation opens account
+2026-10-25 10:48:18 等待消息 wait here
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Choreographer.handleMessage 2
+2026-10-25 10:48:18 等待消息 wait here
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+PASS: native buy click opens paper order sheet
+2026-10-25 10:48:18 等待消息 wait here
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Choreographer.handleMessage 2
+2026-10-25 10:48:18 等待消息 wait here
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+PASS: native close click dismisses modal
+2026-10-25 10:48:18 ActivityThread. newActivity className com.packages.tonghuashun.MainActivity
+2026-10-25 10:48:18 Window.setWindowManager
+2026-10-25 10:48:18 Activity.onCreate
+2026-10-25 10:48:18 ViewGroup.addView com.packages.tonghuashun.MarketView@41cf53f9
+2026-10-25 10:48:18 Choreographer.initialValue
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Choreographer.handleMessage 2
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Choreographer.handleMessage 2
+2026-10-25 10:48:18 等待消息 wait here
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 等待消息 wait here
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:18 Handler.dispatchMessage
+2026-10-25 10:48:18 Choreographer.handleMessage 2
+2026-10-25 10:48:18 Handler.enqueueMessage
+2026-10-25 10:48:18 MessageQueue.enqueueMessage 
+2026-10-25 10:48:19 Handler.dispatchMessage
+PASS: actual APK receives HTTPS quotes on its UI thread: 腾讯报价 · 15只 · 10:48:18 · 5s / F5
+2026-10-25 10:48:19 等待消息 wait here
+2026-10-25 10:48:19 Handler.enqueueMessage
+2026-10-25 10:48:19 MessageQueue.enqueueMessage 
+2026-10-25 10:48:19 Handler.dispatchMessage
+2026-10-25 10:48:19 等待消息 wait here
+2026-10-25 10:48:19 Handler.enqueueMessage
+2026-10-25 10:48:19 MessageQueue.enqueueMessage 
+2026-10-25 10:48:19 Handler.dispatchMessage
+2026-10-25 10:48:19 等待消息 wait here
+2026-10-25 10:48:19 Handler.enqueueMessage
+2026-10-25 10:48:19 MessageQueue.enqueueMessage 
+2026-10-25 10:48:19 Handler.dispatchMessage
+2026-10-25 10:48:19 等待消息 wait here
+2026-10-25 10:48:19 Handler.enqueueMessage
+2026-10-25 10:48:19 MessageQueue.enqueueMessage 
+2026-10-25 10:48:19 Handler.dispatchMessage
+2026-10-25 10:48:19 等待消息 wait here
+2026-10-25 10:48:19 Handler.enqueueMessage
+2026-10-25 10:48:19 MessageQueue.enqueueMessage 
+2026-10-25 10:48:19 Handler.dispatchMessage
+2026-10-25 10:48:19 等待消息 wait here
+2026-10-25 10:48:20 Handler.enqueueMessage
+2026-10-25 10:48:20 MessageQueue.enqueueMessage 
+2026-10-25 10:48:20 Handler.dispatchMessage
+2026-10-25 10:48:20 等待消息 wait here
+2026-10-25 10:48:20 Handler.enqueueMessage
+2026-10-25 10:48:20 MessageQueue.enqueueMessage 
+2026-10-25 10:48:20 Handler.dispatchMessage
+2026-10-25 10:48:20 等待消息 wait here
+2026-10-25 10:48:20 Handler.enqueueMessage
+2026-10-25 10:48:20 MessageQueue.enqueueMessage 
+2026-10-25 10:48:20 Handler.dispatchMessage
+2026-10-25 10:48:20 等待消息 wait here
+2026-10-25 10:48:20 Handler.enqueueMessage
+2026-10-25 10:48:20 MessageQueue.enqueueMessage 
+2026-10-25 10:48:20 Handler.dispatchMessage
+2026-10-25 10:48:20 等待消息 wait here
+2026-10-25 10:48:20 Handler.enqueueMessage
+2026-10-25 10:48:20 MessageQueue.enqueueMessage 
+2026-10-25 10:48:20 Handler.dispatchMessage
+2026-10-25 10:48:20 等待消息 wait here
+2026-10-25 10:48:21 Handler.enqueueMessage
+2026-10-25 10:48:21 MessageQueue.enqueueMessage 
+2026-10-25 10:48:21 Handler.dispatchMessage
+2026-10-25 10:48:21 等待消息 wait here
+2026-10-25 10:48:21 Handler.enqueueMessage
+2026-10-25 10:48:21 MessageQueue.enqueueMessage 
+2026-10-25 10:48:21 Handler.dispatchMessage
+2026-10-25 10:48:21 等待消息 wait here
+2026-10-25 10:48:21 Handler.enqueueMessage
+2026-10-25 10:48:21 MessageQueue.enqueueMessage 
+2026-10-25 10:48:21 Handler.dispatchMessage
+2026-10-25 10:48:21 等待消息 wait here
+2026-10-25 10:48:21 Handler.enqueueMessage
+2026-10-25 10:48:21 MessageQueue.enqueueMessage 
+2026-10-25 10:48:21 Handler.dispatchMessage
+2026-10-25 10:48:21 等待消息 wait here
+2026-10-25 10:48:22 Handler.enqueueMessage
+2026-10-25 10:48:22 MessageQueue.enqueueMessage 
+2026-10-25 10:48:22 Handler.dispatchMessage
+2026-10-25 10:48:22 等待消息 wait here
+2026-10-25 10:48:22 Handler.enqueueMessage
+2026-10-25 10:48:22 MessageQueue.enqueueMessage 
+2026-10-25 10:48:22 Handler.dispatchMessage
+2026-10-25 10:48:22 等待消息 wait here
+2026-10-25 10:48:22 Handler.enqueueMessage
+2026-10-25 10:48:22 MessageQueue.enqueueMessage 
+2026-10-25 10:48:22 Handler.dispatchMessage
+2026-10-25 10:48:22 等待消息 wait here
+2026-10-25 10:48:22 Handler.enqueueMessage
+2026-10-25 10:48:22 MessageQueue.enqueueMessage 
+2026-10-25 10:48:22 Handler.dispatchMessage
+2026-10-25 10:48:22 等待消息 wait here
+2026-10-25 10:48:22 Handler.enqueueMessage
+2026-10-25 10:48:22 MessageQueue.enqueueMessage 
+2026-10-25 10:48:22 Handler.dispatchMessage
+2026-10-25 10:48:22 等待消息 wait here
+2026-10-25 10:48:23 Handler.enqueueMessage
+2026-10-25 10:48:23 MessageQueue.enqueueMessage 
+2026-10-25 10:48:23 Handler.dispatchMessage
+2026-10-25 10:48:23 等待消息 wait here
+2026-10-25 10:48:23 Handler.enqueueMessage
+2026-10-25 10:48:23 MessageQueue.enqueueMessage 
+2026-10-25 10:48:23 Handler.dispatchMessage
+2026-10-25 10:48:23 等待消息 wait here
+2026-10-25 10:48:23 Handler.enqueueMessage
+2026-10-25 10:48:23 MessageQueue.enqueueMessage 
+2026-10-25 10:48:23 Handler.dispatchMessage
+2026-10-25 10:48:23 等待消息 wait here
+2026-10-25 10:48:23 Handler.enqueueMessage
+2026-10-25 10:48:23 MessageQueue.enqueueMessage 
+2026-10-25 10:48:23 Handler.dispatchMessage
+2026-10-25 10:48:23 等待消息 wait here
+2026-10-25 10:48:23 Handler.enqueueMessage
+2026-10-25 10:48:23 MessageQueue.enqueueMessage 
+2026-10-25 10:48:23 Handler.dispatchMessage
+2026-10-25 10:48:23 Handler.enqueueMessage
+2026-10-25 10:48:23 MessageQueue.enqueueMessage 
+2026-10-25 10:48:23 Handler.dispatchMessage
+2026-10-25 10:48:23 Choreographer.handleMessage 2
+2026-10-25 10:48:23 等待消息 wait here
+2026-10-25 10:48:23 Handler.enqueueMessage
+2026-10-25 10:48:23 MessageQueue.enqueueMessage 
+2026-10-25 10:48:23 Handler.dispatchMessage
+PASS: attached application automatically fetches a second quote batch
+2026-10-25 10:48:23 等待消息 wait here
+2026-10-25 10:48:24 Handler.enqueueMessage
+2026-10-25 10:48:24 MessageQueue.enqueueMessage 
+2026-10-25 10:48:24 Handler.dispatchMessage
+2026-10-25 10:48:24 等待消息 wait here
+2026-10-25 10:48:24 Handler.enqueueMessage
+2026-10-25 10:48:24 MessageQueue.enqueueMessage 
+2026-10-25 10:48:24 Handler.dispatchMessage
+2026-10-25 10:48:24 等待消息 wait here
+2026-10-25 10:48:24 Handler.enqueueMessage
+2026-10-25 10:48:24 MessageQueue.enqueueMessage 
+2026-10-25 10:48:24 Handler.dispatchMessage
+2026-10-25 10:48:24 等待消息 wait here
+2026-10-25 10:48:24 Handler.enqueueMessage
+2026-10-25 10:48:24 MessageQueue.enqueueMessage 
+2026-10-25 10:48:24 Handler.dispatchMessage
+2026-10-25 10:48:24 等待消息 wait here
+2026-10-25 10:48:24 Handler.enqueueMessage
+2026-10-25 10:48:24 MessageQueue.enqueueMessage 
+2026-10-25 10:48:24 Handler.dispatchMessage
+2026-10-25 10:48:24 等待消息 wait here
+2026-10-25 10:48:25 Handler.enqueueMessage
+2026-10-25 10:48:25 MessageQueue.enqueueMessage 
+2026-10-25 10:48:25 Handler.dispatchMessage
+2026-10-25 10:48:25 等待消息 wait here
+2026-10-25 10:48:25 Handler.enqueueMessage
+2026-10-25 10:48:25 MessageQueue.enqueueMessage 
+2026-10-25 10:48:25 Handler.dispatchMessage
+2026-10-25 10:48:25 等待消息 wait here
+2026-10-25 10:48:25 Handler.enqueueMessage
+2026-10-25 10:48:25 MessageQueue.enqueueMessage 
+2026-10-25 10:48:25 Handler.dispatchMessage
+2026-10-25 10:48:25 等待消息 wait here
+2026-10-25 10:48:25 Handler.enqueueMessage
+2026-10-25 10:48:25 MessageQueue.enqueueMessage 
+2026-10-25 10:48:25 Handler.dispatchMessage
+2026-10-25 10:48:25 等待消息 wait here
+2026-10-25 10:48:25 Handler.enqueueMessage
+2026-10-25 10:48:25 MessageQueue.enqueueMessage 
+2026-10-25 10:48:25 Handler.dispatchMessage
+2026-10-25 10:48:25 等待消息 wait here
+2026-10-25 10:48:26 Handler.enqueueMessage
+2026-10-25 10:48:26 MessageQueue.enqueueMessage 
+2026-10-25 10:48:26 Handler.dispatchMessage
+2026-10-25 10:48:26 等待消息 wait here
+2026-10-25 10:48:26 Handler.enqueueMessage
+2026-10-25 10:48:26 MessageQueue.enqueueMessage 
+2026-10-25 10:48:26 Handler.dispatchMessage
+2026-10-25 10:48:26 等待消息 wait here
+2026-10-25 10:48:26 Handler.enqueueMessage
+2026-10-25 10:48:26 MessageQueue.enqueueMessage 
+2026-10-25 10:48:26 Handler.dispatchMessage
+2026-10-25 10:48:26 等待消息 wait here
+2026-10-25 10:48:26 Handler.enqueueMessage
+2026-10-25 10:48:26 MessageQueue.enqueueMessage 
+2026-10-25 10:48:26 Handler.dispatchMessage
+2026-10-25 10:48:26 等待消息 wait here
+2026-10-25 10:48:26 Handler.enqueueMessage
+2026-10-25 10:48:26 MessageQueue.enqueueMessage 
+2026-10-25 10:48:26 Handler.dispatchMessage
+2026-10-25 10:48:26 等待消息 wait here
+2026-10-25 10:48:27 Handler.enqueueMessage
+2026-10-25 10:48:27 MessageQueue.enqueueMessage 
+2026-10-25 10:48:27 Handler.dispatchMessage
+2026-10-25 10:48:27 等待消息 wait here
+2026-10-25 10:48:27 Handler.enqueueMessage
+2026-10-25 10:48:27 MessageQueue.enqueueMessage 
+2026-10-25 10:48:27 Handler.dispatchMessage
+2026-10-25 10:48:27 等待消息 wait here
+2026-10-25 10:48:27 Handler.enqueueMessage
+2026-10-25 10:48:27 MessageQueue.enqueueMessage 
+2026-10-25 10:48:27 Handler.dispatchMessage
+2026-10-25 10:48:27 等待消息 wait here
+2026-10-25 10:48:27 Handler.enqueueMessage
+2026-10-25 10:48:27 MessageQueue.enqueueMessage 
+2026-10-25 10:48:27 Handler.dispatchMessage
+2026-10-25 10:48:27 等待消息 wait here
+2026-10-25 10:48:27 Handler.enqueueMessage
+2026-10-25 10:48:27 MessageQueue.enqueueMessage 
+2026-10-25 10:48:27 Handler.dispatchMessage
+2026-10-25 10:48:27 等待消息 wait here
+2026-10-25 10:48:28 Handler.enqueueMessage
+2026-10-25 10:48:28 MessageQueue.enqueueMessage 
+2026-10-25 10:48:28 Handler.dispatchMessage
+2026-10-25 10:48:28 等待消息 wait here
+2026-10-25 10:48:28 Handler.enqueueMessage
+2026-10-25 10:48:28 MessageQueue.enqueueMessage 
+2026-10-25 10:48:28 Handler.dispatchMessage
+2026-10-25 10:48:28 等待消息 wait here
+2026-10-25 10:48:28 Handler.enqueueMessage
+2026-10-25 10:48:28 MessageQueue.enqueueMessage 
+2026-10-25 10:48:28 Handler.dispatchMessage
+2026-10-25 10:48:28 等待消息 wait here
+2026-10-25 10:48:28 Handler.enqueueMessage
+2026-10-25 10:48:28 MessageQueue.enqueueMessage 
+2026-10-25 10:48:28 Handler.dispatchMessage
+2026-10-25 10:48:28 等待消息 wait here
+2026-10-25 10:48:28 Handler.enqueueMessage
+2026-10-25 10:48:28 MessageQueue.enqueueMessage 
+2026-10-25 10:48:28 Handler.dispatchMessage
+PASS: detaching the native window stops the quote worker
+PASS: Linux Java 8 APK and X11 integration; previews: /home/xshx/github/framework/out/tonghuashun-previews
