@@ -31,7 +31,31 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
             if (attrs.width > 0) mWidth = attrs.width;
             if (attrs.height > 0) mHeight = attrs.height;
         }
+//      1.创建窗口
+        if (mWindow == null) {
+            mWindow = new XWindow(mWidth, mHeight);
+        }
+//      2.将图像画到窗口上
         requestLayout();
+
+//      3.打开事件接收
+        mWindow.registeListener( new XWindow.Listener() {
+            @Override public void onEvent(int width, int height, boolean closed) {
+                if (closed) { WindowManagerGlobal.getInstance().removeView(mView); close(); return; }
+                mWidth = Math.max(1, width); mHeight = Math.max(1, height);
+                scheduleTraversals();
+            }
+            @Override public void onKeyInput(KeyEvent event) { mView.dispatchKeyEvent(event); }
+            @Override public void onInput(MotionEvent event) {
+                // A resize and press may arrive in the same native batch.
+                if (mView.getWidth() != mWidth || mView.getHeight() != mHeight) {
+                    mView.measure(View.MeasureSpec.makeMeasureSpec(mWidth, View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(mHeight, View.MeasureSpec.EXACTLY));
+                    mView.layout(0, 0, mWidth, mHeight);
+                }
+                mView.dispatchTouchEvent(event);
+            }
+        } );
     }
     @Override public void requestLayout() { scheduleTraversals(); }
     @Override public void invalidate() { scheduleTraversals(); }
@@ -45,23 +69,7 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     }
     private void performTraversals() {
         if (mWindow == null) {
-            mWindow = new XWindow(mWidth, mHeight, new XWindow.Listener() {
-                @Override public void onEvent(int width, int height, boolean closed) {
-                    if (closed) { WindowManagerGlobal.getInstance().removeView(mView); close(); return; }
-                    mWidth = Math.max(1, width); mHeight = Math.max(1, height);
-                    scheduleTraversals();
-                }
-                @Override public void onKeyInput(KeyEvent event) { mView.dispatchKeyEvent(event); }
-                @Override public void onInput(MotionEvent event) {
-                    // A resize and press may arrive in the same native batch.
-                    if (mView.getWidth() != mWidth || mView.getHeight() != mHeight) {
-                        mView.measure(View.MeasureSpec.makeMeasureSpec(mWidth, View.MeasureSpec.EXACTLY),
-                                View.MeasureSpec.makeMeasureSpec(mHeight, View.MeasureSpec.EXACTLY));
-                        mView.layout(0, 0, mWidth, mHeight);
-                    }
-                    mView.dispatchTouchEvent(event);
-                }
-            });
+            mWindow = new XWindow(mWidth, mHeight );
         }
         mWindow.present(renderToImage(mView, mWidth, mHeight));
     }

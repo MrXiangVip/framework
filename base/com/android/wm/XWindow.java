@@ -23,7 +23,8 @@ public final class XWindow implements AutoCloseable {
     private static native void nativePresent(long handle, int[] pixels, int width, int height);
     private static native void nativeClose(long handle);
 
-    public XWindow(int width, int height, Listener listener) {
+    private Listener  mListener=null;
+    public XWindow(int width, int height) {
         handle = nativeOpen(width, height);
         if (handle == 0) throw new IllegalStateException("Cannot create X11 window; check DISPLAY");
         Handler ui = new Handler() {
@@ -31,19 +32,28 @@ public final class XWindow implements AutoCloseable {
                 int[] batch = (int[]) message.obj;
                 for (int i = 0; i < batch.length && !isClosed(); i += 3) {
                     int modifiers = batch[i] >>> 8, kind = batch[i] & 255, x = batch[i + 1], y = batch[i + 2];
-                    if (kind == 1) listener.onEvent(x, y, false);
-                    else if (kind == 2) {
+                    if (kind == 1) {
+                        if(mListener!=null){
+                            mListener.onEvent(x, y, false);
+                        }
+                    } else if (kind == 2) {
                         close();
-                        listener.onEvent(x, y, true);
+                        if(mListener!=null){
+                            mListener.onEvent(x, y, true);
+                        }
                     } else if (kind == 7 || kind == 8 || kind == 9) {
-                        listener.onKeyInput(new KeyEvent(kind == 7 ? KeyEvent.TEXT : kind == 8 ? KeyEvent.DOWN : KeyEvent.UP, x, y));
+                       if(mListener!=null ){
+                           mListener.onKeyInput(new KeyEvent(kind == 7 ? KeyEvent.TEXT : kind == 8 ? KeyEvent.DOWN : KeyEvent.UP, x, y));
+                       }
                     } else {
                         int action = kind == 3 ? MotionEvent.ACTION_DOWN : kind == 4 ? MotionEvent.ACTION_UP
                                 : kind == 11 ? MotionEvent.ACTION_DOWN : kind == 12 ? MotionEvent.ACTION_UP
                                 : kind == 10 || kind == 14 ? MotionEvent.ACTION_SCROLL : kind == 13 ? MotionEvent.ACTION_HOVER
                                 : kind == 5 || kind == 15 ? MotionEvent.ACTION_MOVE : MotionEvent.ACTION_CANCEL;
-                        listener.onInput(new MotionEvent(action, x, y, kind == 11 || kind == 12 || kind == 15 ? 3 : 1, modifiers,
-                                kind == 10 ? 120 : kind == 14 ? -120 : 0));
+                        if( mListener !=null ){
+                            mListener.onInput(new MotionEvent(action, x, y, kind == 11 || kind == 12 || kind == 15 ? 3 : 1, modifiers,
+                                    kind == 10 ? 120 : kind == 14 ? -120 : 0));
+                        }
                     }
                 }
             }
@@ -59,6 +69,7 @@ public final class XWindow implements AutoCloseable {
         }, 0, 25, TimeUnit.MILLISECONDS);
     }
 
+
     private synchronized int[] poll() { return handle == 0 ? null : nativePoll(handle); }
     public synchronized boolean isClosed() { return handle == 0; }
     public synchronized void present(BufferedImage frame) {
@@ -71,6 +82,12 @@ public final class XWindow implements AutoCloseable {
             nativeClose(handle);
             handle = 0;
             events.shutdownNow();
+        }
+    }
+
+    public void registeListener(Listener listener ){
+        if( listener !=null ){
+            mListener = listener;
         }
     }
 }
