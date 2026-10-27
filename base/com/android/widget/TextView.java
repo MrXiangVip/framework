@@ -24,6 +24,9 @@ public class TextView extends View {
             mTextColor = attrs.color("textColor", mTextColor);
         }
     }
+    public int getTextSize() { return mTextSize; }
+    public void setTextSize(int size) { mTextSize = Math.max(1, size); requestLayout(); invalidate(); }
+    public void setTextColor(int color) { mTextColor = color; invalidate(); }
     public String getText() { return mText; }
     public void setText(String text) { mText = text == null ? "" : text; requestLayout(); invalidate(); }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {

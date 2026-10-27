@@ -5,6 +5,7 @@ import com.android.graphics.Canvas;
 import com.android.os.Handler;
 import com.android.util.AttributeSet;
 import com.android.view.*;
+import com.android.widget.EditText;
 import com.android.widget.Button;
 import java.awt.Font;
 import java.awt.font.FontRenderContext;
@@ -24,10 +25,10 @@ public class GalleryView extends ViewGroup {
     private final Set<Path> broken = new HashSet<>();
     private final Map<String, Button> buttons = new LinkedHashMap<>();
     private final Tile[] tiles = new Tile[16];
-    private final PathInput input;
+    private final EditText input;
     private final PhotoSurface surface;
     private GalleryImages.Decoded current;
-    private boolean busy, viewing, pathFocused;
+    private boolean busy, viewing;
     private String status = "";
     private int index, page, columns = 3, rows = 3, capacity = 9, inset;
     private double zoom = 1, panX, panY;
@@ -42,7 +43,7 @@ public class GalleryView extends ViewGroup {
         home = Paths.get(System.getProperty("framework.gallery.directory", Paths.get(System.getProperty("user.home"), "Pictures").toString())).toAbsolutePath().normalize();
         camera = Paths.get(System.getProperty("framework.camera.output", Paths.get(System.getProperty("user.home"), "Pictures", "FrameworkCamera").toString())).toAbsolutePath().normalize();
         directory = home;
-        input = new PathInput(context); input.setId("path"); input.setOnClickListener(view -> { pathFocused = true; input.cursor = input.text.length(); input.all = false; invalidate(); });
+        input = new EditText(context); input.setId("path"); input.setSingleLine(); input.setMaxLength(4096); input.setTextSize(13); input.setTextColor(0xff344054);
         addView(input, new LayoutParams(-2, -2));
         button("go", "Go", this::go);
         button("home", "Pictures", () -> scan(home)); button("camera", "Camera photos", () -> scan(camera)); button("refresh", "Refresh", () -> scan(directory));
@@ -58,7 +59,7 @@ public class GalleryView extends ViewGroup {
             tile.setOnClickListener(view -> { int target = page * capacity + position; if (!busy && target < photos.size()) open(target); });
             addView(tile, new LayoutParams(-2, -2));
         }
-        input.set(directory.toString()); scan(directory);
+        setInput(input, directory.toString()); scan(directory);
     }
     private void button(String id, String text, Runnable action) {
         Button button = new GalleryButton(getContext()); button.setId(id); button.setText(text);
@@ -78,15 +79,15 @@ public class GalleryView extends ViewGroup {
         });
     }
     private void go() {
-        try { scan(directory.resolve(input.text)); }
+        try { scan(directory.resolve(input.getText())); }
         catch (InvalidPathException e) { status = "Invalid directory path"; invalidate(); }
     }
     private void scan(Path path) {
         work("Scanning pictures...", () -> {
             GalleryImages.Album album = GalleryImages.scan(path);
             return () -> {
-                photos = album.photos; index = 0; directory = album.directory; input.set(directory.toString());
-                thumbnails.clear(); broken.clear(); current = null; viewing = false; page = 0; pathFocused = false;
+                photos = album.photos; index = 0; directory = album.directory; setInput(input, directory.toString());
+                thumbnails.clear(); broken.clear(); current = null; viewing = false; page = 0; clearFocus();
                 status = (album.limited ? "First 3000 photos only. " : "") + (album.skipped > 0 ? album.skipped + " unreadable entries skipped" : "");
             };
         });
@@ -116,7 +117,7 @@ public class GalleryView extends ViewGroup {
             try { decoded = GalleryImages.decode(photo.path, 2048); }
             catch (Exception e) { error = "Cannot open image: " + (e.getMessage() == null ? "Damaged image" : e.getMessage()); }
             final GalleryImages.Decoded image = decoded; final String result = error;
-            return () -> { index = target; current = image; viewing = true; zoom = 1; panX = panY = 0; pathFocused = false; status = result; };
+            return () -> { index = target; current = image; viewing = true; zoom = 1; panX = panY = 0; clearFocus(); status = result; };
         });
     }
     private void back() { viewing = false; current = null; page = index / capacity; status = ""; requestLayout(); invalidate(); }
@@ -129,23 +130,35 @@ public class GalleryView extends ViewGroup {
     public String getCurrentName() { return photos.isEmpty() ? "" : photos.get(index).label; }
     public String getTileName(int tile) { int i = page * capacity + tile; return i < photos.size() ? photos.get(i).label : ""; }
     public double getZoom() { return zoom; }
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        if (busy && event.getAction() != MotionEvent.ACTION_CANCEL) return true;
+        return super.dispatchTouchEvent(event);
+    }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (busy) return true;
+        if (event.getType() == KeyEvent.DOWN && (event.getValue() == KeyEvent.TAB || event.getValue() == KeyEvent.ISO_LEFT_TAB)) {
+            if (input.getWidth() > 0) input.requestFocus();
+            return true;
+        }
         if (event.getType() == KeyEvent.DOWN) {
             int key = event.getValue();
             if (viewing) {
                 if (key == KeyEvent.ESCAPE) { back(); return true; }
                 if (key == KeyEvent.LEFT) { if (index > 0) open(index - 1); return true; }
                 if (key == KeyEvent.RIGHT) { if (index + 1 < photos.size()) open(index + 1); return true; }
-            } else if (key == KeyEvent.ENTER || key == 0xff8d) { if (pathFocused) go(); return true; }
+            } else if (key == KeyEvent.ENTER || key == 0xff8d) { if (input.isFocused()) go(); return true; }
         }
         if (viewing && event.getType() == KeyEvent.TEXT) {
             if (event.getValue() == '+' || event.getValue() == '=') { setZoom(zoom * 1.5); return true; }
             if (event.getValue() == '-') { setZoom(zoom / 1.5); return true; }
             if (event.getValue() == '0') { zoom = 1; panX = panY = 0; invalidate(); return true; }
         }
-        if (!viewing && pathFocused && input.key(event)) { invalidate(); return true; }
+        if (!viewing && input.isFocused() && input.dispatchKeyEvent(event)) { invalidate(); return true; }
         return false;
+    }
+    private static void setInput(EditText field, String value) {
+        field.setText(value);
+        field.setSelection(field.getText().length());
     }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         setMeasuredDimension(resolveSize(600, widthSpec), resolveSize(800, heightSpec));
@@ -258,43 +271,5 @@ public class GalleryView extends ViewGroup {
             canvas.drawText(getText(), Math.max(4, (getWidth() - width) / 2), (getHeight() - 14) / 2 + 13, 14, 0xff202124);
         }
     }
-    private final class PathInput extends View {
-        String text = ""; int cursor; boolean all;
-        PathInput(Context context) { super(context); }
-        void set(String value) { text = value; cursor = value.length(); all = false; }
-        boolean key(KeyEvent event) {
-            int key = event.getValue();
-            if (event.getType() == KeyEvent.TEXT) {
-                if (!Character.isValidCodePoint(key) || Character.isISOControl(key)) return false;
-                String inserted = new String(Character.toChars(key));
-                if ((all ? 0 : text.length()) + inserted.length() > 4096) return true;
-                if (all) set(""); text = text.substring(0, cursor) + inserted + text.substring(cursor); cursor += inserted.length(); return true;
-            }
-            if (event.getType() != KeyEvent.DOWN) return false;
-            if ((event.getModifiers() & KeyEvent.CONTROL) != 0 && (key == 'a' || key == 'A')) { all = true; return true; }
-            if (key == KeyEvent.HOME) cursor = 0;
-            else if (key == KeyEvent.END) cursor = text.length();
-            else if (key == KeyEvent.LEFT) { if (cursor > 0) cursor = text.offsetByCodePoints(cursor, -1); }
-            else if (key == KeyEvent.RIGHT) { if (cursor < text.length()) cursor = text.offsetByCodePoints(cursor, 1); }
-            else if (key == KeyEvent.BACKSPACE || key == KeyEvent.DELETE) {
-                if (all) set("");
-                else if (key == KeyEvent.BACKSPACE && cursor > 0) {
-                    int before = text.offsetByCodePoints(cursor, -1); text = text.substring(0, before) + text.substring(cursor); cursor = before;
-                } else if (key == KeyEvent.DELETE && cursor < text.length()) text = text.substring(0, cursor) + text.substring(text.offsetByCodePoints(cursor, 1));
-            } else return false;
-            all = false; return true;
-        }
-        @Override protected void onDraw(Canvas canvas) {
-            canvas.fillRect(0, 0, getWidth(), getHeight(), pathFocused && all ? 0xffdce7ff : 0xffffffff);
-            canvas.strokeRect(0, 0, getWidth(), getHeight(), pathFocused ? 0xff5179db : 0xffccd4e0);
-            Font font = new Font(Font.SANS_SERIF, Font.PLAIN, 14); int start = 0;
-            while (start < cursor && font.getStringBounds(text.substring(start, cursor), METRICS).getWidth() > getWidth() - 28) start = text.offsetByCodePoints(start, 1);
-            canvas.save();
-            try {
-                canvas.clipRect(8, 4, Math.max(0, getWidth() - 16), Math.max(0, getHeight() - 8));
-                canvas.drawText(text.substring(start), 12, 26, 14, 0xff344054);
-                if (pathFocused) canvas.fillRect(12 + (int) font.getStringBounds(text.substring(start, cursor), METRICS).getWidth(), 8, 1, 24, 0xff5179db);
-            } finally { canvas.restore(); }
-        }
-    }
+
 }

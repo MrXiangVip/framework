@@ -5,6 +5,7 @@ import com.android.graphics.Canvas;
 import com.android.os.Handler;
 import com.android.util.AttributeSet;
 import com.android.view.*;
+import com.android.widget.EditText;
 import com.packages.mqchat.PeerProtocol.*;
 import com.packages.mqchat.PeerStore.*;
 import java.awt.*;
@@ -21,11 +22,10 @@ import javax.imageio.stream.ImageInputStream;
 public final class PeerView extends ViewGroup implements AutoCloseable {
     private final ChatText text;
     private final Map<String,Control> buttons=new LinkedHashMap<>();
-    private final List<Input> fields=new ArrayList<>();
     private final Map<String,String> drafts=new HashMap<>();
     private final Map<String,BufferedImage> images=new LinkedHashMap<String,BufferedImage>(){protected boolean removeEldestEntry(Map.Entry<String,BufferedImage> e){return size()>128;}};
-    private final Input friendCode,nickname,avatarPath,backupPath,composer,search;
-    private Input focused;private String page="friends",selected="",notice="";private boolean confirmImport,closed,wasAttached;
+    private final EditText friendCode,nickname,avatarPath,backupPath,composer,search;
+    private String page="friends",selected="",notice="";private boolean confirmImport,closed,wasAttached;
     private final Panel panel;private PeerSession session;private final java.util.Timer lifecycle=new java.util.Timer("mqchat-view-lifecycle",true);
     private final Handler ui=new Handler(message->{if(!closed){invalidate();if(wasAttached&&!attached())close();}return true;});
     public PeerView(Context context,AttributeSet attrs){
@@ -38,36 +38,60 @@ public final class PeerView extends ViewGroup implements AutoCloseable {
         button("network","连接",()->{if(session.connected())session.disconnect();else{session.disconnect();session.connect();}});
         button("friends","通讯录",()->show("friends"));button("profile","我的",()->show("profile"));button("backup","备份迁移",()->show("backup"));
         button("addFriend","添加好友",()->show("addFriend"));button("editProfile","编辑资料",()->{syncIdentity();show("editProfile");});
-        button("add","发送好友申请",()->session.addFriend(friendCode.value));button("back","‹ 返回",()->show(page.equals("backup")||page.equals("editProfile")?"profile":"friends"));
+        button("add","发送好友申请",()->session.addFriend(friendCode.getText()));button("back","‹ 返回",()->show(page.equals("backup")||page.equals("editProfile")?"profile":"friends"));
         button("send","发送",()->send());button("accept","同意申请",()->{session.accept(selected);if(isFriend(selected))show("chat");});
         button("decline","拒绝",()->{session.decline(selected);show("friends");});
-        button("saveProfile","保存资料",this::saveProfile);button("clearAvatar","清除头像",()->{session.updateProfile(nickname.value,new byte[0]);notice="头像已清除";});
-        button("export","导出备份",()->{session.exportBackup(Paths.get(backupPath.value));confirmImport=false;});
-        button("import","导入备份",()->{if(!confirmImport){confirmImport=true;notice="再次点击“确认恢复”：当前身份、好友及聊天记录将被备份替换";}else{session.importBackup(Paths.get(backupPath.value));syncIdentity();drafts.clear();selected="";confirmImport=false;notice="";}});
+        button("saveProfile","保存资料",this::saveProfile);button("clearAvatar","清除头像",()->{session.updateProfile(nickname.getText(),new byte[0]);notice="头像已清除";});
+        button("export","导出备份",()->{session.exportBackup(Paths.get(backupPath.getText()));confirmImport=false;});
+        button("import","导入备份",()->{if(!confirmImport){confirmImport=true;notice="再次点击“确认恢复”：当前身份、好友及聊天记录将被备份替换";}else{session.importBackup(Paths.get(backupPath.getText()));syncIdentity();drafts.clear();selected="";confirmImport=false;notice="";}});
         PeerSession created=null;try{Path home=Paths.get(System.getProperty("framework.mqchat.dataDir",Paths.get(System.getProperty("user.home"),".mqchat").toString()));created=new PeerSession(home.resolve("mqchat.sqlite"),()->ui.sendMessage(ui.obtainMessage(0,null)));}catch(Exception e){e.printStackTrace(System.err);notice=e instanceof ClassNotFoundException?"数据库初始化失败：应用安装包缺少依赖，请重新构建并更新 MQChat":"数据库初始化失败："+e.getClass().getSimpleName()+" · "+e.getMessage();}
-        session=created;if(session!=null)syncIdentity();backupPath.set(Paths.get(System.getProperty("user.home"),"mqchat-backup.sqlite").toString());focused=search;
+        session=created;if(session!=null)syncIdentity();setInput(backupPath, Paths.get(System.getProperty("user.home"),"mqchat-backup.sqlite").toString());focus(search);
         lifecycle.scheduleAtFixedRate(new TimerTask(){public void run(){ui.sendMessage(ui.obtainMessage(0,null));}},1000,1000);
     }
     public PeerSession getSession(){return session;}
     public String getPage(){return page;}
     public String getSelected(){return selected;}
-    public String getComposer(){return composer.value;}
-    private void syncIdentity(){nickname.set(session.identity().name);avatarPath.set("");}
+    public String getComposer(){return composer.getText();}
+    private void syncIdentity(){setInput(nickname, session.identity().name);setInput(avatarPath, "");}
     private boolean attached(){View root=this;while(root.getParent() instanceof View)root=(View)root.getParent();return root.getParent()!=null;}
     private boolean isFriend(String uuid){try{Contact c=session.store.contact(uuid);return c!=null&&c.state.equals("accepted");}catch(Exception e){return false;}}
-    private void show(String next){if(page.equals("chat"))drafts.put(selected,composer.value);page=next;notice="";confirmImport=false;panel.offset=0;focused=next.equals("chat")?composer:next.equals("friends")?search:next.equals("addFriend")?friendCode:next.equals("editProfile")?nickname:next.equals("backup")?backupPath:null;if(next.equals("chat"))composer.set(drafts.getOrDefault(selected,""));requestLayout();invalidate();}
+    private void show(String next){if(page.equals("chat"))drafts.put(selected,composer.getText());page=next;notice="";confirmImport=false;panel.offset=0;focus(next.equals("chat")?composer:next.equals("friends")?search:next.equals("addFriend")?friendCode:next.equals("editProfile")?nickname:next.equals("backup")?backupPath:null);if(next.equals("chat"))setInput(composer, drafts.getOrDefault(selected,""));requestLayout();invalidate();}
     private void choose(Contact contact){selected=contact.profile.uuid;show(contact.state.equals("accepted")?"chat":"request");}
-    private void send(){if(session!=null&&session.send(selected,composer.value)){composer.set("");drafts.remove(selected);panel.bottom=true;}invalidate();}
-    private void saveProfile(){try{byte[] avatar=session.identity().avatar;if(!avatarPath.value.trim().isEmpty())avatar=readAvatar(Paths.get(avatarPath.value.trim()));session.updateProfile(nickname.value,avatar);avatarPath.set("");notice="";}catch(Exception e){notice="头像读取失败："+e.getMessage();}invalidate();}
+    private void send(){if(session!=null&&session.send(selected,composer.getText())){setInput(composer, "");drafts.remove(selected);panel.bottom=true;}invalidate();}
+    private void saveProfile(){try{byte[] avatar=session.identity().avatar;if(!avatarPath.getText().trim().isEmpty())avatar=readAvatar(Paths.get(avatarPath.getText().trim()));session.updateProfile(nickname.getText(),avatar);setInput(avatarPath, "");notice="";}catch(Exception e){notice="头像读取失败："+e.getMessage();}invalidate();}
     static byte[] readAvatar(Path path)throws Exception{
         if(!Files.isRegularFile(path)||Files.size(path)>8*1024*1024)throw new IOException("请选择小于 8 MB 的图片");
         BufferedImage image;try(ImageInputStream stream=ImageIO.createImageInputStream(path.toFile())){Iterator<ImageReader> readers=ImageIO.getImageReaders(stream);if(!readers.hasNext())throw new IOException("图片格式不支持");ImageReader reader=readers.next();try{reader.setInput(stream);if(reader.getWidth(0)>8192||reader.getHeight(0)>8192)throw new IOException("图片尺寸过大");ImageReadParam param=reader.getDefaultReadParam();int sample=Math.max(1,Math.max(reader.getWidth(0),reader.getHeight(0))/256);param.setSourceSubsampling(sample,sample,0,0);image=reader.read(0,param);}finally{reader.dispose();}}
         BufferedImage small=new BufferedImage(64,64,BufferedImage.TYPE_INT_RGB);Graphics2D g=small.createGraphics();try{g.setColor(Color.WHITE);g.fillRect(0,0,64,64);g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);int side=Math.min(image.getWidth(),image.getHeight()),x=(image.getWidth()-side)/2,y=(image.getHeight()-side)/2;g.drawImage(image,0,0,64,64,x,y,x+side,y+side,null);}finally{g.dispose();}ByteArrayOutputStream bytes=new ByteArrayOutputStream();ImageIO.write(small,"jpg",bytes);if(bytes.size()>6000)throw new IOException("图片压缩后仍过大");return bytes.toByteArray();
     }
-    private Input input(String id,String hint,int limit,boolean multiline){Input field=new Input(getContext(),hint,limit,multiline);field.setId(id);field.setOnClickListener(v->{focused=field;field.cursor=field.value.length();field.all=false;invalidate();});fields.add(field);addView(field,new LayoutParams(-2,-2));return field;}
+    private EditText input(String id, String hint, int limit, boolean multiline) {
+        EditText field = new EditText(getContext()) {
+            @Override protected int measureText(String value) { return (int) Math.ceil(text.width(value, mTextSize)); }
+            @Override protected void drawTextLine(Canvas canvas, String value, int x, int baseline, int color) {
+                text.draw(canvas, value, x, baseline, mTextSize, color);
+            }
+        };
+        field.setId(id); field.setHint(hint); field.setSingleLine(!multiline); field.setMaxCodePoints(limit); field.setTextSize(14);
+        addView(field, new LayoutParams(-2, -2)); return field;
+    }
     private void button(String id,String label,Runnable action){Control control=new Control(getContext(),label);control.setId(id);control.setOnClickListener(v->{if(session!=null)try{action.run();}catch(Exception e){notice="操作失败："+e.getMessage();}requestLayout();invalidate();});buttons.put(id,control);addView(control,new LayoutParams(-2,-2));}
-    @Override public boolean dispatchKeyEvent(KeyEvent event){if(event.getType()==KeyEvent.DOWN){int key=event.getValue();if(key==KeyEvent.ENTER&&(event.getModifiers()&KeyEvent.SHIFT)==0){if(focused==composer)send();else if(focused==friendCode&&session!=null)session.addFriend(friendCode.value);return true;}if(key==KeyEvent.TAB){List<Input> visible=new ArrayList<>();for(Input field:fields)if(field.getWidth()>0)visible.add(field);if(!visible.isEmpty())focused=visible.get((visible.indexOf(focused)+1)%visible.size());invalidate();return true;}if(key==KeyEvent.ESCAPE){show("friends");return true;}}
-        if(focused!=null){focused.key(event);if(focused==search)panel.offset=0;confirmImport=false;invalidate();}return true;}
+    @Override public boolean dispatchKeyEvent(KeyEvent event){
+        if (event.getType() == KeyEvent.DOWN && (event.getValue() == KeyEvent.TAB || event.getValue() == KeyEvent.ISO_LEFT_TAB))
+            return super.dispatchKeyEvent(event);
+        if(event.getType()==KeyEvent.DOWN){int key=event.getValue();if(key==KeyEvent.ENTER&&(event.getModifiers()&KeyEvent.SHIFT)==0){if(focused()==composer)send();else if(focused()==friendCode&&session!=null)session.addFriend(friendCode.getText());return true;}if(key==KeyEvent.ESCAPE){show("friends");return true;}}
+        if(focused()!=null){focused().dispatchKeyEvent(event);if(focused()==search)panel.offset=0;confirmImport=false;invalidate();}return true;}
+    private EditText focused() {
+        View view = findFocus();
+        return view instanceof EditText ? (EditText) view : null;
+    }
+    private void focus(EditText field) {
+        clearFocus();
+        if (field != null) { field.requestFocus(); field.setSelection(field.getText().length()); }
+    }
+    private static void setInput(EditText field, String value) {
+        field.setText(value);
+        field.setSelection(field.getText().length());
+    }
     @Override protected void onMeasure(int width,int height){setMeasuredDimension(resolveSize(600,width),resolveSize(800,height));for(int i=0;i<getChildCount();i++)getChildAt(i).measure(MeasureSpec.makeMeasureSpec(getMeasuredWidth(),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(44,MeasureSpec.EXACTLY));}
     private void place(View view,int x,int y,int width,int height){view.layout(x,y,x+Math.max(0,width),y+Math.max(0,height));}
     private void place(String id,int x,int y,int width,int height){place(buttons.get(id),x,y,width,height);}
@@ -180,23 +204,12 @@ public final class PeerView extends ViewGroup implements AutoCloseable {
             label(canvas,value,Math.max(4,(getWidth()-(int)text.width(value,14))/2),getHeight()/2+5,14,active?0xffffffff:0xff138f78);
         }
     }
-    private final class Input extends View {
-        final String hint;final int limit;final boolean multiline;String value="";int cursor;boolean all;
-        Input(Context context,String hint,int limit,boolean multiline){super(context);this.hint=hint;this.limit=limit;this.multiline=multiline;}
-        void set(String value){this.value=value;cursor=value.length();all=false;}
-        boolean insert(String s){if(all)set("");if(value.codePointCount(0,value.length())>=limit)return true;value=value.substring(0,cursor)+s+value.substring(cursor);cursor+=s.length();return true;}
-        boolean key(KeyEvent event){int key=event.getValue();if(event.getType()==KeyEvent.TEXT){if(Character.isValidCodePoint(key)&&!Character.isISOControl(key)&&!(key>=0xd800&&key<=0xdfff))return insert(new String(Character.toChars(key)));return false;}if(event.getType()!=KeyEvent.DOWN)return false;
-            if((event.getModifiers()&KeyEvent.CONTROL)!=0&&(key=='a'||key=='A')){all=true;return true;}if(key==KeyEvent.ENTER&&multiline&&(event.getModifiers()&KeyEvent.SHIFT)!=0)return insert("\n");
-            if(key==KeyEvent.HOME)cursor=0;else if(key==KeyEvent.END)cursor=value.length();else if(key==KeyEvent.LEFT&&cursor>0)cursor=value.offsetByCodePoints(cursor,-1);else if(key==KeyEvent.RIGHT&&cursor<value.length())cursor=value.offsetByCodePoints(cursor,1);
-            else if(key==KeyEvent.BACKSPACE||key==KeyEvent.DELETE){if(all)set("");else if(key==KeyEvent.BACKSPACE&&cursor>0){int from=value.offsetByCodePoints(cursor,-1);value=value.substring(0,from)+value.substring(cursor);cursor=from;}else if(key==KeyEvent.DELETE&&cursor<value.length())value=value.substring(0,cursor)+value.substring(value.offsetByCodePoints(cursor,1));}all=false;return true;
-        }
-        @Override protected void onDraw(Canvas canvas){canvas.fillRect(0,0,getWidth(),getHeight(),focused==this&&all?0xffd9f2e8:0xffffffff);canvas.strokeRect(0,0,getWidth(),getHeight(),focused==this?0xff138f78:0xffd4e3df);canvas.save();try{canvas.clipRect(9,5,Math.max(0,getWidth()-18),getHeight()-10);if(value.isEmpty()){label(canvas,hint,11,27,13,0xff809593);if(focused==this)canvas.fillRect(10,10,1,20,0xff138f78);return;}if(multiline){List<String> lines=wrap(value,getWidth()-26,14),before=wrap(value.substring(0,cursor),getWidth()-26,14);int visible=Math.max(1,(getHeight()-12)/21),line=before.size()-1,start=Math.max(0,line-visible+1);for(int i=start;i<Math.min(lines.size(),start+visible);i++)label(canvas,lines.get(i),11,25+(i-start)*21,14,0xff183d38);if(focused==this)canvas.fillRect(11+(int)text.width(before.get(line),14),10+(line-start)*21,1,18,0xff138f78);}else{int start=0;while(start<cursor&&text.width(value.substring(start,cursor),14)>getWidth()-28)start=value.offsetByCodePoints(start,1);label(canvas,value.substring(start),11,27,14,0xff183d38);if(focused==this)canvas.fillRect(11+(int)text.width(value.substring(start,cursor),14),10,1,20,0xff138f78);}}finally{canvas.restore();}}
-    }
+
     private final class Panel extends View {
         int offset,dragY,total;boolean dragging,bottom=true;List<Contact> visibleContacts=Collections.emptyList();
         Panel(Context context){super(context);}
         @Override public boolean dispatchTouchEvent(MotionEvent event){if(event.getAction()==MotionEvent.ACTION_DOWN){dragY=event.getY();dragging=false;}else if(event.getAction()==MotionEvent.ACTION_MOVE){int delta=dragY-event.getY();if(Math.abs(delta)>3)dragging=true;offset=Math.max(0,Math.min(Math.max(0,total-getHeight()),offset+delta));dragY=event.getY();bottom=offset>=total-getHeight();invalidate();}else if(event.getAction()==MotionEvent.ACTION_UP&&!dragging&&page.equals("friends")){int index=(event.getY()+offset)/76;if(index>=0&&index<visibleContacts.size())choose(visibleContacts.get(index));}return true;}
-        @Override protected void onDraw(Canvas canvas){if(session==null||getWidth()<1||getHeight()<1)return;canvas.save();try{canvas.clipRect(0,0,getWidth(),getHeight());if(page.equals("friends")){visibleContacts=new ArrayList<>();String query=search.value.trim().toLowerCase(Locale.ROOT);
+        @Override protected void onDraw(Canvas canvas){if(session==null||getWidth()<1||getHeight()<1)return;canvas.save();try{canvas.clipRect(0,0,getWidth(),getHeight());if(page.equals("friends")){visibleContacts=new ArrayList<>();String query=search.getText().trim().toLowerCase(Locale.ROOT);
                 for(Contact c:session.store.contacts())if(query.isEmpty()||c.profile.name.toLowerCase(Locale.ROOT).contains(query)||c.profile.code().toLowerCase(Locale.ROOT).contains(query)||c.profile.uuid.toLowerCase(Locale.ROOT).contains(query))visibleContacts.add(c);
                 total=visibleContacts.size()*76;offset=Math.min(offset,Math.max(0,total-getHeight()));
                 if(visibleContacts.isEmpty()){

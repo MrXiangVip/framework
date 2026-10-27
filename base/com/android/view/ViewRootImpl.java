@@ -38,7 +38,7 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
 //      2.将图像画到窗口上
         requestLayout();
 
-//      3.打开事件接收
+//      3.注册事件接收
         mWindow.registeListener( new XWindow.Listener() {
             @Override public void onEvent(int width, int height, boolean closed) {
                 if (closed) { WindowManagerGlobal.getInstance().removeView(mView); close(); return; }

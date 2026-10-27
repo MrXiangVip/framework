@@ -6,6 +6,7 @@ import com.android.graphics.Canvas;
 import com.android.os.Handler;
 import com.android.util.AttributeSet;
 import com.android.view.*;
+import com.android.widget.EditText;
 import com.android.widget.Button;
 import java.awt.Font;
 import java.awt.font.FontRenderContext;
@@ -17,17 +18,18 @@ import java.util.concurrent.*;
 
 /** Settings preferences, actual packaged applications, and read-only host information. */
 public class SettingsView extends ViewGroup {
+    private boolean updatingInputs;
     private final Path file;
     private final SettingsStore store;
     private SettingsStore.Values values = SettingsStore.Values.defaults();
     private String theme = "light", status = "Loading settings...", section = "general";
     private int textSize = 16, page, selected = -1, capacity = 5, inset = 24, step = 80;
-    private boolean clock24 = true, busy, dirty, confirming, focused;
+    private boolean clock24 = true, busy, dirty, confirming;
     private List<SettingsInfo.App> apps = new ArrayList<>();
     private List<String[]> device = new ArrayList<>();
     private final Map<String, Control> controls = new LinkedHashMap<>();
     private final Row[] rows = new Row[8];
-    private final NameInput input;
+    private final EditText input;
     private final Handler ui = new Handler(message -> { ((Runnable) message.obj).run(); return true; });
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> { Thread worker = new Thread(r, "settings-io"); worker.setDaemon(true); return worker; });
     private static final FontRenderContext METRICS = new FontRenderContext(null, true, true);
@@ -41,14 +43,20 @@ public class SettingsView extends ViewGroup {
         control("font", "", () -> { textSize = textSize == 18 ? 14 : textSize + 2; changed(); });
         control("clock", "", () -> { clock24 = !clock24; changed(); });
         control("save", "Save", this::save); control("reload", "Reload", this::load);
-        control("reset", "Reset", () -> { confirming = true; focused = false; requestLayout(); invalidate(); });
+        control("reset", "Reset", () -> { confirming = true; clearFocus(); requestLayout(); invalidate(); });
         control("confirm", "Reset settings", () -> persist(SettingsStore.Values.defaults(), "Defaults restored"));
         control("cancel", "Cancel", () -> { confirming = false; requestLayout(); invalidate(); });
         control("refresh", "Refresh", this::refresh);
         control("previous", "< Previous", () -> { if (page > 0) { page--; selected = -1; invalidate(); } });
         control("next", "Next >", () -> { if ((page + 1) * capacity < count()) { page++; selected = -1; invalidate(); } });
         control("open", "Open app", this::open);
-        input = new NameInput(context); input.setId("name"); input.setOnClickListener(v -> { focused = true; input.cursor = input.text.length(); input.all = false; invalidate(); });
+        input = new EditText(context) {
+            @Override protected void onDraw(Canvas canvas) {
+                canvas.fillRect(0, 0, getWidth(), getHeight(), card()); mTextColor = ink(); super.onDraw(canvas);
+            }
+        };
+        input.setId("name"); input.setSingleLine(); input.setMaxCodePoints(40); input.setTextSize(14);
+        input.setOnTextChangedListener((view, text) -> { if (!updatingInputs) changed(); });
         addView(input, new LayoutParams(-2, -2));
         for (int i = 0; i < rows.length; i++) { rows[i] = new Row(context, i); rows[i].setId("row_" + i); addView(rows[i], new LayoutParams(-2, -2)); }
         apply(values); load();
@@ -70,15 +78,15 @@ public class SettingsView extends ViewGroup {
             ui.sendMessage(ui.obtainMessage(0, (Runnable) () -> { busy = false; done.run(); requestLayout(); invalidate(); }));
         });
     }
-    private void apply(SettingsStore.Values saved) { values = saved; theme = saved.theme; textSize = saved.textSize; clock24 = saved.clock24; input.text = saved.name; input.cursor = input.text.length(); input.all = false; dirty = false; focused = false; }
+    private void apply(SettingsStore.Values saved) { values = saved; theme = saved.theme; textSize = saved.textSize; clock24 = saved.clock24; setInput(input, saved.name); dirty = false; clearFocus(); }
     private void load() { work("Loading settings...", () -> { SettingsStore.Values saved = store.load(); return () -> { apply(saved); confirming = false; status = "Settings loaded"; }; }); }
     private void save() {
-        try { persist(new SettingsStore.Values(input.text, theme, textSize, clock24), "Settings saved"); }
+        try { persist(new SettingsStore.Values(input.getText(), theme, textSize, clock24), "Settings saved"); }
         catch (IllegalArgumentException e) { status = e.getMessage(); invalidate(); }
     }
     private void persist(SettingsStore.Values saved, String message) { work("Saving settings...", () -> { store.save(saved); return () -> { apply(saved); confirming = false; status = message; }; }); }
     private void changed() { dirty = true; status = "Unsaved changes"; invalidate(); }
-    private void section(String value) { section = value; page = 0; selected = -1; focused = false; confirming = false; requestLayout(); invalidate(); if (!value.equals("general")) refresh(); }
+    private void section(String value) { section = value; page = 0; selected = -1; clearFocus(); confirming = false; requestLayout(); invalidate(); if (!value.equals("general")) refresh(); }
     private void refresh() {
         if (section.equals("apps")) work("Reading applications...", () -> { List<SettingsInfo.App> found = SettingsInfo.apps(SettingsInfo.appDirectory()); return () -> { apps = found; page = 0; selected = -1; status = found.size() + " packaged applications"; }; });
         else if (section.equals("device")) work("Reading device information...", () -> { List<String[]> found = SettingsInfo.device(file); return () -> { device = found; page = 0; status = "Host information refreshed"; }; });
@@ -99,23 +107,36 @@ public class SettingsView extends ViewGroup {
     public String getTheme() { return theme; }
     public int getTextSize() { return textSize; }
     public boolean is24Hour() { return clock24; }
-    public String getDeviceName() { return input.text; }
+    public String getDeviceName() { return input.getText(); }
     public int getAppCount() { return apps.size(); }
     public int getDeviceCount() { return device.size(); }
     public boolean isDirty() { return dirty; }
     public boolean isConfirming() { return confirming; }
     public String getRowName(int row) { int index = page * capacity + row; return index >= count() ? "" : section.equals("apps") ? apps.get(index).name : device.get(index)[0]; }
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        if (busy && event.getAction() != MotionEvent.ACTION_CANCEL) return true;
+        return super.dispatchTouchEvent(event);
+    }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (busy) return true;
         if (event.getType() == KeyEvent.DOWN && event.getValue() == KeyEvent.ESCAPE) {
-            if (confirming) { confirming = false; requestLayout(); } else { focused = false; }
+            if (confirming) { confirming = false; requestLayout(); } else { clearFocus(); }
             invalidate(); return true;
         }
-        if (section.equals("general") && !confirming && focused) {
+        if (section.equals("general") && !confirming && event.getType() == KeyEvent.DOWN
+                && (event.getValue() == KeyEvent.TAB || event.getValue() == KeyEvent.ISO_LEFT_TAB)) return input.requestFocus();
+        if (section.equals("general") && !confirming && input.isFocused()) {
             if (event.getType() == KeyEvent.DOWN && event.getValue() == KeyEvent.ENTER) { save(); return true; }
-            if (input.key(event)) { changed(); return true; }
+            if (input.dispatchKeyEvent(event)) return true;
         }
         return false;
+    }
+    private void setInput(EditText field, String value) {
+        updatingInputs = true;
+        try {
+            field.setText(value);
+            field.setSelection(field.getText().length());
+        } finally { updatingInputs = false; }
     }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         setMeasuredDimension(resolveSize(600, widthSpec), resolveSize(800, heightSpec));
@@ -156,7 +177,7 @@ public class SettingsView extends ViewGroup {
     @Override protected void onDraw(Canvas canvas) {
         canvas.fillRect(0, 0, getWidth(), getHeight(), dark() ? 0xff121d2e : 0xfff3f6fc);
         canvas.drawText("SETTINGS", inset, 40, 25, ink());
-        canvas.drawText(fit(input.text, getWidth() - inset * 2, 14), inset, 67, 14, muted());
+        canvas.drawText(fit(input.getText(), getWidth() - inset * 2, 14), inset, 67, 14, muted());
         if (confirming) {
             canvas.drawText("Restore default preferences?", inset, 200, Math.min(22, getWidth() / 16), ink());
             canvas.drawText("Only saved Settings preferences are reset.", inset, 240, Math.min(15, getWidth() / 27), muted());
@@ -219,41 +240,5 @@ public class SettingsView extends ViewGroup {
             canvas.drawText(text, Math.max(4, (getWidth() - width) / 2), getHeight() / 2 + 5, 13, active || isPressed() ? dark() ? 0xff121d2e : 0xffffffff : ink());
         }
     }
-    private final class NameInput extends View {
-        String text = ""; int cursor; boolean all;
-        NameInput(Context context) { super(context); }
-        boolean key(KeyEvent event) {
-            int key = event.getValue();
-            if (event.getType() == KeyEvent.TEXT) {
-                if (!Character.isValidCodePoint(key) || Character.isISOControl(key)) return false;
-                if ((all ? 0 : text.codePointCount(0, text.length())) >= 40) return true;
-                if (all) { text = ""; cursor = 0; all = false; }
-                String insert = new String(Character.toChars(key)); text = text.substring(0, cursor) + insert + text.substring(cursor); cursor += insert.length(); return true;
-            }
-            if (event.getType() != KeyEvent.DOWN) return false;
-            if ((event.getModifiers() & KeyEvent.CONTROL) != 0 && (key == 'a' || key == 'A')) { all = true; return true; }
-            if (key == KeyEvent.HOME) cursor = 0;
-            else if (key == KeyEvent.END) cursor = text.length();
-            else if (key == KeyEvent.LEFT) { if (cursor > 0) cursor = text.offsetByCodePoints(cursor, -1); }
-            else if (key == KeyEvent.RIGHT) { if (cursor < text.length()) cursor = text.offsetByCodePoints(cursor, 1); }
-            else if (key == KeyEvent.BACKSPACE || key == KeyEvent.DELETE) {
-                if (all) { text = ""; cursor = 0; }
-                else if (key == KeyEvent.BACKSPACE && cursor > 0) { int previous = text.offsetByCodePoints(cursor, -1); text = text.substring(0, previous) + text.substring(cursor); cursor = previous; }
-                else if (key == KeyEvent.DELETE && cursor < text.length()) text = text.substring(0, cursor) + text.substring(text.offsetByCodePoints(cursor, 1));
-            } else return false;
-            all = false; return true;
-        }
-        @Override protected void onDraw(Canvas canvas) {
-            canvas.fillRect(0, 0, getWidth(), getHeight(), focused && all ? dark() ? 0xff384f78 : 0xffdce8ff : card());
-            canvas.strokeRect(0, 0, getWidth(), getHeight(), focused ? accent() : muted());
-            Font font = new Font(Font.SANS_SERIF, Font.PLAIN, 14); int start = 0;
-            while (start < cursor && font.getStringBounds(text.substring(start, cursor), METRICS).getWidth() > getWidth() - 28) start = text.offsetByCodePoints(start, 1);
-            canvas.save();
-            try {
-                canvas.clipRect(8, 4, Math.max(0, getWidth() - 16), getHeight() - 8);
-                canvas.drawText(text.substring(start), 10, 24, 14, ink());
-                if (focused) canvas.fillRect(10 + (int) font.getStringBounds(text.substring(start, cursor), METRICS).getWidth(), 7, 1, 23, accent());
-            } finally { canvas.restore(); }
-        }
-    }
+
 }

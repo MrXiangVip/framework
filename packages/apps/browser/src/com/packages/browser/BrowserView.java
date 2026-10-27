@@ -5,28 +5,55 @@ import com.android.graphics.Canvas;
 import com.android.os.Handler;
 import com.android.util.AttributeSet;
 import com.android.view.*;
+import com.android.widget.EditText;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Browser chrome and input only; Chromium owns all webpage layout and execution. */
-public final class BrowserView extends View implements AutoCloseable {
+public final class BrowserView extends ViewGroup implements AutoCloseable {
     private static final int TOP = 108, FOOT = 26;
     private final BrowserText fonts = new BrowserText();
     private BrowserEngine engine;
-    private String address = "", notice = "", pageUrl = "about:blank";
-    private boolean editing = true, all, home = true, closed, starting, pressedPage;
-    private int caret, pressedButton = -1;
+    private String notice = "", pageUrl = "about:blank";
+    private final EditText addressInput;
+    private boolean addressPointer;
+    private boolean home = true, closed, starting, pressedPage;
+    private int pressedButton = -1;
     private final AtomicBoolean pending = new AtomicBoolean();
     private final Handler ui = new Handler(message -> { pending.set(false); ((Runnable) message.obj).run(); return true; });
     private final ExecutorService worker = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "browser-start"); t.setDaemon(true); return t; });
     private ScheduledExecutorService lifecycle;
     private final Rectangle[] buttons = new Rectangle[5];
     private Rectangle location = new Rectangle();
-    public BrowserView(Context context, AttributeSet attrs) { super(context, attrs); }
+    public BrowserView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        addressInput = new EditText(context) {
+            @Override protected int measureText(String value) { return fonts.width(value, mTextSize); }
+            @Override protected void drawTextLine(Canvas canvas, String value, int x, int baseline, int color) {
+                fonts.draw(canvas, value, x, baseline, mTextSize, color);
+            }
+            @Override protected void onDraw(Canvas canvas) {
+                canvas.fillRect(0, 0, getWidth(), getHeight(), isFocused() ? 0xff344761 : 0xff132035);
+                super.onDraw(canvas);
+            }
+            @Override protected void onFocusChanged(boolean focused) {
+                super.onFocusChanged(focused);
+                if (engine != null) engine.focus(!focused && !home);
+            }
+        };
+        addressInput.setId("address"); addressInput.setSingleLine(); addressInput.setMaxLength(8192);
+        addressInput.setTextSize(13); addressInput.setTextColor(0xffe7eefb);
+        addressInput.setHint("Search or enter a website"); addressInput.setHintTextColor(0xff94a8c4);
+        addressInput.setSelectAllOnFocus(true);
+        addView(addressInput, new LayoutParams(-2, -2)); addressInput.requestFocus();
+    }
+    private void setAddress(String value) {
+        addressInput.setText(value); addressInput.setSelection(addressInput.getText().length());
+    }
     public BrowserEngine getEngine() { return engine; }
-    public String getAddress() { return address; }
+    public String getAddress() { return addressInput.getText(); }
     public boolean isHome() { return home; }
     public String getNotice() { return notice; }
     private void post(Runnable task) { ui.sendMessage(ui.obtainMessage(0, task)); }
@@ -35,7 +62,7 @@ public final class BrowserView extends View implements AutoCloseable {
         post(() -> {
             if (closed || engine == null) return;
             BrowserEngine.Snapshot state = engine.snapshot(); pageUrl = state.url;
-            if (!editing) { address = state.url; caret = address.length(); }
+            if (!addressInput.isFocused()) setAddress(state.url);
             notice = state.error; invalidate();
         });
     }
@@ -44,7 +71,7 @@ public final class BrowserView extends View implements AutoCloseable {
         try { url = BrowserController.address(text); }
         catch (IllegalArgumentException e) { notice = e.getMessage(); invalidate(); return; }
         if (closed) return;
-        address = url; caret = url.length(); editing = all = home = false; notice = ""; pageUrl = url;
+        setAddress(url); home = false; addressInput.clearFocus(); notice = ""; pageUrl = url;
         if (engine != null && engine.isAlive()) { engine.navigate(url); engine.focus(true); invalidate(); return; }
         if (starting) { notice = "Starting browser..."; invalidate(); return; }
         starting = true; notice = "Starting browser...";
@@ -60,7 +87,7 @@ public final class BrowserView extends View implements AutoCloseable {
                 if (next == null) notice = error;
                 else {
                     next.setListener(this::engineChanged); resizeEngine();
-                    if (!home) { next.navigate(pageUrl); next.focus(!editing); }
+                    if (!home) { next.navigate(pageUrl); next.focus(!addressInput.isFocused()); }
                     notice = "";
                 }
                 invalidate();
@@ -69,59 +96,65 @@ public final class BrowserView extends View implements AutoCloseable {
         invalidate();
     }
     private void resizeEngine() { if (engine != null) engine.resize(getWidth(), Math.max(1, getHeight() - contentTop() - FOOT)); }
-    private void goHome() { home = true; editing = true; address = ""; caret = 0; all = false; notice = ""; if (engine != null) engine.focus(false); invalidate(); }
-    private void editAddress() { editing = true; all = true; caret = address.length(); if (engine != null) engine.focus(false); invalidate(); }
+    private void goHome() {
+        home = true; setAddress(""); addressInput.requestFocus(); notice = "";
+        if (engine != null) engine.focus(false); invalidate();
+    }
+    private void editAddress() {
+        addressInput.requestFocus(); addressInput.selectAll();
+        if (engine != null) engine.focus(false); invalidate();
+    }
     private void action(int index) {
         if (index == 3) { goHome(); return; }
-        if (index == 4) { navigate(address); return; }
+        if (index == 4) { navigate(addressInput.getText()); return; }
         if (engine == null || home) return;
-        editing = false; engine.focus(true);
+        addressInput.clearFocus(); engine.focus(true);
         if (index == 0) engine.back();
         if (index == 1) engine.forward();
         if (index == 2) { if (engine.snapshot().loading) engine.stop(); else engine.reload(); }
     }
-    @Override protected void onMeasure(int width, int height) { setMeasuredDimension(resolveSize(960, width), resolveSize(720, height)); }
+    @Override protected void onMeasure(int width, int height) {
+        setMeasuredDimension(resolveSize(960, width), resolveSize(720, height));
+        int left = getMeasuredWidth() < 420 ? 12 : 166;
+        addressInput.measure(MeasureSpec.makeMeasureSpec(Math.max(30, getMeasuredWidth() - left - 64), MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(34, MeasureSpec.EXACTLY));
+    }
     @Override protected void onLayout(boolean changed, int l, int t, int r, int b) {
         for (int i = 0; i < 4; i++) buttons[i] = new Rectangle(12 + i * 36, 53, 32, 34);
         int left = getWidth() < 420 ? 12 : 166;
         int y = getWidth() < 420 ? 92 : 53;
         location = new Rectangle(left, y, Math.max(30, getWidth() - left - 64), 34);
         buttons[4] = new Rectangle(Math.max(left + 34, getWidth() - 48), y, 36, 34);
+        addressInput.layout(location.x, location.y, location.x + location.width, location.y + location.height);
         resizeEngine();
     }
     private int contentTop() { return getWidth() < 420 ? 142 : TOP; }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         int key = event.getValue(); boolean ctrl = (event.getModifiers() & KeyEvent.CONTROL) != 0;
         if (event.getType() == KeyEvent.DOWN && ctrl && (key == 'l' || key == 'L')) { editAddress(); return true; }
-        if (event.getType() == KeyEvent.DOWN && !editing && (key == 0xffc2 || ctrl && (key == 'r' || key == 'R'))) {
+        if (event.getType() == KeyEvent.DOWN && !addressInput.isFocused()
+                && (key == 0xffc2 || ctrl && (key == 'r' || key == 'R'))) {
             if (engine != null) engine.reload(); return true;
         }
-        if (!editing && !home) { if (engine != null) engine.key(event.getType(), key, event.getModifiers()); return true; }
-        if (event.getType() == KeyEvent.TEXT) {
-            if (Character.isValidCodePoint(key) && !Character.isISOControl(key) && !ctrl) replaceSelection(new String(Character.toChars(key)));
-        } else if (event.getType() == KeyEvent.DOWN) {
-            if (ctrl && (key == 'a' || key == 'A')) all = true;
-            else if (key == KeyEvent.ENTER) navigate(address);
-            else if (key == KeyEvent.ESCAPE) { editing = false; all = false; if (engine != null) engine.focus(true); }
-            else if (key == KeyEvent.BACKSPACE) {
-                if (all) replaceSelection(""); else if (caret > 0) { int start = address.offsetByCodePoints(caret, -1); address = address.substring(0, start) + address.substring(caret); caret = start; }
-            } else if (key == KeyEvent.DELETE) {
-                if (all) replaceSelection(""); else if (caret < address.length()) address = address.substring(0, caret) + address.substring(address.offsetByCodePoints(caret, 1));
-            } else if (key == KeyEvent.LEFT) { caret = all ? 0 : caret > 0 ? address.offsetByCodePoints(caret, -1) : 0; all = false; }
-            else if (key == KeyEvent.RIGHT) { caret = all ? address.length() : caret < address.length() ? address.offsetByCodePoints(caret, 1) : caret; all = false; }
-            else if (key == KeyEvent.HOME) { caret = 0; all = false; }
-            else if (key == KeyEvent.END) { caret = address.length(); all = false; }
+        if (addressInput.isFocused()) {
+            if (event.getType() == KeyEvent.DOWN && (key == KeyEvent.ENTER || key == 0xff8d)) { navigate(addressInput.getText()); return true; }
+            if (event.getType() == KeyEvent.DOWN && key == KeyEvent.ESCAPE) { addressInput.clearFocus(); return true; }
+            return super.dispatchKeyEvent(event);
         }
-        invalidate(); return true;
+        if (!home) { if (engine != null) engine.key(event.getType(), key, event.getModifiers()); return true; }
+        if (event.getType() == KeyEvent.DOWN && (key == KeyEvent.TAB || key == KeyEvent.ISO_LEFT_TAB)) return addressInput.requestFocus();
+        return false;
     }
-    private void replaceSelection(String text) {
-        if ((all ? 0 : address.length()) + text.length() > 8192) return;
-        if (all) { address = ""; caret = 0; all = false; }
-        address = address.substring(0, caret) + text + address.substring(caret); caret += text.length();
-    }
+
     @Override public boolean dispatchTouchEvent(MotionEvent event) {
         int x = event.getX(), y = event.getY(), action = event.getAction();
-        if (action == MotionEvent.ACTION_CANCEL) { pressedButton = -1; pressedPage = false; if (engine != null) { engine.mouse(3, 0, 0, 1, 0); engine.focus(false); } return true; }
+        if (action == MotionEvent.ACTION_CANCEL) { addressPointer = false; super.dispatchTouchEvent(event); pressedButton = -1; pressedPage = false; if (engine != null) { engine.mouse(3, 0, 0, 1, 0); engine.focus(false); } return true; }
+        if (addressPointer || action == MotionEvent.ACTION_DOWN && location.contains(x, y)) {
+            if (action == MotionEvent.ACTION_DOWN) addressPointer = true;
+            boolean handled = super.dispatchTouchEvent(event);
+            if (action == MotionEvent.ACTION_UP) addressPointer = false;
+            return handled;
+        }
         if (action == MotionEvent.ACTION_SCROLL) {
             if (!home && engine != null && y >= contentTop()) engine.wheel(x, y - contentTop(), event.getScrollDelta(), event.getModifiers());
             return true;
@@ -130,9 +163,9 @@ public final class BrowserView extends View implements AutoCloseable {
         if (event.getButton() != 1 && (home || y < contentTop())) return true;
         if (action == MotionEvent.ACTION_DOWN) {
             for (int i = 0; i < buttons.length; i++) if (buttons[i] != null && buttons[i].contains(x, y)) { pressedButton = i; invalidate(); return true; }
-            if (location.contains(x, y) || home && y >= contentTop()) { editAddress(); return true; }
+            if (home && y >= contentTop()) { editAddress(); return true; }
             if (y >= contentTop() && y < getHeight() - FOOT && engine != null) {
-                editing = false; pressedPage = true; engine.focus(true);
+                addressInput.clearFocus(); pressedPage = true; engine.focus(true);
                 engine.mouse(action, x, y - contentTop(), event.getButton(), event.getModifiers()); invalidate(); return true;
             }
         }
@@ -164,15 +197,6 @@ public final class BrowserView extends View implements AutoCloseable {
                 g.fillRoundRect(box.x, box.y, box.width, box.height, 10, 10);
                 text(g, labels[i], box.x + 10, box.y + 24, 23, i == 4 ? 0x10251f : 0xe3edf9, false);
             }
-            g.setColor(new Color(editing ? 0x344761 : 0x132035)); g.fillRoundRect(location.x, location.y, location.width, location.height, 12, 12);
-            Graphics2D entry = (Graphics2D) g.create();
-            try {
-                entry.clipRect(location.x + 10, location.y, Math.max(1, location.width - 20), location.height);
-                int shift = Math.max(0, fonts.width(address.substring(0, caret), 13) - location.width + 28);
-                if (editing && all) { entry.setColor(new Color(0x426e9a)); entry.fillRect(location.x + 10, location.y + 7, fonts.width(address, 13), 21); }
-                text(entry, address.isEmpty() ? "Search or enter a website" : address, location.x + 11 - shift, location.y + 22, 13, address.isEmpty() ? 0x94a8c4 : 0xe7eefb, false);
-                if (editing && !all) { int cx = location.x + 11 + fonts.width(address.substring(0, caret), 13) - shift; entry.setColor(new Color(0x6ce0c1)); entry.drawLine(cx, location.y + 9, cx, location.y + 25); }
-            } finally { entry.dispose(); }
             g.setClip(0, top, w, Math.max(0, h - top - FOOT));
             BufferedImage image = engine == null ? null : engine.frame();
             if (!home && image != null) g.drawImage(image, 0, top, w, Math.max(1, h - top - FOOT), null);

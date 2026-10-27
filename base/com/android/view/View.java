@@ -15,6 +15,7 @@ public class View {
     private String mId;
     private OnClickListener mClickListener;
     private boolean mPressed;
+    private boolean mFocusable, mFocused;
     public interface OnClickListener { void onClick(View view); }
     public static final int MEASURED_SIZE_MASK = 0x00ffffff;
 
@@ -46,6 +47,35 @@ public class View {
         return true;
     }
     public boolean isPressed() { return mPressed; }
+    public void setFocusable(boolean focusable) {
+        mFocusable = focusable;
+        if (!focusable) clearFocus();
+    }
+    public boolean isFocusable() { return mFocusable; }
+    public boolean isFocused() { return mFocused; }
+    public View findFocus() { return mFocused ? this : null; }
+    public View getRootView() {
+        View root = this;
+        while (root.mParent instanceof View) root = (View) root.mParent;
+        return root;
+    }
+    public boolean requestFocus() {
+        if (!mFocusable) return false;
+        View previous = getRootView().findFocus();
+        if (previous == this) return true;
+        if (previous != null) previous.clearFocus();
+        mFocused = true;
+        onFocusChanged(true);
+        invalidate();
+        return true;
+    }
+    public void clearFocus() {
+        if (!mFocused) return;
+        mFocused = false;
+        onFocusChanged(false);
+        invalidate();
+    }
+    protected void onFocusChanged(boolean focused) {}
     public boolean dispatchKeyEvent(KeyEvent event) { return false; }
     public boolean dispatchTouchEvent(MotionEvent event) { return onTouchEvent(event); }
     protected boolean onTouchEvent(MotionEvent event) {
@@ -77,6 +107,9 @@ public class View {
     public int getWidth() { return mRight - mLeft; }
     public int getHeight() { return mBottom - mTop; }
     public int getPadding() { return mPadding; }
+    public void setPadding(int padding) {
+        mPadding = Math.max(0, padding); requestLayout(); invalidate();
+    }
     public void requestLayout() { if (mParent != null) mParent.requestLayout(); }
     public void invalidate() { if (mParent != null) mParent.invalidate(); }
 

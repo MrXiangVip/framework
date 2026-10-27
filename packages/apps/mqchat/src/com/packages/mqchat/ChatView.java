@@ -5,6 +5,7 @@ import com.android.graphics.Canvas;
 import com.android.os.Handler;
 import com.android.util.AttributeSet;
 import com.android.view.*;
+import com.android.widget.EditText;
 import java.awt.*;
 
 import java.awt.image.BufferedImage;
@@ -22,8 +23,7 @@ public class ChatView extends ViewGroup {
     private final List<ChatMessage> messages=new ArrayList<>();
     private final LinkedHashSet<String> seen=new LinkedHashSet<>();
     private final Map<String,Control> buttons=new LinkedHashMap<>();
-    private final Input nickname,topic,composer;
-    private Input focused;
+    private final EditText nickname,topic,composer;
     private final History history;
     private String status="填入昵称和 Topic，连接后即可聊天",activeTopic="";
     private boolean connecting,ready;
@@ -39,16 +39,16 @@ public class ChatView extends ViewGroup {
     public ChatView(Context context,AttributeSet attrs){
         super(context,attrs);typography=new ChatText(getContext().getClassLoader());
         nickname=input("nickname","你的昵称",24,false);
-        nickname.set("用户-"+identity.substring(0,4));
+        setInput(nickname, "用户-"+identity.substring(0,4));
         topic=input("topic","双方填写完全相同的 Topic",512,false);
-        topic.set("mqchat/room/"+identity.substring(0,8));
+        setInput(topic, "mqchat/room/"+identity.substring(0,8));
         composer=input("composer","写一条消息…",2000,true);
         history=new History(context);history.setId("history");addView(history,new LayoutParams(-2,-2));
         button("connect","连接频道",()->{if(connecting)disconnect();else connect();});
         button("send","发送  ↗",this::send);
         button("up","↑ 较早",()->history.scroll(-160));
         button("down","最新 ↓",()->{history.scroll(Integer.MAX_VALUE/2);});
-        focused=nickname;
+        focus(nickname);
     }
     private void post(Runnable action){
         if(events.offer(action)&&scheduled.compareAndSet(false,true))ui.sendMessage(ui.obtainMessage(0,null));
@@ -59,19 +59,25 @@ public class ChatView extends ViewGroup {
         if(!events.isEmpty()&&scheduled.compareAndSet(false,true))ui.sendMessage(ui.obtainMessage(0,null));
         invalidate();
     }
-    private Input input(String id,String hint,int limit,boolean multiline){
-        Input field=new Input(getContext(),hint,limit,multiline);field.setId(id);
-        field.setOnClickListener(v->{if(!connecting||field==composer){focused=field;field.cursor=field.text.length();field.all=false;invalidate();}});
-        addView(field,new LayoutParams(-2,-2));return field;
+    private EditText input(String id, String hint, int limit, boolean multiline) {
+        EditText field = new EditText(getContext()) {
+            @Override protected int measureText(String value) { return (int) Math.ceil(typography.width(value, mTextSize)); }
+            @Override protected void drawTextLine(Canvas canvas, String value, int x, int baseline, int color) {
+                typography.draw(canvas, value, x, baseline, mTextSize, color);
+            }
+        };
+        field.setId(id); field.setHint(hint); field.setSingleLine(!multiline); field.setMaxCodePoints(limit); field.setTextSize(14);
+
+        addView(field, new LayoutParams(-2, -2)); return field;
     }
     private void button(String id,String label,Runnable action){Control button=new Control(getContext(),label,id.equals("connect")||id.equals("send"));button.setId(id);button.setOnClickListener(v->{action.run();invalidate();});buttons.put(id,button);addView(button,new LayoutParams(-2,-2));}
     private void connect(){
-        String room=topic.text.trim(),name=nickname.text.trim();
+        String room=topic.getText().trim(),name=nickname.getText().trim();
         try{MqttClient.validateTopic(room);ChatMessage.validate(name,"validation");}
         catch(IllegalArgumentException invalid){status=invalid.getMessage();return;}
-        nickname.set(name);topic.set(room);
+        setInput(nickname, name);setInput(topic, room);
         if(!activeTopic.equals(room)){messages.clear();seen.clear();history.reset();activeTopic=room;}
-        connecting=true;ready=false;status="正在连接 EMQX…";focused=composer;
+        connecting=true;nickname.setFocusable(false);topic.setFocusable(false);ready=false;status="正在连接 EMQX…";focus(composer);
         final long token=++generation;
         String host=System.getProperty("framework.mqchat.host","broker.emqx.io");
         boolean tls=Boolean.parseBoolean(System.getProperty("framework.mqchat.tls","true"));
@@ -84,10 +90,10 @@ public class ChatView extends ViewGroup {
             public void published(String id){current(()->mark(id,"已发布"));}
             public void failed(String id){current(()->mark(id,"未确认，可重新发送"));}
         });client.start();}
-        catch(RuntimeException invalid){connecting=false;ready=false;status="连接配置无效："+invalid.getMessage();client=null;}
+        catch(RuntimeException invalid){connecting=false;nickname.setFocusable(true);topic.setFocusable(true);ready=false;status="连接配置无效："+invalid.getMessage();client=null;}
     }
     public void disconnect(){
-        ++generation;ready=false;connecting=false;
+        ++generation;ready=false;connecting=false;nickname.setFocusable(true);topic.setFocusable(true);
         if(client!=null){client.close();client=null;}
         for(ChatMessage message:messages)if(message.own&&message.status.equals("发送中"))message.status="未确认，可重新发送";
         status="已断开 · 可修改昵称或 Topic 后重新连接";invalidate();
@@ -95,10 +101,10 @@ public class ChatView extends ViewGroup {
     private void send(){
         if(!ready||client==null){status="请先连接频道，连接成功后再发送";return;}
         ChatMessage message;
-        try{message=ChatMessage.outgoing(identity,nickname.text,composer.text);}
+        try{message=ChatMessage.outgoing(identity,nickname.getText(),composer.getText());}
         catch(IllegalArgumentException invalid){status=invalid.getMessage();return;}
         if(!client.publish(message.id,message.bytes())){status="发送队列已满或连接已断开，消息保留在输入框";return;}
-        add(message);composer.set("");focused=composer;history.bottom=true;
+        add(message);setInput(composer, "");focus(composer);history.bottom=true;
     }
     private void mark(String id,String value){for(ChatMessage m:messages)if(m.id.equals(id)&&m.own){m.status=value;break;}}
     private void receive(byte[] payload){ChatMessage message=ChatMessage.incoming(payload,identity);if(message==null||seen.contains(message.id))return;add(message);}
@@ -109,8 +115,8 @@ public class ChatView extends ViewGroup {
     }
     public boolean isConnected(){return ready;}
     public String getStatus(){return status;}
-    public String getTopic(){return topic.text;}
-    public String getComposer(){return composer.text;}
+    public String getTopic(){return topic.getText();}
+    public String getComposer(){return composer.getText();}
     public int getMessageCount(){return messages.size();}
     public String getMessageBody(int index){return messages.get(index).body;}
     public String getMessageStatus(int index){return messages.get(index).status;}
@@ -126,15 +132,30 @@ public class ChatView extends ViewGroup {
         return super.dispatchTouchEvent(event);
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event){
+        if (event.getType() == KeyEvent.DOWN && (event.getValue() == KeyEvent.TAB || event.getValue() == KeyEvent.ISO_LEFT_TAB))
+            return super.dispatchKeyEvent(event);
+
         int key=event.getValue();
         if(event.getType()==KeyEvent.DOWN){
-            if(key==KeyEvent.TAB){focused=connecting?composer:focused==nickname?topic:focused==topic?composer:nickname;invalidate();return true;}
-            if(key==KeyEvent.ESCAPE){focused=null;invalidate();return true;}
+
+            if(key==KeyEvent.ESCAPE){focus(null);invalidate();return true;}
             if(key==0xff55||key==0xff56){history.scroll(key==0xff55?-160:160);return true;}
-            if(key==KeyEvent.ENTER&&(event.getModifiers()&KeyEvent.SHIFT)==0){if(focused==composer)send();else if(!connecting)connect();invalidate();return true;}
+            if(key==KeyEvent.ENTER&&(event.getModifiers()&KeyEvent.SHIFT)==0){if(focused()==composer)send();else if(!connecting)connect();invalidate();return true;}
         }
-        if(focused!=null&&(!connecting||focused==composer)&&focused.key(event)){invalidate();return true;}
+        if(focused()!=null&&(!connecting||focused()==composer)&&focused().dispatchKeyEvent(event)){invalidate();return true;}
         return true;
+    }
+    private EditText focused() {
+        View view = findFocus();
+        return view instanceof EditText ? (EditText) view : null;
+    }
+    private void focus(EditText field) {
+        clearFocus();
+        if (field != null) { field.requestFocus(); field.setSelection(field.getText().length()); }
+    }
+    private static void setInput(EditText field, String value) {
+        field.setText(value);
+        field.setSelection(field.getText().length());
     }
     @Override protected void onMeasure(int w,int h){
         setMeasuredDimension(resolveSize(600,w),resolveSize(800,h));inset=Math.max(12,Math.min(24,getMeasuredWidth()/24));
@@ -194,55 +215,7 @@ public class ChatView extends ViewGroup {
             typography.draw(canvas,value,x,getHeight()/2+5,size,primary?0xffffffff:0xff138f78);
         }
     }
-    private final class Input extends View {
-        final String hint;final int limit;final boolean multiline;String text="";int cursor;boolean all;
-        Input(Context context,String hint,int limit,boolean multiline){super(context);this.hint=hint;this.limit=limit;this.multiline=multiline;}
-        void set(String value){text=value;cursor=text.length();all=false;}
-        boolean key(KeyEvent event){
-            int key=event.getValue();
-            if(event.getType()==KeyEvent.TEXT){
-                if(!Character.isValidCodePoint(key)||Character.isISOControl(key)||key>=0xd800&&key<=0xdfff)return false;
-                return insert(new String(Character.toChars(key)));
-            }
-            if(event.getType()!=KeyEvent.DOWN)return false;
-            if((event.getModifiers()&KeyEvent.CONTROL)!=0&&(key=='a'||key=='A')){all=true;return true;}
-            if(key==KeyEvent.ENTER&&multiline&&(event.getModifiers()&KeyEvent.SHIFT)!=0)return insert("\n");
-            if(key==KeyEvent.HOME)cursor=0;
-            else if(key==KeyEvent.END)cursor=text.length();
-            else if(key==KeyEvent.LEFT){if(cursor>0)cursor=text.offsetByCodePoints(cursor,-1);}
-            else if(key==KeyEvent.RIGHT){if(cursor<text.length())cursor=text.offsetByCodePoints(cursor,1);}
-            else if(key==KeyEvent.BACKSPACE||key==KeyEvent.DELETE){
-                if(all)set("");
-                else if(key==KeyEvent.BACKSPACE&&cursor>0){int start=text.offsetByCodePoints(cursor,-1);text=text.substring(0,start)+text.substring(cursor);cursor=start;}
-                else if(key==KeyEvent.DELETE&&cursor<text.length())text=text.substring(0,cursor)+text.substring(text.offsetByCodePoints(cursor,1));
-            }else return false;
-            all=false;return true;
-        }
-        private boolean insert(String value){
-            if(!all&&text.codePointCount(0,text.length())>=limit)return true;
-            if(all)set("");text=text.substring(0,cursor)+value+text.substring(cursor);cursor+=value.length();return true;
-        }
-        @Override protected void onDraw(Canvas canvas){
-            canvas.fillRect(0,0,getWidth(),getHeight(),focused==this&&all?0xffd9f2e8:connecting&&this!=composer?0xffe8f0ed:0xffffffff);
-            canvas.strokeRect(0,0,getWidth(),getHeight(),focused==this?0xff138f78:0xffd4e3df);
-            canvas.save();
-            try{
-                canvas.clipRect(10,5,Math.max(0,getWidth()-20),getHeight()-10);
-                if(text.isEmpty()&&focused!=this){typography.draw(canvas,hint,12,27,14,0xff809593);return;}
-                if(multiline){
-                    List<String> lines=wrap(text,getWidth()-26,14),before=wrap(text.substring(0,cursor),getWidth()-26,14);
-                    int visible=Math.max(1,(getHeight()-12)/21),line=before.size()-1,start=Math.max(0,line-visible+1);
-                    for(int i=start;i<Math.min(lines.size(),start+visible);i++)typography.draw(canvas,lines.get(i),12,25+(i-start)*21,14,0xff1d3638);
-                    if(focused==this){int x=(int)typography.width(before.get(line),14);canvas.fillRect(12+x,10+(line-start)*21,1,18,0xff138f78);}
-                }else{
-                    int start=0;
-                    while(start<cursor&&typography.width(text.substring(start,cursor),14)>getWidth()-28)start=text.offsetByCodePoints(start,1);
-                    typography.draw(canvas,text.substring(start),12,27,14,0xff1d3638);
-                    if(focused==this)canvas.fillRect(12+(int)typography.width(text.substring(start,cursor),14),10,1,20,0xff138f78);
-                }
-            }finally{canvas.restore();}
-        }
-    }
+
     private final class History extends View {
         int offset,total,dragY;boolean bottom=true,dragging;
         History(Context context){super(context);}

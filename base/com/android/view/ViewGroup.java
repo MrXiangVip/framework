@@ -60,7 +60,11 @@ public abstract  class ViewGroup extends View implements ViewParent {
             index = mChildrenCount;
         }
         addInArray(child, index);
+        // Resolve detached subtree focus before attaching it to this tree.
+        View childFocus = child.findFocus();
+        if (childFocus != null) childFocus.clearFocus();
         child.mParent = this;
+        if (childFocus != null) childFocus.requestFocus();
 
     }
     private void addInArray(View child, int index) {
@@ -98,10 +102,44 @@ public abstract  class ViewGroup extends View implements ViewParent {
         for (int i = 0; found == null && i < mChildrenCount; i++) found = mChildren[i].findViewById(id);
         return found;
     }
+    @Override public View findFocus() {
+        View focused = super.findFocus();
+        for (int i = 0; focused == null && i < mChildrenCount; i++) focused = mChildren[i].findFocus();
+        return focused;
+    }
+    @Override public void clearFocus() {
+        super.clearFocus();
+        for (int i = 0; i < mChildrenCount; i++) mChildren[i].clearFocus();
+    }
+    private static void collectFocusables(View view, java.util.List<View> result) {
+        if (view.isFocusable() && view.getWidth() > 0 && view.getHeight() > 0) result.add(view);
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) collectFocusables(group.getChildAt(i), result);
+        }
+    }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        View focused = findFocus();
+        View focusedChild = null;
+        for (int i = 0; focused != null && i < mChildrenCount; i++) {
+            if (mChildren[i].findFocus() == focused) { focusedChild = mChildren[i]; break; }
+        }
+        if (focusedChild != null && focusedChild.dispatchKeyEvent(event)) return true;
         for (int i = 0; i < mChildrenCount; i++) {
             View child = mChildren[i];
-            if (child.getWidth() > 0 && child.getHeight() > 0 && child.dispatchKeyEvent(event)) return true;
+            if (child != focusedChild && child.getWidth() > 0 && child.getHeight() > 0 && child.dispatchKeyEvent(event)) return true;
+        }
+        if (getRootView() == this && event.getType() == KeyEvent.DOWN
+                && (event.getValue() == KeyEvent.TAB || event.getValue() == KeyEvent.ISO_LEFT_TAB) && (event.getModifiers() & KeyEvent.CONTROL) == 0) {
+            java.util.List<View> focusables = new java.util.ArrayList<>();
+            collectFocusables(this, focusables);
+            if (!focusables.isEmpty()) {
+                int current = focusables.indexOf(findFocus());
+                int step = event.getValue() == KeyEvent.ISO_LEFT_TAB || (event.getModifiers() & KeyEvent.SHIFT) != 0 ? -1 : 1;
+                int next = current < 0 ? (step > 0 ? 0 : focusables.size() - 1)
+                        : (current + step + focusables.size()) % focusables.size();
+                return focusables.get(next).requestFocus();
+            }
         }
         return super.dispatchKeyEvent(event);
     }
@@ -149,6 +187,7 @@ public abstract  class ViewGroup extends View implements ViewParent {
         if (mTouchTarget != null) mTouchTarget.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
         mTouchTarget = null;
         for (int i = 0; i < mChildrenCount; i++) {
+            mChildren[i].clearFocus();
             mChildren[i].mParent = null;
             mChildren[i] = null;
         }

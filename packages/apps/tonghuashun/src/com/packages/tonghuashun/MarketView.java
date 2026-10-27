@@ -4,6 +4,7 @@ import com.android.content.Context;
 import com.android.graphics.Canvas;
 import com.android.util.AttributeSet;
 import com.android.view.*;
+import com.android.widget.EditText;
 import java.awt.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage;
@@ -15,7 +16,7 @@ import java.util.Locale;
 import java.util.Random;
 
 /** Reference-inspired quote terminal. Drawing and hit targets share logical coordinates. */
-public final class MarketView extends View implements AutoCloseable {
+public final class MarketView extends ViewGroup implements AutoCloseable {
     private static final int RED = 0xf3313c, GREEN = 0x079c23, INK = 0x303335, MUTED = 0x979b9f, LINE = 0xeeeeef;
     private static final String[] NAV = {"首页", "行情", "自选", "交易", "资讯", "理财"};
     private final MarketStore store;
@@ -43,7 +44,9 @@ public final class MarketView extends View implements AutoCloseable {
     private boolean searching, editing, dragging, pressed, orderBuy = true;
     private String query = "", notice = "", orderQuantity = "100", articleTitle = "", articleBody = "";
     private MarketStore.Stock selected;
-    private boolean orderOpen, quantityEditing;
+    private boolean orderOpen;
+    private final EditText searchInput, quantityInput;
+    private boolean inputPointer;
     private Rectangle chart = new Rectangle();
     private final class Target {
         final Rectangle bounds; final Runnable action;
@@ -55,8 +58,48 @@ public final class MarketView extends View implements AutoCloseable {
         store = new MarketStore(Paths.get(System.getProperty("framework.tonghuashun.data",
                 Paths.get(System.getProperty("user.home"), ".local", "share", "framework-tonghuashun", "account.properties").toString())));
         store.setOnline(Boolean.parseBoolean(System.getProperty("framework.tonghuashun.online", "true")));
+        searchInput = textInput("search", "输入名称或代码", 40, false);
+        quantityInput = textInput("quantity", "股数", 7, true);
+        quantityInput.setSelectAllOnFocus(true); quantityInput.setText("100");
+        searchInput.setOnTextChangedListener((view, value) -> { query = value; scroll = 0; invalidate(); });
+        quantityInput.setOnTextChangedListener((view, value) -> { orderQuantity = value; invalidate(); });
         notice = store.warning();
     }
+    private EditText textInput(String id, String hint, int limit, boolean numeric) {
+        EditText field = new EditText(getContext()) {
+            @Override protected int measureText(String value) { return fonts.width(value, mTextSize); }
+            @Override protected void drawTextLine(Canvas canvas, String value, int x, int baseline, int color) {
+                fonts.draw(canvas, value, x, baseline, mTextSize, color);
+            }
+            @Override public void replaceSelection(String value) {
+                if (numeric && value != null && !value.isEmpty()) {
+                    value = value.replaceAll("[^0-9]", "");
+                    if (value.isEmpty()) return;
+                }
+                super.replaceSelection(value);
+            }
+        };
+        field.setId(id); field.setSingleLine(); field.setMaxLength(limit); field.setHint(hint);
+        addView(field, new LayoutParams(-2, -2)); return field;
+    }
+    private void layoutInput(EditText field, int x, int y, int width, int height, int fontSize) {
+        int size = Math.max(1, (int) Math.round(fontSize * scale()));
+        if (field.getTextSize() != size) field.setTextSize(size);
+        int padding = Math.max(1, (int) Math.round(8 * scale()));
+        if (field.getPadding() != padding) field.setPadding(padding);
+        int l = (int) Math.round(left() + x * scale()), t = (int) Math.round(y * scale());
+        int w = (int) Math.round(width * scale()), h = (int) Math.round(height * scale());
+        field.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.EXACTLY));
+        field.layout(l, t, l + w, t + h);
+    }
+    private void layoutInputs() {
+        if (searching && !orderOpen) layoutInput(searchInput, 20, 14, 437, 42, 19);
+        else { searchInput.clearFocus(); searchInput.layout(0, 0, 0, 0); }
+        if (orderOpen) layoutInput(quantityInput, 226, Math.max(72, (height() - 420) / 2) + 137, 221, 48, 24);
+        else { quantityInput.clearFocus(); quantityInput.layout(0, 0, 0, 0); }
+    }
+    @Override protected void onLayout(boolean changed, int l, int t, int r, int b) { layoutInputs(); }
+
     public MarketStore getStore() { return store; }
     public int getPage() { return page; }
     public String getSelectedCode() { return selected == null ? "" : selected.code; }
@@ -86,11 +129,11 @@ public final class MarketView extends View implements AutoCloseable {
     @Override protected void onMeasure(int w, int h) { setMeasuredDimension(resolveSize(600, w), resolveSize(900, h)); }
     private void target(int x, int y, int w, int h, Runnable action) { targets.add(new Target(x, y, w, h, action)); }
     private void navigate(int next) {
-        page = next; selected = null; searching = editing = orderOpen = quantityEditing = false;
+        page = next; selected = null; searching = editing = orderOpen = false; clearFocus();
         scroll = maxScroll = 0; crosshair = -1; articleTitle = ""; notice = store.warning(); invalidate();
     }
     private void detail(MarketStore.Stock stock) { selected = stock; searching = false; scroll = 0; crosshair = -1; period = 0; notice = ""; invalidate(); }
-    private void search() { searching = true; selected = null; query = ""; scroll = 0; notice = ""; invalidate(); }
+    private void search() { searching = true; selected = null; searchInput.setText(""); searchInput.requestFocus(); scroll = 0; notice = ""; invalidate(); }
     private void toggle(String code) {
         try { store.toggleWatch(code); notice = store.watched(code) ? "已加入自选" : "已移出自选"; }
         catch (Exception e) { notice = "保存失败：" + e.getMessage(); }
@@ -98,12 +141,12 @@ public final class MarketView extends View implements AutoCloseable {
     }
     private void order(boolean buy) {
         if (selected == null || !selected.tradable) { notice = "模拟买卖支持宁德时代、贵州茅台、招商银行、比亚迪、中国平安"; invalidate(); return; }
-        orderPrice = store.available(selected) ? selected.cents() : 0; orderBuy = buy; orderOpen = true; quantityEditing = false; orderQuantity = "100"; notice = ""; invalidate();
+        orderPrice = store.available(selected) ? selected.cents() : 0; orderBuy = buy; orderOpen = true; quantityInput.clearFocus(); quantityInput.setText("100"); notice = ""; invalidate();
     }
     private void submit() {
         try {
             store.trade(selected.code, orderBuy, Integer.parseInt(orderQuantity), orderPrice);
-            orderOpen = quantityEditing = false; notice = "模拟" + (orderBuy ? "买入" : "卖出") + "已成交，持仓与资金已保存";
+            orderOpen = false; quantityInput.clearFocus(); notice = "模拟" + (orderBuy ? "买入" : "卖出") + "已成交，持仓与资金已保存";
         } catch (Exception e) { notice = e instanceof NumberFormatException ? "请输入有效的整数股数" : e.getMessage(); if (selected != null && e.getMessage() != null && e.getMessage().contains("报价已变化")) orderPrice = selected.cents(); }
         invalidate();
     }
@@ -134,6 +177,7 @@ public final class MarketView extends View implements AutoCloseable {
         center(g, label, x + w / 2, y + 22, 14, active ? RED : INK); target(x, y, w, 32, action);
     }
     @Override protected void onDraw(Canvas canvas) {
+        layoutInputs();
         startQuotes();
         Graphics2D g = canvas.getImage().createGraphics();
         try {
@@ -248,7 +292,6 @@ public final class MarketView extends View implements AutoCloseable {
     }
     private void drawSearch(Graphics2D g) {
         fill(g, RED, 0, 0, 550, 69); fill(g, 0xffffff, 20, 14, 437, 42);
-        text(g, clipped(g, query.isEmpty() ? "输入名称或代码" : query + "|", 407, 19), 34, 44, 19, query.isEmpty() ? MUTED : INK);
         center(g, "取消", 504, 44, 18, 0xffffff); target(465, 0, 85, 69, () -> navigate(page));
         text(g, "搜索证券 · 键盘输入 / 回车查看", 23, 102, 14, MUTED);
         quoteList(g, store.search(query), 123, height() - 74, true);
@@ -425,14 +468,13 @@ public final class MarketView extends View implements AutoCloseable {
         targets.clear(); int y = Math.max(72, (height() - 420) / 2);
         fill(g, 0xffffff, 20, y, 510, 416);
         text(g, orderBuy ? "模拟买入" : "模拟卖出", 43, y + 43, 25, orderBuy ? RED : GREEN);
-        right(g, "关闭", 508, y + 40, 16, MUTED); target(450, y, 80, 60, () -> { orderOpen = false; quantityEditing = false; invalidate(); });
+        right(g, "关闭", 508, y + 40, 16, MUTED); target(450, y, 80, 60, () -> { orderOpen = false; quantityInput.clearFocus(); invalidate(); });
         text(g, selected.name + "  " + selected.code, 43, y + 85, 20, INK);
         text(g, (store.isOnline() ? "确认报价  " : "示例成交价  ") + (store.available(selected) && orderPrice > 0 ? number(orderPrice / 100.0, 2) : "--") + " 元", 43, y + 119, 16, MUTED);
         text(g, "数量（股）", 43, y + 167, 16, INK);
         fill(g, 0xf4f5f6, 166, y + 137, 341, 48);
-        center(g, "−", 195, y + 170, 24, INK); center(g, orderQuantity + (quantityEditing ? "|" : ""), 334, y + 170, 24, INK); center(g, "+", 479, y + 170, 24, INK);
+        center(g, "−", 195, y + 170, 24, INK); center(g, "+", 479, y + 170, 24, INK);
         target(166, y + 137, 60, 48, () -> adjustQuantity(-100)); target(447, y + 137, 60, 48, () -> adjustQuantity(100));
-        target(226, y + 137, 221, 48, () -> { quantityEditing = true; orderQuantity = ""; invalidate(); });
         String amount = "—";
         try { int n = Integer.parseInt(orderQuantity); if (n > 0 && n <= 1_000_000 && orderPrice > 0 && store.available(selected)) amount = money(orderPrice * n); } catch (NumberFormatException ignored) { }
         text(g, "预计金额", 43, y + 221, 16, MUTED); right(g, amount + " 元", 507, y + 221, 22, INK);
@@ -443,35 +485,45 @@ public final class MarketView extends View implements AutoCloseable {
         target(43, y + 336, 464, 55, this::submit);
     }
     private void adjustQuantity(int delta) {
-        try { orderQuantity = Integer.toString(Math.max(100, Math.min(1_000_000, Integer.parseInt(orderQuantity) + delta))); }
-        catch (NumberFormatException e) { orderQuantity = "100"; }
-        quantityEditing = false; invalidate();
+        try { quantityInput.setText(Integer.toString(Math.max(100, Math.min(1_000_000, Integer.parseInt(orderQuantity) + delta)))); }
+        catch (NumberFormatException e) { quantityInput.setText("100"); }
+        quantityInput.clearFocus(); invalidate();
     }
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
         if (e.getType() == KeyEvent.DOWN && e.getValue() == 0xffc2) { refreshQuotes(); return true; }
         if (e.getType() == KeyEvent.DOWN && e.getValue() == KeyEvent.ESCAPE) {
             if (orderOpen) orderOpen = false; else if (!articleTitle.isEmpty()) articleTitle = ""; else if (searching) searching = false; else selected = null;
-            quantityEditing = false; notice = ""; invalidate(); return true;
+            quantityInput.clearFocus(); notice = ""; invalidate(); return true;
         }
         if (e.getType() == KeyEvent.DOWN && (e.getModifiers() & KeyEvent.CONTROL) != 0 && (e.getValue() == 'f' || e.getValue() == 'F')) { if (!orderOpen && articleTitle.isEmpty()) search(); return true; }
-        if (searching || orderOpen && quantityEditing) {
-            String value = searching ? query : orderQuantity;
-            if (e.getType() == KeyEvent.TEXT && (e.getModifiers() & KeyEvent.CONTROL) == 0 && Character.isValidCodePoint(e.getValue()) && !Character.isISOControl(e.getValue())) {
-                if (value.length() < (searching ? 40 : 7) && (searching || e.getValue() >= '0' && e.getValue() <= '9')) value += new String(Character.toChars(e.getValue()));
-            } else if (e.getType() == KeyEvent.DOWN && e.getValue() == KeyEvent.BACKSPACE && !value.isEmpty()) value = value.substring(0, value.offsetByCodePoints(value.length(), -1));
-            else if (e.getType() == KeyEvent.DOWN && e.getValue() == KeyEvent.ENTER) {
+        if (searching || orderOpen && quantityInput.isFocused()) {
+            EditText field = searching ? searchInput : quantityInput;
+            if (e.getType() == KeyEvent.DOWN && (e.getValue() == KeyEvent.ENTER || e.getValue() == 0xff8d)) {
                 if (searching) { List<MarketStore.Stock> result = store.search(query); if (!result.isEmpty()) detail(result.get(0)); }
-                else quantityEditing = false;
+                else quantityInput.clearFocus();
+                invalidate(); return true;
             }
-            if (searching) { query = value; scroll = 0; } else if (orderOpen) orderQuantity = value;
-            invalidate(); return true;
+            return field.dispatchKeyEvent(e);
         }
+        if (orderOpen && e.getType() == KeyEvent.DOWN && (e.getValue() == KeyEvent.TAB || e.getValue() == KeyEvent.ISO_LEFT_TAB)) return quantityInput.requestFocus();
         if (!orderOpen && articleTitle.isEmpty() && selected == null && e.getType() == KeyEvent.DOWN && (e.getValue() == 0xff54 || e.getValue() == 0xff52)) {
             scroll = Math.max(0, Math.min(maxScroll, scroll + (e.getValue() == 0xff54 ? 70 : -70))); invalidate(); return true;
         }
         return false;
     }
+    private boolean hitInput(EditText input, MotionEvent event) {
+        return event.getX() >= input.getLeft() && event.getX() < input.getRight()
+                && event.getY() >= input.getTop() && event.getY() < input.getBottom();
+    }
     @Override public boolean dispatchTouchEvent(MotionEvent e) {
+        if (inputPointer || e.getAction() == MotionEvent.ACTION_DOWN
+                && (searchInput.getWidth() > 0 && hitInput(searchInput, e) || quantityInput.getWidth() > 0 && hitInput(quantityInput, e))) {
+            if (e.getAction() == MotionEvent.ACTION_DOWN) inputPointer = true;
+            boolean handled = super.dispatchTouchEvent(e);
+            if (e.getAction() == MotionEvent.ACTION_UP || e.getAction() == MotionEvent.ACTION_CANCEL) inputPointer = false;
+            return handled;
+        }
+
         double x = (e.getX() - left()) / scale(), y = e.getY() / scale();
         if (e.getAction() == MotionEvent.ACTION_CANCEL) { pressed = dragging = false; return true; }
         if (e.getAction() == MotionEvent.ACTION_SCROLL) {

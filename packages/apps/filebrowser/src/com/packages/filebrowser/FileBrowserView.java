@@ -5,6 +5,7 @@ import com.android.graphics.Canvas;
 import com.android.os.Handler;
 import com.android.util.AttributeSet;
 import com.android.view.*;
+import com.android.widget.EditText;
 import com.android.widget.Button;
 import java.awt.Font;
 import java.awt.font.FontRenderContext;
@@ -20,8 +21,7 @@ public class FileBrowserView extends ViewGroup {
     private boolean cut, hidden, busy;
     private String status = "", prompt = "";
     private String mode = "browse";
-    private final Input path, search, name;
-    private Input focused;
+    private final EditText path, search, name;
     private final Map<String, Button> controls = new LinkedHashMap<>();
     private final Row[] rows = new Row[10];
     private List<FileOperations.Entry> entries = new ArrayList<>(), filtered = new ArrayList<>();
@@ -39,7 +39,7 @@ public class FileBrowserView extends ViewGroup {
         home = Paths.get(System.getProperty("framework.filebrowser.home", System.getProperty("user.home"))).toAbsolutePath().normalize();
         directory = home;
         path = input("path", "Directory path", 4096); search = input("search", "Search files in this folder", 120); name = input("name", "Name", 255);
-        focused = search;
+        focus(search);
         button("home", "Home", () -> navigate(home));
         button("up", "Up", () -> { Path parent = directory.getParent(); if (parent != null) navigate(parent); });
         button("open", "Open", this::openSelected);
@@ -54,8 +54,8 @@ public class FileBrowserView extends ViewGroup {
         button("previous", "<", () -> { if (page > 0) { page--; selected = null; status = ""; } invalidate(); });
         button("next", ">", () -> { if ((page + 1) * pageSize < pageCountItems()) { page++; if (mode.equals("browse")) selected = null; status = ""; } invalidate(); });
         button("confirm", "Confirm", this::confirm);
-        button("cancel", "Cancel", () -> { mode = "browse"; focused = search; status = ""; requestLayout(); invalidate(); });
-        button("back", "Back", () -> { mode = "browse"; preview = null; page = 0; focused = search; requestLayout(); invalidate(); });
+        button("cancel", "Cancel", () -> { mode = "browse"; focus(search); status = ""; requestLayout(); invalidate(); });
+        button("back", "Back", () -> { mode = "browse"; preview = null; page = 0; focus(search); requestLayout(); invalidate(); });
         for (int i = 0; i < rows.length; i++) {
             Row row = new Row(context, i); rows[i] = row; row.setId("row_" + i);
             row.setOnClickListener(view -> {
@@ -68,12 +68,13 @@ public class FileBrowserView extends ViewGroup {
             });
             addView(row, new LayoutParams(-2, -2));
         }
-        path.set(directory.toString()); navigate(directory);
+        setInput(path, directory.toString()); navigate(directory);
     }
-    private Input input(String id, String hint, int limit) {
-        Input value = new Input(getContext(), hint, limit); value.setId(id);
-        value.setOnClickListener(view -> { if (!busy) { focused = value; value.cursor = value.text.length(); value.all = false; invalidate(); } });
-        addView(value, new LayoutParams(-2, -2)); return value;
+    private EditText input(String id, String hint, int limit) {
+        EditText field = new EditText(getContext());
+        field.setId(id); field.setHint(hint); field.setSingleLine(); field.setMaxLength(limit); field.setTextSize(14);
+        if ("search".equals(id)) field.setOnTextChangedListener((view, text) -> { page = 0; filter(); invalidate(); });
+        addView(field, new LayoutParams(-2, -2)); return field;
     }
     private void button(String id, String text, Runnable action) {
         Button button = new ToolButton(getContext()); button.setId(id); button.setText(text);
@@ -98,7 +99,7 @@ public class FileBrowserView extends ViewGroup {
         });
     }
     private void navigateInput() {
-        try { navigate(directory.resolve(path.text)); }
+        try { navigate(directory.resolve(path.getText())); }
         catch (InvalidPathException e) { status = "Invalid path"; invalidate(); }
     }
     private void navigate(Path target) {
@@ -110,11 +111,11 @@ public class FileBrowserView extends ViewGroup {
     }
     private void applyListing(FileOperations.Listing listing, String message) {
         directory = listing.directory; entries = listing.entries; selected = null;
-        path.set(directory.toString()); search.set(""); page = 0; filter(); mode = "browse"; focused = search; preview = null;
+        setInput(path, directory.toString()); setInput(search, ""); page = 0; filter(); mode = "browse"; focus(search); preview = null;
         status = message;
     }
     private void filter() {
-        filtered = new ArrayList<>(); String query = search.text.toLowerCase(Locale.ROOT);
+        filtered = new ArrayList<>(); String query = search.getText().toLowerCase(Locale.ROOT);
         for (FileOperations.Entry entry : entries) if (entry.name.toLowerCase(Locale.ROOT).contains(query)) filtered.add(entry);
         page = Math.min(page, Math.max(0, (filtered.size() - 1) / pageSize));
         selected = null;
@@ -136,7 +137,7 @@ public class FileBrowserView extends ViewGroup {
         });
     }
     private void showPrompt(String operation, String title, String initial) {
-        mode = operation; prompt = title; name.set(initial); focused = name; status = ""; requestLayout(); invalidate();
+        mode = operation; prompt = title; setInput(name, initial); focus(name); status = ""; requestLayout(); invalidate();
     }
     private void copySelection(boolean move) {
         if (!requireSelection()) return;
@@ -152,7 +153,7 @@ public class FileBrowserView extends ViewGroup {
         });
     }
     private void confirm() {
-        final String operation = mode, newName = name.text;
+        final String operation = mode, newName = name.getText();
         final Path target = selected, folder = directory; final boolean showHidden = hidden;
         work("Working...", () -> {
             if (operation.equals("new")) FileOperations.createFolder(folder, newName);
@@ -170,22 +171,41 @@ public class FileBrowserView extends ViewGroup {
     public int getEntryCount() { return filtered.size(); }
     public String getSelectedName() { return selected == null ? "" : selected.getFileName().toString(); }
     public String getRowName(int index) { FileOperations.Entry entry = rows[index].entry(); return entry == null ? "" : entry.name; }
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        if (busy && event.getAction() != MotionEvent.ACTION_CANCEL) return true;
+        return super.dispatchTouchEvent(event);
+    }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (busy) return true;
+        if (event.getType() == KeyEvent.DOWN && (event.getValue() == KeyEvent.TAB || event.getValue() == KeyEvent.ISO_LEFT_TAB))
+            return super.dispatchKeyEvent(event);
+
         if (event.getType() == KeyEvent.DOWN) {
             if (event.getValue() == KeyEvent.ESCAPE && !mode.equals("browse")) { controls.get(mode.equals("preview") ? "back" : "cancel").performClick(); return true; }
             if (event.getValue() == KeyEvent.ENTER || event.getValue() == 0xff8d) {
                 if (mode.equals("new") || mode.equals("rename")) confirm();
-                else if (mode.equals("browse") && focused == path) { try { navigate(directory.resolve(path.text)); } catch (InvalidPathException e) { status = "Invalid path"; invalidate(); } }
+                else if (mode.equals("browse") && focused() == path) { try { navigate(directory.resolve(path.getText())); } catch (InvalidPathException e) { status = "Invalid path"; invalidate(); } }
                 else if (mode.equals("browse") && selected != null) openSelected();
                 return true;
             }
-            if (event.getValue() == KeyEvent.TAB && mode.equals("browse")) { focused = focused == path ? search : path; invalidate(); return true; }
+
         }
-        if (focused != null && !mode.equals("delete") && !mode.equals("preview") && focused.key(event)) {
-            if (focused == search) { page = 0; filter(); } invalidate(); return true;
+        if (focused() != null && !mode.equals("delete") && !mode.equals("preview") && focused().dispatchKeyEvent(event)) {
+            return true;
         }
         return false;
+    }
+    private EditText focused() {
+        View view = findFocus();
+        return view instanceof EditText ? (EditText) view : null;
+    }
+    private void focus(EditText field) {
+        clearFocus();
+        if (field != null) { field.requestFocus(); field.setSelection(field.getText().length()); }
+    }
+    private static void setInput(EditText field, String value) {
+        field.setText(value);
+        field.setSelection(field.getText().length());
     }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         setMeasuredDimension(resolveSize(600, widthSpec), resolveSize(800, heightSpec));
@@ -300,43 +320,5 @@ public class FileBrowserView extends ViewGroup {
             canvas.drawText((entry.directory ? "Folder" : size(entry.size)) + (entry.link ? "  |  Link" : ""), 50, 39, 12, 0xff667085);
         }
     }
-    private final class Input extends View {
-        String text = ""; final String hint; final int limit; int cursor; boolean all;
-        Input(Context context, String hint, int limit) { super(context); this.hint = hint; this.limit = limit; }
-        void set(String value) { text = value; cursor = value.length(); all = false; }
-        boolean key(KeyEvent event) {
-            int key = event.getValue();
-            if (event.getType() == KeyEvent.TEXT) {
-                if (!Character.isValidCodePoint(key) || Character.isISOControl(key)) return false;
-                String inserted = new String(Character.toChars(key));
-                if ((all ? 0 : text.length()) + inserted.length() > limit) return true;
-                if (all) set(""); text = text.substring(0, cursor) + inserted + text.substring(cursor); cursor += inserted.length(); return true;
-            }
-            if (event.getType() != KeyEvent.DOWN) return false;
-            if ((event.getModifiers() & KeyEvent.CONTROL) != 0 && (key == 'a' || key == 'A')) { all = true; return true; }
-            if (key == KeyEvent.HOME) cursor = 0;
-            else if (key == KeyEvent.END) cursor = text.length();
-            else if (key == KeyEvent.LEFT) { if (cursor > 0) cursor = text.offsetByCodePoints(cursor, -1); }
-            else if (key == KeyEvent.RIGHT) { if (cursor < text.length()) cursor = text.offsetByCodePoints(cursor, 1); }
-            else if (key == KeyEvent.BACKSPACE || key == KeyEvent.DELETE) {
-                if (all) set("");
-                else if (key == KeyEvent.BACKSPACE && cursor > 0) {
-                    int before = text.offsetByCodePoints(cursor, -1); text = text.substring(0, before) + text.substring(cursor); cursor = before;
-                } else if (key == KeyEvent.DELETE && cursor < text.length()) text = text.substring(0, cursor) + text.substring(text.offsetByCodePoints(cursor, 1));
-            } else return false;
-            all = false; return true;
-        }
-        @Override protected void onDraw(Canvas canvas) {
-            canvas.fillRect(0, 0, getWidth(), getHeight(), focused == this && all ? 0xffdce7ff : 0xffffffff);
-            canvas.strokeRect(0, 0, getWidth(), getHeight(), focused == this ? 0xff5179db : 0xffccd4e0);
-            Font font = new Font(Font.SANS_SERIF, Font.PLAIN, 15); int start = 0;
-            while (start < cursor && font.getStringBounds(text.substring(start, cursor), METRICS).getWidth() > getWidth() - 28) start = text.offsetByCodePoints(start, 1);
-            canvas.save();
-            try {
-                canvas.clipRect(8, 4, Math.max(0, getWidth() - 16), Math.max(0, getHeight() - 8));
-                canvas.drawText(text.isEmpty() ? hint : text.substring(start), 12, 26, 15, text.isEmpty() ? 0xff98a2b3 : 0xff182230);
-                if (focused == this) canvas.fillRect(12 + (int) font.getStringBounds(text.substring(start, cursor), METRICS).getWidth(), 8, 1, 24, 0xff5179db);
-            } finally { canvas.restore(); }
-        }
-    }
+
 }

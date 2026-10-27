@@ -5,6 +5,8 @@ public final class KeyEvent {
     public static final int TEXT = 0, DOWN = 1, UP = 2;
     public static final int BACKSPACE = 0xff08, TAB = 0xff09, ENTER = 0xff0d, ESCAPE = 0xff1b;
     public static final int HOME = 0xff50, LEFT = 0xff51, RIGHT = 0xff53, END = 0xff57, DELETE = 0xffff;
+    public static final int ISO_LEFT_TAB = 0xfe20; // X11 Shift+Tab keysym
+    public static final int ARROW_UP = 0xff52, ARROW_DOWN = 0xff54;
     public static final int SHIFT = 1, CONTROL = 4;
     private final int type, value, modifiers;
     public KeyEvent(int type, int value, int modifiers) {

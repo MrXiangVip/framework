@@ -42,6 +42,9 @@ public final class BrowserText {
         TextLayout result = new TextLayout(attributed.getIterator(), METRICS); layouts.put(key, result); return result;
     }
     public int width(String value, int size) { return value.isEmpty() ? 0 : (int) Math.ceil(layout(value, size, false).getAdvance()); }
+    public void draw(com.android.graphics.Canvas canvas, String value, int x, int baseline, int size, int color) {
+        if (!value.isEmpty()) canvas.drawText(layout(value, size, false), x, baseline, color);
+    }
     public void draw(Graphics2D g, String value, int x, int baseline, int size, int color, boolean bold) {
         if (value.isEmpty()) return;
         g.setColor(new Color(color)); layout(value, size, bold).draw(g, x, baseline);

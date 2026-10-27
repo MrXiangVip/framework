@@ -4,6 +4,7 @@ import com.android.content.Context;
 import com.android.graphics.Canvas;
 import com.android.util.AttributeSet;
 import com.android.view.*;
+import com.android.widget.EditText;
 import com.android.widget.Button;
 import java.awt.Font;
 import java.awt.font.FontRenderContext;
@@ -16,8 +17,7 @@ import java.util.List;
 public class ContactsView extends ViewGroup {
     private final ContactStore store;
     private List<ContactStore.Contact> contacts = new ArrayList<>(), filtered = new ArrayList<>();
-    private final Field search, name, phone, email;
-    private Field focused;
+    private final EditText search, name, phone, email;
     private final Button add, previous, next, save, cancel;
     private Button delete;
     private final Row[] rows = new Row[8];
@@ -36,11 +36,11 @@ public class ContactsView extends ViewGroup {
         previous = button("previous", "<", () -> { if (page > 0) page--; invalidate(); });
         next = button("next", ">", () -> { if ((page + 1) * pageSize < filtered.size()) page++; invalidate(); });
         save = button("save", "Save", this::saveContact);
-        cancel = button("cancel", "Cancel", () -> { editing = false; focused = search; confirmingDelete = false; reload(); requestLayout(); invalidate(); });
+        cancel = button("cancel", "Cancel", () -> { editing = false; focus(search); confirmingDelete = false; reload(); requestLayout(); invalidate(); });
         delete = button("delete", "Delete", () -> {
             if (editingId == null) return;
             if (!confirmingDelete) { confirmingDelete = true; delete.setText("Confirm?"); status = "Click Confirm? again to delete, or Cancel."; invalidate(); return; }
-            try { store.delete(editingId); editing = false; focused = search; status = "Contact deleted"; reload(); requestLayout(); }
+            try { store.delete(editingId); editing = false; focus(search); status = "Contact deleted"; reload(); requestLayout(); }
             catch (IOException | RuntimeException e) { status = "Delete failed: " + e.getMessage(); }
             invalidate();
         });
@@ -49,11 +49,17 @@ public class ContactsView extends ViewGroup {
             row.setId("row_" + i); row.setOnClickListener(view -> { ContactStore.Contact value = row.contact(); if (value != null) edit(value); });
             addView(row, new LayoutParams(-2, -2));
         }
-        focused = search; reload();
+        focus(search); reload();
     }
-    private Field field(String id, String hint, int limit) {
-        Field field = new Field(getContext(), hint, limit); field.setId(id);
-        field.setOnClickListener(view -> { focused = field; field.cursor = field.text.length(); field.selectAll = false; invalidate(); });
+    private EditText field(String id, String hint, int limit) {
+        EditText field = new EditText(getContext());
+        field.setId(id); field.setHint(hint); field.setSingleLine(); field.setMaxLength(limit); field.setTextSize(17);
+        field.setOnTextChangedListener((view, text) -> {
+            confirmingDelete = false;
+            if (delete != null) delete.setText("Delete");
+            if ("search".equals(view.getId())) { page = 0; filter(); }
+            invalidate();
+        });
         addView(field, new LayoutParams(-2, -2)); return field;
     }
     private Button button(String id, String text, Runnable action) {
@@ -65,7 +71,7 @@ public class ContactsView extends ViewGroup {
         catch (IOException | RuntimeException e) { status = "Load failed: " + e.getMessage(); }
     }
     private void filter() {
-        String query = search.text.trim().toLowerCase(Locale.ROOT), digits = query.replaceAll("[^0-9]", "");
+        String query = search.getText().trim().toLowerCase(Locale.ROOT), digits = query.replaceAll("[^0-9]", "");
         filtered = new ArrayList<>();
         for (ContactStore.Contact contact : contacts) {
             String text = (contact.name + " " + contact.phone + " " + contact.email).toLowerCase(Locale.ROOT);
@@ -76,15 +82,15 @@ public class ContactsView extends ViewGroup {
     }
     private void edit(ContactStore.Contact contact) {
         editing = true; editingId = contact == null ? null : contact.id;
-        name.set(contact == null ? "" : contact.name); phone.set(contact == null ? "" : contact.phone); email.set(contact == null ? "" : contact.email);
-        focused = name; confirmingDelete = false; delete.setText("Delete"); status = "";
+        setInput(name, contact == null ? "" : contact.name); setInput(phone, contact == null ? "" : contact.phone); setInput(email, contact == null ? "" : contact.email);
+        focus(name); confirmingDelete = false; delete.setText("Delete"); status = "";
         requestLayout(); invalidate();
     }
     private void saveContact() {
         try {
             store.save(new ContactStore.Contact(editingId == null ? UUID.randomUUID().toString() : editingId,
-                    name.text, phone.text, email.text), editingId == null);
-            editing = false; focused = search; search.set(""); page = 0; status = "Contact saved";
+                    name.getText(), phone.getText(), email.getText()), editingId == null);
+            editing = false; focus(search); setInput(search, ""); page = 0; status = "Contact saved";
             reload(); requestLayout();
         } catch (IOException | RuntimeException e) { status = "Save failed: " + e.getMessage(); }
         invalidate();
@@ -93,28 +99,30 @@ public class ContactsView extends ViewGroup {
     public int getFilteredCount() { return filtered.size(); }
     public String getStatus() { return status; }
     public boolean isEditing() { return editing; }
-    public String getFieldText(String id) { return ((Field) findViewById(id)).text; }
+    public String getFieldText(String id) { return ((EditText) findViewById(id)).getText(); }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        if (event.getType() == KeyEvent.DOWN && (event.getValue() == KeyEvent.TAB || event.getValue() == KeyEvent.ISO_LEFT_TAB))
+            return super.dispatchKeyEvent(event);
+
         if (event.getType() == KeyEvent.DOWN) {
             int key = event.getValue();
-            if (key == KeyEvent.TAB || key == 0xfe20) {
-                if (editing) {
-                    Field[] fields = {name, phone, email}; int index = Arrays.asList(fields).indexOf(focused);
-                    focused = fields[(index + (((event.getModifiers() & KeyEvent.SHIFT) != 0 || key == 0xfe20) ? 2 : 1)) % 3];
-                } else focused = search;
-                invalidate(); return true;
-            }
+
             if (key == KeyEvent.ESCAPE && editing) { cancel.performClick(); return true; }
             if ((key == KeyEvent.ENTER || key == 0xff8d) && editing) { saveContact(); return true; }
         }
-        if (focused == null) return false;
-        boolean changed = focused.key(event);
-        if (changed) { confirmingDelete = false; delete.setText("Delete"); if (focused == search) { page = 0; filter(); } invalidate(); }
-        return changed;
+        return focused() != null && focused().dispatchKeyEvent(event);
     }
-    @Override public boolean dispatchTouchEvent(MotionEvent event) {
-        if (event.getAction() == MotionEvent.ACTION_CANCEL && focused != null) focused.selectAll = false;
-        return super.dispatchTouchEvent(event);
+    private EditText focused() {
+        View view = findFocus();
+        return view instanceof EditText ? (EditText) view : null;
+    }
+    private void focus(EditText field) {
+        clearFocus();
+        if (field != null) { field.requestFocus(); field.setSelection(field.getText().length()); }
+    }
+    private static void setInput(EditText field, String value) {
+        field.setText(value);
+        field.setSelection(field.getText().length());
     }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         setMeasuredDimension(resolveSize(600, widthSpec), resolveSize(800, heightSpec));
@@ -181,50 +189,5 @@ public class ContactsView extends ViewGroup {
             canvas.drawText(fit(value.phone.isEmpty() ? value.email : value.phone, getWidth() - 80, 13), 64, 49, 13, 0xff667085);
         }
     }
-    private final class Field extends View {
-        String text = ""; final String hint; final int limit; int cursor; boolean selectAll;
-        Field(Context context, String hint, int limit) { super(context); this.hint = hint; this.limit = limit; }
-        void set(String value) { text = value; cursor = text.length(); selectAll = false; }
-        boolean key(KeyEvent event) {
-            int key = event.getValue();
-            if (event.getType() == KeyEvent.TEXT) {
-                if (!Character.isValidCodePoint(key) || Character.isISOControl(key)) return false;
-                String inserted = new String(Character.toChars(key));
-                if ((selectAll ? 0 : text.length()) + inserted.length() > limit) return true;
-                if (selectAll) set("");
-                text = text.substring(0, cursor) + inserted + text.substring(cursor); cursor += inserted.length(); return true;
-            }
-            if (event.getType() != KeyEvent.DOWN) return false;
-            if ((event.getModifiers() & KeyEvent.CONTROL) != 0 && (key == 'a' || key == 'A')) { selectAll = true; return true; }
-            if (key == KeyEvent.HOME) cursor = 0;
-            else if (key == KeyEvent.END) cursor = text.length();
-            else if (key == KeyEvent.LEFT) { if (cursor > 0) cursor = text.offsetByCodePoints(cursor, -1); }
-            else if (key == KeyEvent.RIGHT) { if (cursor < text.length()) cursor = text.offsetByCodePoints(cursor, 1); }
-            else if (key == KeyEvent.BACKSPACE || key == KeyEvent.DELETE) {
-                if (selectAll) set("");
-                else if (key == KeyEvent.BACKSPACE && cursor > 0) {
-                    int before = text.offsetByCodePoints(cursor, -1); text = text.substring(0, before) + text.substring(cursor); cursor = before;
-                } else if (key == KeyEvent.DELETE && cursor < text.length()) text = text.substring(0, cursor) + text.substring(text.offsetByCodePoints(cursor, 1));
-            } else return false;
-            selectAll = false; return true;
-        }
-        @Override protected void onDraw(Canvas canvas) {
-            canvas.fillRect(0, 0, getWidth(), getHeight(), focused == this && selectAll ? 0xffdce7ff : 0xffffffff);
-            canvas.strokeRect(0, 0, getWidth(), getHeight(), focused == this ? 0xff5179db : 0xffccd4e0);
-            // Horizontally scroll the text around the insertion point.
-            int start = 0;
-            Font font = new Font(Font.SANS_SERIF, Font.PLAIN, 17);
-            while (start < cursor && font.getStringBounds(text.substring(start, cursor), METRICS).getWidth() > getWidth() - 28)
-                start = text.offsetByCodePoints(start, 1);
-            canvas.save();
-            try {
-                canvas.clipRect(8, 4, Math.max(0, getWidth() - 16), Math.max(0, getHeight() - 8));
-                canvas.drawText(text.isEmpty() ? hint : text.substring(start), 12, 29, 17, text.isEmpty() ? 0xff98a2b3 : 0xff182230);
-                if (focused == this) {
-                    int x = 12 + (int) font.getStringBounds(text.substring(start, cursor), METRICS).getWidth();
-                    canvas.fillRect(x, 10, 1, 25, 0xff5179db);
-                }
-            } finally { canvas.restore(); }
-        }
-    }
+
 }

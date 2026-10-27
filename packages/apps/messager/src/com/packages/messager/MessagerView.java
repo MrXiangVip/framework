@@ -5,6 +5,7 @@ import com.android.graphics.Canvas;
 import com.android.os.Handler;
 import com.android.util.AttributeSet;
 import com.android.view.*;
+import com.android.widget.EditText;
 import com.android.widget.Button;
 import java.awt.Font;
 import java.awt.font.FontRenderContext;
@@ -16,17 +17,17 @@ import java.util.concurrent.*;
 
 /** Local conversation manager rendered by the framework View tree, with real X11 text input. */
 public class MessagerView extends ViewGroup {
+    private boolean updatingInputs;
     private final MessageStore store;
     private List<MessageStore.Message> messages = new ArrayList<>(), history = new ArrayList<>();
     private final List<Conversation> conversations = new ArrayList<>();
     private final Map<String, Control> controls = new LinkedHashMap<>();
     private final ConversationRow[] rows = new ConversationRow[8];
-    private final Input search, recipient, body;
+    private final EditText search, recipient, body;
     private final History surface;
     private boolean busy, editing, dirty, creating;
     private String current = "", status = "", dialog = "";
     private int page, historyPage, capacity = 5, inset = 24;
-    private Input focused;
     private final Handler ui = new Handler(message -> { ((Runnable) message.obj).run(); return true; });
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> { Thread worker = new Thread(r, "messager-store"); worker.setDaemon(true); return worker; });
     private static final FontRenderContext METRICS = new FontRenderContext(null, true, true);
@@ -42,7 +43,7 @@ public class MessagerView extends ViewGroup {
         control("new", "+ New", () -> open("")); control("refresh", "Refresh", this::load);
         control("back", "< Back", this::back);
         control("save_draft", "Save draft", () -> save(true)); control("send", "Save locally", () -> save(false));
-        control("delete", "Delete chat", () -> { dialog = "delete"; focused = null; requestLayout(); invalidate(); });
+        control("delete", "Delete chat", () -> { dialog = "delete"; focus(null); requestLayout(); invalidate(); });
         control("confirm", "Confirm", this::confirm);
         control("cancel", "Cancel", () -> { dialog = ""; requestLayout(); invalidate(); });
         control("previous", "< Previous", () -> { if (editing) { if (historyPage > 0) { historyPage--; surface.reset(); } } else if (page > 0) page--; invalidate(); });
@@ -54,10 +55,16 @@ public class MessagerView extends ViewGroup {
         for (int i = 0; i < rows.length; i++) { rows[i] = new ConversationRow(context, i); rows[i].setId("row_" + i); addView(rows[i], new LayoutParams(-2, -2)); }
         load();
     }
-    private Input input(String id, String hint, boolean multiline, int limit) {
-        Input input = new Input(getContext(), hint, multiline, limit); input.setId(id);
-        input.setOnClickListener(v -> { if (!busy) { focused = input; input.cursor = input.text.length(); input.all = false; invalidate(); } });
-        addView(input, new LayoutParams(-2, -2)); return input;
+    private EditText input(String id, String hint, boolean multiline, int limit) {
+        EditText field = new EditText(getContext());
+        field.setId(id); field.setHint(hint); field.setSingleLine(!multiline); field.setMaxCodePoints(limit); field.setTextSize(14);
+        field.setOnTextChangedListener((view, text) -> {
+            if (updatingInputs) return;
+            if ("search".equals(view.getId())) { page = 0; rebuild(); }
+            else { dirty = true; status = "Unsaved changes"; }
+            invalidate();
+        });
+        addView(field, new LayoutParams(-2, -2)); return field;
     }
     private void control(String id, String text, Runnable action) {
         Control button = new Control(getContext(), text); button.setId(id);
@@ -78,7 +85,7 @@ public class MessagerView extends ViewGroup {
     private void load() { work("Loading messages...", () -> { List<MessageStore.Message> loaded = store.load(); return () -> { messages = loaded; rebuild(); status = "Local messages loaded"; }; }); }
     private void rebuild() {
         Map<String, Conversation> groups = new HashMap<>();
-        String query = search.text.trim().toLowerCase(Locale.ROOT);
+        String query = search.getText().trim().toLowerCase(Locale.ROOT);
         for (MessageStore.Message message : messages) {
             Conversation conversation = groups.computeIfAbsent(message.recipient, Conversation::new);
             if (conversation.last == null || message.time >= conversation.last.time) conversation.last = message;
@@ -98,16 +105,16 @@ public class MessagerView extends ViewGroup {
     }
     private void open(String phone) {
         current = phone; creating = phone.isEmpty(); editing = true; dirty = false; dialog = "";
-        recipient.set(phone); body.set("");
-        for (MessageStore.Message message : messages) if (message.recipient.equals(phone) && message.kind.equals(MessageStore.DRAFT)) body.set(message.body);
+        setInput(recipient, phone); setInput(body, "");
+        for (MessageStore.Message message : messages) if (message.recipient.equals(phone) && message.kind.equals(MessageStore.DRAFT)) setInput(body, message.body);
         rebuild(); historyPage = Math.max(0, (history.size() - 1) / 10); surface.reset();
-        focused = creating ? recipient : body; status = "Local only - no SMS delivery"; requestLayout(); invalidate();
+        focus(creating ? recipient : body); status = "Local only - no SMS delivery"; requestLayout(); invalidate();
     }
     private void back() {
-        if (dirty) { dialog = "discard"; focused = null; requestLayout(); invalidate(); }
+        if (dirty) { dialog = "discard"; focus(null); requestLayout(); invalidate(); }
         else list();
     }
-    private void list() { editing = false; dirty = false; dialog = ""; focused = null; current = ""; status = "Local messages only"; rebuild(); requestLayout(); invalidate(); }
+    private void list() { editing = false; dirty = false; dialog = ""; focus(null); current = ""; status = "Local messages only"; rebuild(); requestLayout(); invalidate(); }
     private void confirm() {
         if (dialog.equals("discard")) { list(); return; }
         if (dialog.equals("delete")) {
@@ -116,17 +123,17 @@ public class MessagerView extends ViewGroup {
         }
     }
     private void save(boolean draft) {
-        final String phone, text = body.text;
+        final String phone, text = body.getText();
         try {
-            phone = MessageStore.normalizeRecipient(creating ? recipient.text : current);
+            phone = MessageStore.normalizeRecipient(creating ? recipient.getText() : current);
             MessageStore.validate(new MessageStore.Message(UUID.randomUUID().toString(), phone, text.trim(), draft ? MessageStore.DRAFT : MessageStore.OUTBOX, System.currentTimeMillis()));
         } catch (IllegalArgumentException e) { status = e.getMessage(); invalidate(); return; }
         work(draft ? "Saving draft..." : "Saving local message...", () -> {
             List<MessageStore.Message> loaded = store.save(phone, text, draft);
             return () -> {
-                messages = loaded; current = phone; recipient.set(phone); creating = false; dirty = false;
-                if (draft) body.set(text.trim()); else body.set("");
-                focused = body; rebuild(); historyPage = Math.max(0, (history.size() - 1) / 10); surface.reset();
+                messages = loaded; current = phone; setInput(recipient, phone); creating = false; dirty = false;
+                if (draft) setInput(body, text.trim()); else setInput(body, "");
+                focus(body); rebuild(); historyPage = Math.max(0, (history.size() - 1) / 10); surface.reset();
                 status = draft ? "Draft saved" : "Saved locally - not sent as SMS";
             };
         });
@@ -136,30 +143,51 @@ public class MessagerView extends ViewGroup {
     public boolean isDirty() { return dirty; }
     public String getStatus() { return status; }
     public String getDialog() { return dialog; }
-    public String getBody() { return body.text; }
-    public String getRecipient() { return recipient.text; }
+    public String getBody() { return body.getText(); }
+    public String getRecipient() { return recipient.getText(); }
     public int getConversationCount() { return conversations.size(); }
     public int getMessageCount() { return messages.size(); }
     public int getHistoryCount() { return history.size(); }
     public int getHistoryPage() { return historyPage; }
     public String getRowRecipient(int row) { int index = page * capacity + row; return index < conversations.size() ? conversations.get(index).phone : ""; }
     public int getHistoryScroll() { return surface.offset; }
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        if (busy && event.getAction() != MotionEvent.ACTION_CANCEL) return true;
+        return super.dispatchTouchEvent(event);
+    }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (busy) return true;
+        if (event.getType() == KeyEvent.DOWN && (event.getValue() == KeyEvent.TAB || event.getValue() == KeyEvent.ISO_LEFT_TAB))
+            return super.dispatchKeyEvent(event);
+
         int key = event.getValue();
         if (event.getType() == KeyEvent.DOWN) {
-            if (key == KeyEvent.ESCAPE) { if (!dialog.isEmpty()) { dialog = ""; requestLayout(); invalidate(); } else if (editing) back(); else { focused = null; invalidate(); } return true; }
+            if (key == KeyEvent.ESCAPE) { if (!dialog.isEmpty()) { dialog = ""; requestLayout(); invalidate(); } else if (editing) back(); else { focus(null); invalidate(); } return true; }
             if (!dialog.isEmpty()) return true;
-            if (key == KeyEvent.TAB) { focused = editing ? focused == recipient ? body : creating ? recipient : body : search; invalidate(); return true; }
+
             if (editing && key == KeyEvent.ENTER && (event.getModifiers() & KeyEvent.CONTROL) != 0) { save(false); return true; }
-            if (editing && key == KeyEvent.ENTER && focused == recipient) { focused = body; invalidate(); return true; }
+            if (editing && key == KeyEvent.ENTER && focused() == recipient) { focus(body); invalidate(); return true; }
             if (editing && (key == 0xff55 || key == 0xff56)) { surface.scroll(key == 0xff55 ? -150 : 150); return true; }
         }
-        if (dialog.isEmpty() && focused != null && focused.key(event)) {
-            if (focused == search) { page = 0; rebuild(); } else { dirty = true; status = "Unsaved changes"; }
-            invalidate(); return true;
+        if (dialog.isEmpty() && focused() != null && focused().dispatchKeyEvent(event)) {
+            return true;
         }
         return false;
+    }
+    private EditText focused() {
+        View view = findFocus();
+        return view instanceof EditText ? (EditText) view : null;
+    }
+    private void focus(EditText field) {
+        clearFocus();
+        if (field != null) { field.requestFocus(); field.setSelection(field.getText().length()); }
+    }
+    private void setInput(EditText field, String value) {
+        updatingInputs = true;
+        try {
+            field.setText(value);
+            field.setSelection(field.getText().length());
+        } finally { updatingInputs = false; }
     }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         setMeasuredDimension(resolveSize(600, widthSpec), resolveSize(800, heightSpec)); inset = Math.min(24, getMeasuredWidth() / 20);
@@ -201,10 +229,10 @@ public class MessagerView extends ViewGroup {
             canvas.drawText(dialog.equals("delete") ? "All local messages and its draft will be removed." : "Use Save draft to keep your message first.", inset, 214, Math.min(14, getWidth() / 29), MUTED);
         } else if (editing) {
             if (!creating) canvas.drawText(fit(current, width - 192, 16), inset + 88, 114, 16, INK);
-            canvas.drawText("Message  " + body.text.codePointCount(0, body.text.length()) + "/2000", inset, getHeight() - 215, 12, MUTED);
+            canvas.drawText("Message  " + body.getText().codePointCount(0, body.getText().length()) + "/2000", inset, getHeight() - 215, 12, MUTED);
         } else {
             if (conversations.isEmpty()) {
-                canvas.drawText(search.text.isEmpty() ? "No conversations yet" : "No matching conversations", inset, 239, Math.min(21, getWidth() / 16), INK);
+                canvas.drawText(search.getText().isEmpty() ? "No conversations yet" : "No matching conversations", inset, 239, Math.min(21, getWidth() / 16), INK);
                 canvas.drawText("Choose + New to write a local message.", inset, 273, Math.min(14, getWidth() / 28), MUTED);
             }
             canvas.drawText((page + 1) + " / " + Math.max(1, (conversations.size() + capacity - 1) / capacity), getWidth() / 2 - 18, getHeight() - 47, 14, MUTED);
@@ -287,51 +315,5 @@ public class MessagerView extends ViewGroup {
             canvas.drawText(label, Math.max(4, (getWidth() - width) / 2), getHeight() / 2 + 5, 13, primary ? 0xffffffff : INK);
         }
     }
-    private final class Input extends View {
-        final String hint; final boolean multiline; final int limit;
-        String text = ""; int cursor; boolean all;
-        Input(Context context, String hint, boolean multiline, int limit) { super(context); this.hint = hint; this.multiline = multiline; this.limit = limit; }
-        void set(String text) { this.text = text; cursor = text.length(); all = false; }
-        boolean key(KeyEvent event) {
-            int key = event.getValue();
-            if (event.getType() == KeyEvent.TEXT || (event.getType() == KeyEvent.DOWN && key == KeyEvent.ENTER && multiline)) {
-                if (event.getType() == KeyEvent.DOWN) key = '\n';
-                if (!Character.isValidCodePoint(key) || (Character.isISOControl(key) && !(key == '\n' && multiline))) return false;
-                if ((all ? 0 : text.codePointCount(0, text.length())) >= limit) return true;
-                if (all) set(""); String insert = new String(Character.toChars(key)); text = text.substring(0, cursor) + insert + text.substring(cursor); cursor += insert.length(); return true;
-            }
-            if (event.getType() != KeyEvent.DOWN) return false;
-            if ((event.getModifiers() & KeyEvent.CONTROL) != 0 && (key == 'a' || key == 'A')) { all = true; return true; }
-            if (key == KeyEvent.HOME) cursor = 0;
-            else if (key == KeyEvent.END) cursor = text.length();
-            else if (key == KeyEvent.LEFT) { if (cursor > 0) cursor = text.offsetByCodePoints(cursor, -1); }
-            else if (key == KeyEvent.RIGHT) { if (cursor < text.length()) cursor = text.offsetByCodePoints(cursor, 1); }
-            else if (key == KeyEvent.BACKSPACE || key == KeyEvent.DELETE) {
-                if (all) set("");
-                else if (key == KeyEvent.BACKSPACE && cursor > 0) { int previous = text.offsetByCodePoints(cursor, -1); text = text.substring(0, previous) + text.substring(cursor); cursor = previous; }
-                else if (key == KeyEvent.DELETE && cursor < text.length()) text = text.substring(0, cursor) + text.substring(text.offsetByCodePoints(cursor, 1));
-            } else return false;
-            all = false; return true;
-        }
-        @Override protected void onDraw(Canvas canvas) {
-            canvas.fillRect(0, 0, getWidth(), getHeight(), focused == this && all ? 0xffdce8ff : 0xffffffff);
-            canvas.strokeRect(0, 0, getWidth(), getHeight(), focused == this ? ACCENT : 0xffcbd7e9);
-            canvas.save();
-            try {
-                canvas.clipRect(8, 4, Math.max(0, getWidth() - 16), getHeight() - 8);
-                if (text.isEmpty() && focused != this) { canvas.drawText(hint, 10, 25, 14, MUTED); return; }
-                if (!multiline) {
-                    Font font = new Font(Font.SANS_SERIF, Font.PLAIN, 14); int start = 0;
-                    while (start < cursor && font.getStringBounds(text.substring(start, cursor), METRICS).getWidth() > getWidth() - 28) start = text.offsetByCodePoints(start, 1);
-                    canvas.drawText(text.substring(start), 10, 26, 14, INK);
-                    if (focused == this) canvas.fillRect(10 + (int) font.getStringBounds(text.substring(start, cursor), METRICS).getWidth(), 8, 1, 24, ACCENT);
-                } else {
-                    List<String> lines = wrap(text, getWidth() - 24, 14), before = wrap(text.substring(0, cursor), getWidth() - 24, 14);
-                    int visible = Math.max(1, (getHeight() - 12) / 20), line = before.size() - 1, start = Math.max(0, line - visible + 1);
-                    for (int i = start; i < Math.min(lines.size(), start + visible); i++) canvas.drawText(lines.get(i), 10, 23 + (i - start) * 20, 14, INK);
-                    if (focused == this) { int x = (int) new Font(Font.SANS_SERIF, Font.PLAIN, 14).getStringBounds(before.get(line), METRICS).getWidth(); canvas.fillRect(10 + x, 8 + (line - start) * 20, 1, 19, ACCENT); }
-                }
-            } finally { canvas.restore(); }
-        }
-    }
+
 }

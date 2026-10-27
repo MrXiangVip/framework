@@ -5,6 +5,7 @@ import com.android.graphics.Canvas;
 import com.android.os.Handler;
 import com.android.util.AttributeSet;
 import com.android.view.*;
+import com.android.widget.EditText;
 import com.android.widget.Button;
 import java.awt.Font;
 import java.awt.font.FontRenderContext;
@@ -22,11 +23,11 @@ public class VideoView extends ViewGroup {
     private List<Path> files = new ArrayList<>();
     private final Map<String, Control> controls = new LinkedHashMap<>();
     private final FileRow[] rows = new FileRow[8];
-    private final PathInput input;
+    private final EditText input;
     private final Picture picture;
     private final Timeline timeline;
     private int page, capacity = 5, inset = 24;
-    private boolean busy, viewing, focused, disposed;
+    private boolean busy, viewing, disposed;
     private String status = "";
     private Timer timer;
     private final AtomicBoolean refreshPending = new AtomicBoolean();
@@ -43,18 +44,18 @@ public class VideoView extends ViewGroup {
         control("open", "Open", this::openInput);
         control("home", "Videos", () -> browse(home)); control("up", "Up", () -> { if (directory.getParent() != null) browse(directory.getParent()); }); control("refresh", "Refresh", () -> browse(directory));
         control("previous", "< Previous", () -> { if (page > 0) { page--; invalidate(); } }); control("next", "Next >", () -> { if ((page + 1) * capacity < files.size()) { page++; invalidate(); } });
-        control("play", "Play", () -> { engine.togglePause(); focused = false; invalidate(); });
+        control("play", "Play", () -> { engine.togglePause(); clearFocus(); invalidate(); });
         control("stop", "Stop", () -> { engine.stop(); invalidate(); });
         control("rewind", "-10 sec", () -> seekBy(-10)); control("forward", "+10 sec", () -> seekBy(10));
-        control("library", "Library", () -> { engine.stop(); viewing = false; focused = false; browse(directory); });
+        control("library", "Library", () -> { engine.stop(); viewing = false; clearFocus(); browse(directory); });
         control("mute", "Mute", () -> { engine.setMuted(!engine.isMuted()); invalidate(); });
         control("volume_down", "Volume -", () -> { engine.setVolume(engine.getVolume() - 10); invalidate(); }); control("volume_up", "Volume +", () -> { engine.setVolume(engine.getVolume() + 10); invalidate(); });
-        input = new PathInput(context); input.setId("path"); input.setOnClickListener(v -> { if (!busy) { focused = true; input.cursor = input.text.length(); input.all = false; invalidate(); } }); addView(input, new LayoutParams(-2, -2));
+        input = new EditText(context) { @Override protected void onDraw(Canvas canvas) { canvas.fillRect(0, 0, getWidth(), getHeight(), 0xff1c2b43); super.onDraw(canvas); } }; input.setId("path"); input.setSingleLine(); input.setMaxLength(4096); input.setTextSize(13); input.setTextColor(INK); addView(input, new LayoutParams(-2, -2));
         picture = new Picture(context); picture.setId("picture"); addView(picture, new LayoutParams(-2, -2));
         timeline = new Timeline(context); timeline.setId("timeline"); addView(timeline, new LayoutParams(-2, -2));
         for (int i = 0; i < rows.length; i++) { rows[i] = new FileRow(context, i); rows[i].setId("row_" + i); addView(rows[i], new LayoutParams(-2, -2)); }
         String startup = System.getProperty("framework.video.file");
-        if (startup != null) { input.set(startup); openInput(); } else browse(home);
+        if (startup != null) { setInput(input, startup); openInput(); } else browse(home);
     }
     private void control(String id, String text, Runnable action) {
         Control button = new Control(getContext(), text); button.setId(id); button.setOnClickListener(v -> { if (!busy) action.run(); });
@@ -73,7 +74,7 @@ public class VideoView extends ViewGroup {
         });
     }
     private void openInput() {
-        try { open(directory.resolve(input.text.trim())); }
+        try { open(directory.resolve(input.getText().trim())); }
         catch (InvalidPathException e) { status = "Invalid file path"; invalidate(); }
     }
     private void open(Path path) {
@@ -81,7 +82,7 @@ public class VideoView extends ViewGroup {
             Path absolute = path.toAbsolutePath().normalize();
             if (Files.isDirectory(absolute)) return scan(absolute);
             VideoEngine.Media media = VideoEngine.probe(absolute);
-            return () -> { engine.open(media); directory = media.file.getParent(); input.set(media.file.toString()); viewing = true; focused = false; status = ""; };
+            return () -> { engine.open(media); directory = media.file.getParent(); setInput(input, media.file.toString()); viewing = true; clearFocus(); status = ""; };
         });
     }
     private void browse(Path path) { work("Reading video library...", () -> scan(path)); }
@@ -100,9 +101,9 @@ public class VideoView extends ViewGroup {
         }
         entries.sort(Comparator.comparing((Path entry) -> !Files.isDirectory(entry, LinkOption.NOFOLLOW_LINKS)).thenComparing(entry -> entry.getFileName().toString().toLowerCase(Locale.ROOT)).thenComparing(Path::toString));
         final boolean truncated = limited;
-        return () -> { engine.stop(); directory = absolute; input.set(directory.toString()); files = entries; page = 0; viewing = false; focused = false; status = truncated ? "First 2000 entries only" : entries.size() + " videos / folders"; };
+        return () -> { engine.stop(); directory = absolute; setInput(input, directory.toString()); files = entries; page = 0; viewing = false; clearFocus(); status = truncated ? "First 2000 entries only" : entries.size() + " videos / folders"; };
     }
-    private void seekBy(double seconds) { engine.seek(engine.getPosition() + seconds); focused = false; invalidate(); }
+    private void seekBy(double seconds) { engine.seek(engine.getPosition() + seconds); clearFocus(); invalidate(); }
     public VideoEngine getEngine() { return engine; }
     public boolean isBusy() { return busy; }
     public boolean isViewing() { return viewing; }
@@ -123,14 +124,22 @@ public class VideoView extends ViewGroup {
             }
         }, 40, 40);
     }
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        if (busy && event.getAction() != MotionEvent.ACTION_CANCEL) return true;
+        return super.dispatchTouchEvent(event);
+    }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (busy) return true;
-        if (event.getType() == KeyEvent.DOWN && event.getValue() == KeyEvent.ESCAPE) {
-            focused = false; if (viewing) { engine.stop(); viewing = false; browse(directory); } invalidate(); return true;
+        if (event.getType() == KeyEvent.DOWN && (event.getValue() == KeyEvent.TAB || event.getValue() == KeyEvent.ISO_LEFT_TAB)) {
+            if (input.getWidth() > 0) input.requestFocus();
+            return true;
         }
-        if (focused) {
+        if (event.getType() == KeyEvent.DOWN && event.getValue() == KeyEvent.ESCAPE) {
+            clearFocus(); if (viewing) { engine.stop(); viewing = false; browse(directory); } invalidate(); return true;
+        }
+        if (input.isFocused()) {
             if (event.getType() == KeyEvent.DOWN && event.getValue() == KeyEvent.ENTER) { openInput(); return true; }
-            if (input.key(event)) { invalidate(); return true; } return false;
+            if (input.dispatchKeyEvent(event)) { invalidate(); return true; } return false;
         }
         if (viewing) {
             if (event.getType() == KeyEvent.DOWN) {
@@ -143,6 +152,10 @@ public class VideoView extends ViewGroup {
             }
         }
         return false;
+    }
+    private static void setInput(EditText field, String value) {
+        field.setText(value);
+        field.setSelection(field.getText().length());
     }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         setMeasuredDimension(resolveSize(600, widthSpec), resolveSize(800, heightSpec)); inset = Math.min(24, getMeasuredWidth() / 20);
@@ -223,7 +236,7 @@ public class VideoView extends ViewGroup {
             if (event.getAction() == MotionEvent.ACTION_DOWN) dragging = true;
             if (!dragging) return false;
             fraction = Math.max(0, Math.min(1, (double) event.getX() / Math.max(1, getWidth())));
-            if (event.getAction() == MotionEvent.ACTION_UP) { dragging = false; engine.seek(fraction * media.duration); focused = false; }
+            if (event.getAction() == MotionEvent.ACTION_UP) { dragging = false; engine.seek(fraction * media.duration); clearFocus(); }
             if (event.getAction() == MotionEvent.ACTION_CANCEL) dragging = false;
             invalidate(); return true;
         }
@@ -241,35 +254,5 @@ public class VideoView extends ViewGroup {
             text = fit(text, getWidth() - 8, 13); int width = (int) new Font(Font.SANS_SERIF, Font.PLAIN, 13).getStringBounds(text, METRICS).getWidth(); canvas.drawText(text, Math.max(4, (getWidth() - width)/2), getHeight()/2 + 5, 13, INK);
         }
     }
-    private final class PathInput extends View {
-        String text = ""; int cursor; boolean all;
-        PathInput(Context context) { super(context); }
-        void set(String value) { text = value; cursor = value.length(); all = false; }
-        boolean key(KeyEvent event) {
-            int key = event.getValue();
-            if (event.getType() == KeyEvent.TEXT) {
-                if (!Character.isValidCodePoint(key) || Character.isISOControl(key)) return false;
-                if ((all ? 0 : text.length()) >= 4096) return true;
-                if (all) set(""); String insert = new String(Character.toChars(key)); text = text.substring(0, cursor) + insert + text.substring(cursor); cursor += insert.length(); return true;
-            }
-            if (event.getType() != KeyEvent.DOWN) return false;
-            if ((event.getModifiers() & KeyEvent.CONTROL) != 0 && (key == 'a' || key == 'A')) { all = true; return true; }
-            if (key == KeyEvent.HOME) cursor = 0;
-            else if (key == KeyEvent.END) cursor = text.length();
-            else if (key == KeyEvent.LEFT) { if (cursor > 0) cursor = text.offsetByCodePoints(cursor, -1); }
-            else if (key == KeyEvent.RIGHT) { if (cursor < text.length()) cursor = text.offsetByCodePoints(cursor, 1); }
-            else if (key == KeyEvent.BACKSPACE || key == KeyEvent.DELETE) {
-                if (all) set("");
-                else if (key == KeyEvent.BACKSPACE && cursor > 0) { int before = text.offsetByCodePoints(cursor, -1); text = text.substring(0, before) + text.substring(cursor); cursor = before; }
-                else if (key == KeyEvent.DELETE && cursor < text.length()) text = text.substring(0, cursor) + text.substring(text.offsetByCodePoints(cursor, 1));
-            } else return false;
-            all = false; return true;
-        }
-        @Override protected void onDraw(Canvas canvas) {
-            canvas.fillRect(0, 0, getWidth(), getHeight(), focused && all ? 0xff2e4d7a : 0xff1b2b43); canvas.strokeRect(0, 0, getWidth(), getHeight(), focused ? ACCENT : 0xff47658c);
-            Font font = new Font(Font.SANS_SERIF, Font.PLAIN, 13); int start = 0;
-            while (start < cursor && font.getStringBounds(text.substring(start, cursor), METRICS).getWidth() > getWidth() - 28) start = text.offsetByCodePoints(start, 1);
-            canvas.save(); try { canvas.clipRect(8, 4, Math.max(0, getWidth() - 16), getHeight() - 8); canvas.drawText(text.substring(start), 10, 26, 13, INK); if (focused) canvas.fillRect(10 + (int) font.getStringBounds(text.substring(start, cursor), METRICS).getWidth(), 8, 1, 24, ACCENT); } finally { canvas.restore(); }
-        }
-    }
+
 }
