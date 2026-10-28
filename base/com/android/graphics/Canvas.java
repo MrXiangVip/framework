@@ -1,6 +1,8 @@
 package com.android.graphics;
 
 import java.awt.Color;
+import java.awt.AlphaComposite;
+import java.awt.geom.AffineTransform;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -45,6 +47,19 @@ public class Canvas implements AutoCloseable {
         if (width <= 0 || height <= 0) return;
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         graphics.drawImage(bitmap, x, y, width, height, null);
+    }
+    /** Draw with an affine transform and image-only opacity, without leaking Canvas state. */
+    public void drawImage(BufferedImage bitmap, AffineTransform transform, int alpha) {
+        if (alpha < 0 || alpha > 255) throw new IllegalArgumentException("Image alpha must be in [0,255]");
+        java.util.Objects.requireNonNull(bitmap, "bitmap");
+        java.util.Objects.requireNonNull(transform, "transform");
+        if (alpha == 0) return;
+        Graphics2D layer = (Graphics2D) graphics.create();
+        try {
+            layer.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            layer.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha / 255f));
+            layer.drawImage(bitmap, transform, null);
+        } finally { layer.dispose(); }
     }
     public void drawText(String text, int x, int baseline, int size, int color) {
         graphics.setColor(new Color(color, true));
