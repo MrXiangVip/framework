@@ -10,7 +10,12 @@ public final class FightEngine {
     private void sound(Sound sound) { soundListener.accept(sound); }
     public enum State { READY, FIGHT, ROUND_OVER, MATCH_OVER }
     public enum Move {
-        PUNCH(8, 100, .08, .11, .22), KICK(12, 130, .16, .12, .29), SPECIAL(26, 185, .22, .16, .40);
+        PUNCH(14, 112, .12, .11, .30), KICK(18, 140, .18, .12, .36),
+        LIGHT_PUNCH(6, 90, .04, .08, .15), LIGHT_KICK(8, 112, .07, .09, .19),
+        SPECIAL(26, 185, .22, .16, .40);
+        public boolean isKick() { return this == KICK || this == LIGHT_KICK; }
+        public boolean isLight() { return this == LIGHT_PUNCH || this == LIGHT_KICK; }
+        public String label() { switch(this) { case PUNCH: return "重拳"; case KICK: return "重脚"; case LIGHT_PUNCH: return "轻拳"; case LIGHT_KICK: return "轻脚"; default: return "必杀技"; } }
         final int damage, reach;
         final double windup, active, recovery;
         Move(int damage, int reach, double windup, double active, double recovery) {
@@ -20,7 +25,7 @@ public final class FightEngine {
     public static final class Fighter {
         double x, height, velocity, stun, attackTime, flash;
         int health = 100, energy = 40, facing, attackFacing, wins;
-        boolean guard, connected;
+        boolean guard, crouching, connected;
         Move move;
         Fighter(double x, int facing) { this.x = x; this.facing = facing; }
         public double getX() { return x; }
@@ -30,6 +35,7 @@ public final class FightEngine {
         public int getWins() { return wins; }
         public int getFacing() { return move == null ? facing : attackFacing; }
         public boolean isGuarding() { return guard; }
+        public boolean isCrouching() { return crouching; }
         public boolean isHit() { return flash > 0; }
         public Move getMove() { return move; }
         public double getAttackTime() { return attackTime; }
@@ -39,8 +45,8 @@ public final class FightEngine {
     private final Random random;
     private State state;
     private double accumulator, stateTime, remaining, aiDecision, aiGuard;
-    private int direction, round, winner;
-    private boolean blocking, paused, computer = true;
+    private int direction, enemyDirection, round, winner;
+    private boolean crouchRequested, enemyCrouchRequested, training, paused, computer = true;
     private String message;
     private int playerCharacter, enemyCharacter;
     public void setCharacters(int player, int enemy) { playerCharacter = player; enemyCharacter = enemy; }
@@ -52,10 +58,18 @@ public final class FightEngine {
     public State getState() { return state; }
     public int getRound() { return round; }
     public int getWinner() { return winner; }
-    public int getSeconds() { return Math.max(0, (int) Math.ceil(remaining)); }
+    public int getSeconds() { return training ? 0 : Math.max(0, (int) Math.ceil(remaining)); }
     public String getMessage() { return message; }
     public boolean isPaused() { return paused; }
     public void setComputerEnabled(boolean enabled) { computer = enabled; }
+    public void setTraining(boolean enabled) { training = enabled; }
+    public boolean isTraining() { return training; }
+    public void setCrouching(boolean value) { crouchRequested = value; posture(player, value); }
+    public void setEnemyCrouching(boolean value) { enemyCrouchRequested = value; posture(enemy, value); }
+    private void posture(Fighter fighter, boolean requested) { fighter.crouching = requested && fighter.height == 0 && fighter.velocity == 0 && fighter.stun == 0; }
+    public void setEnemyDirection(int value) { enemyDirection = Integer.compare(value, 0); }
+    public void enemyJump() { if (!training && !computer) jump(enemy); }
+    public boolean enemyAttack(Move move) { return !training && !computer && !paused  && state == State.FIGHT && attack(enemy, move); }
 
     public void restart() {
         player.wins = enemy.wins = 0;
@@ -64,29 +78,36 @@ public final class FightEngine {
     }
     private void reset(Fighter fighter, double x, int facing) {
         fighter.x = x; fighter.facing = facing; fighter.height = fighter.velocity = fighter.stun = fighter.flash = 0;
-        fighter.health = 100; fighter.energy = 40; fighter.move = null; fighter.guard = false; fighter.connected = false;
+        fighter.health = 100; fighter.energy = 40; fighter.move = null; fighter.guard = fighter.crouching = false; fighter.connected = false;
     }
     private void beginRound() {
         reset(player, 210, 1); reset(enemy, 510, -1);
-        direction = 0; blocking = false; aiDecision = aiGuard = 0;
-        remaining = 60; stateTime = 1.4; state = State.READY; winner = 0; message = "ROUND " + round; sound(Sound.ROUND);
-    }
-    public void setDirection(int value) { direction = Integer.compare(value, 0); }
-    public void setBlocking(boolean value) { blocking = value; if (!value) player.guard = false; }
-    public void releaseControls() { direction = 0; blocking = false; player.guard = false; }
-    public void togglePause() { paused = !paused; releaseControls(); }
-    public void jump() {
-        if (!paused && state == State.FIGHT && player.height == 0 && player.stun == 0 && player.move == null) {
-            player.velocity = 560; player.guard = false; sound(Sound.JUMP);
+        direction = enemyDirection = 0; crouchRequested = enemyCrouchRequested = false; aiDecision = aiGuard = 0;
+        remaining = training ? 0 : 60; winner = 0;
+        if (training) {
+            player.x = 360; player.energy = 100;
+            stateTime = 0; state = State.FIGHT; message = "";
+        } else {
+            stateTime = 1.4; state = State.READY; message = "ROUND " + round; sound(Sound.ROUND);
         }
     }
-    public boolean attack(Move move) { return !paused && !blocking && state == State.FIGHT && attack(player, move); }
+    public void setDirection(int value) { direction = Integer.compare(value, 0); }
+    public void releaseControls() { direction = enemyDirection = 0; crouchRequested = enemyCrouchRequested = false; player.guard = enemy.guard = player.crouching = enemy.crouching = false; }
+    public void togglePause() { paused = !paused; releaseControls(); }
+    public void jump() { jump(player); }
+    private void jump(Fighter fighter) {
+        if (!paused && state == State.FIGHT && fighter.height == 0 && !fighter.crouching && fighter.stun == 0 && fighter.move == null) {
+            fighter.velocity = 560; fighter.guard = false; sound(Sound.JUMP);
+        }
+    }
+    public boolean attack(Move move) { return !paused  && state == State.FIGHT && attack(player, move); }
     private boolean attack(Fighter fighter, Move move) {
-        if (fighter.move != null || fighter.stun > 0 || fighter.guard || fighter.health <= 0) return false;
+        if (fighter.move != null || fighter.stun > 0 || fighter.health <= 0) return false;
         if (move == Move.SPECIAL && fighter.energy < 40) return false;
         if (move == Move.SPECIAL) fighter.energy -= 40;
+        fighter.guard = false;
         fighter.move = move; fighter.attackTime = 0; fighter.attackFacing = fighter.facing; fighter.connected = false;
-        sound(move == Move.PUNCH ? Sound.PUNCH : move == Move.KICK ? Sound.KICK : Sound.SPECIAL);
+        sound(move == Move.SPECIAL ? Sound.SPECIAL : move.isKick() ? Sound.KICK : Sound.PUNCH);
         return true;
     }
     /** Split real time into fixed steps; a stall can advance at most 250 ms. */
@@ -107,14 +128,24 @@ public final class FightEngine {
         }
         stateTime = Math.max(0, stateTime - dt);
         if (stateTime == 0) message = "";
+        posture(player, crouchRequested); posture(enemy, !computer && enemyCrouchRequested);
+        if (training) {
+            // Solo practice has no opponent: no AI, collision, hit detection, or result.
+            player.energy = 100;
+            if (direction != 0 && player.move == null) player.facing = direction;
+            player.guard = false;
+            move(player, player.guard ? 0 : direction, dt);
+            advance(player, dt);
+            return;
+        }
         remaining = Math.max(0, remaining - dt);
         player.facing = player.x <= enemy.x ? 1 : -1;
         enemy.facing = -player.facing;
-        player.guard = blocking && player.move == null && player.stun == 0 && player.height == 0 && player.velocity == 0;
+        player.guard = backGuard(player, direction);
         if (computer) think(dt);
-        else enemy.guard = false;
+        else enemy.guard = backGuard(enemy, enemyDirection);
         move(player, player.guard ? 0 : direction, dt);
-        move(enemy, computer && enemy.move == null && !enemy.guard && Math.abs(enemy.x - player.x) > 108 ? enemy.facing : 0, dt);
+        move(enemy, computer ? (enemy.move == null && !enemy.guard && Math.abs(enemy.x - player.x) > 108 ? enemy.facing : 0) : (enemy.guard ? 0 : enemyDirection), dt);
         separate();
         advance(player, dt); advance(enemy, dt);
         // Capture both hit decisions before applying damage, allowing simultaneous knockouts.
@@ -122,6 +153,11 @@ public final class FightEngine {
         if (damageToEnemy > 0) damage(enemy, player, damageToEnemy);
         if (damageToPlayer > 0) damage(player, enemy, damageToPlayer);
         if (player.health <= 0 || enemy.health <= 0 || remaining <= 1e-8) endRound();
+    }
+    /** Facing is recalculated each step, so back changes immediately after a side switch. */
+    private boolean backGuard(Fighter fighter, int inputDirection) {
+        return inputDirection == -fighter.facing && fighter.move == null && fighter.stun == 0
+                && fighter.height == 0 && fighter.velocity == 0 && fighter.health > 0;
     }
     private void think(double dt) {
         aiDecision -= dt; aiGuard = Math.max(0, aiGuard - dt);
@@ -138,7 +174,7 @@ public final class FightEngine {
     }
     private void move(Fighter fighter, int direction, double dt) {
         int character = fighter == player ? playerCharacter : enemyCharacter;
-        if (fighter.stun == 0 && fighter.move == null) fighter.x += direction * (155 + character % 4 * 12) * dt;
+        if (fighter.stun == 0 && fighter.move == null && !fighter.crouching) fighter.x += direction * (155 + character % 4 * 12) * dt;
         fighter.x = Math.max(65, Math.min(655, fighter.x));
         if (fighter.height > 0 || fighter.velocity > 0) {
             fighter.height = Math.max(0, fighter.height + fighter.velocity * dt);
@@ -187,7 +223,7 @@ public final class FightEngine {
         if (winner == 1) player.wins++;
         if (winner == 2) enemy.wins++;
         state = State.MATCH_OVER;
-        message = winner == 0 ? "DRAW" : winner == 1 ? "YOU WIN" : "CPU WINS";
+        message = winner == 0 ? "DRAW" : winner == 1 ? "1P WINS" : computer ? "CPU WINS" : "2P WINS";
         sound(player.health <= 0 || enemy.health <= 0 ? Sound.KO : Sound.TIME_UP);
         if (state == State.MATCH_OVER) sound(winner == 0 ? Sound.DRAW : winner == 1 ? Sound.WIN : Sound.LOSE);
         else if (winner == 0) sound(Sound.DRAW);
