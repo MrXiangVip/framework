@@ -25,7 +25,7 @@ public final class FightEngine {
     public static final class Fighter {
         double x, height, velocity, stun, attackTime, flash;
         int health = 100, energy = 40, facing, attackFacing, wins;
-        boolean guard, crouching, connected;
+        boolean guard, crouching, connected, moving;
         Move move;
         Fighter(double x, int facing) { this.x = x; this.facing = facing; }
         public double getX() { return x; }
@@ -35,6 +35,7 @@ public final class FightEngine {
         public int getWins() { return wins; }
         public int getFacing() { return move == null ? facing : attackFacing; }
         public boolean isGuarding() { return guard; }
+        public boolean isMoving() { return moving; }
         public boolean isCrouching() { return crouching; }
         public boolean isHit() { return flash > 0; }
         public Move getMove() { return move; }
@@ -78,7 +79,7 @@ public final class FightEngine {
     }
     private void reset(Fighter fighter, double x, int facing) {
         fighter.x = x; fighter.facing = facing; fighter.height = fighter.velocity = fighter.stun = fighter.flash = 0;
-        fighter.health = 100; fighter.energy = 40; fighter.move = null; fighter.guard = fighter.crouching = false; fighter.connected = false;
+        fighter.health = 100; fighter.energy = 40; fighter.move = null; fighter.guard = fighter.crouching = false; fighter.connected = fighter.moving = false;
     }
     private void beginRound() {
         reset(player, 210, 1); reset(enemy, 510, -1);
@@ -92,7 +93,7 @@ public final class FightEngine {
         }
     }
     public void setDirection(int value) { direction = Integer.compare(value, 0); }
-    public void releaseControls() { direction = enemyDirection = 0; crouchRequested = enemyCrouchRequested = false; player.guard = enemy.guard = player.crouching = enemy.crouching = false; }
+    public void releaseControls() { direction = enemyDirection = 0; crouchRequested = enemyCrouchRequested = false; player.guard = enemy.guard = player.crouching = enemy.crouching = player.moving = enemy.moving = false; }
     public void togglePause() { paused = !paused; releaseControls(); }
     public void jump() { jump(player); }
     private void jump(Fighter fighter) {
@@ -169,13 +170,15 @@ public final class FightEngine {
             aiGuard = .42; enemy.guard = true;
         } else if (distance < 125) {
             double choice = random.nextDouble();
-            attack(enemy, choice < .16 && enemy.energy >= 40 ? Move.SPECIAL : choice < .56 ? Move.KICK : Move.PUNCH);
+            attack(enemy, choice < .25 ? Move.LIGHT_PUNCH : choice < .50 ? Move.LIGHT_KICK : choice < .75 ? Move.PUNCH : Move.KICK);
         }
     }
     private void move(Fighter fighter, int direction, double dt) {
+        double oldX = fighter.x;
         int character = fighter == player ? playerCharacter : enemyCharacter;
         if (fighter.stun == 0 && fighter.move == null && !fighter.crouching) fighter.x += direction * (155 + character % 4 * 12) * dt;
         fighter.x = Math.max(65, Math.min(655, fighter.x));
+        fighter.moving = Math.abs(fighter.x-oldX)>1e-8;
         if (fighter.height > 0 || fighter.velocity > 0) {
             fighter.height = Math.max(0, fighter.height + fighter.velocity * dt);
             fighter.velocity -= 1250 * dt;

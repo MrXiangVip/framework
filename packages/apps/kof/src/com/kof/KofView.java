@@ -8,10 +8,8 @@ import com.android.view.View;
 import com.android.view.MotionEvent;
 import com.android.view.KeyEvent;
 import java.awt.*;
-import java.awt.geom.*;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
-import javax.imageio.ImageIO;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -22,10 +20,23 @@ public class KofView extends View {
     private final Set<Integer> keys = new HashSet<>();
     private final StageArt stages = new StageArt();
     private final Font uiFont;
+    private final FighterSprites[] artwork=new FighterSprites[GameSession.NAMES.length];
+    private final FighterSprites[] actors=new FighterSprites[2];
+    private final int[] actorCharacters={-1,-1};
+    private FighterSprites sprites(int id) {
+        if(artwork[id]==null) artwork[id]=new FighterSprites(getContext(),id);
+        return artwork[id];
+    }
+    private FighterSprites actor(int slot,int id) {
+        if(actorCharacters[slot]!=id) { actors[slot]=new FighterSprites(sprites(id)); actorCharacters[slot]=id; }
+        return actors[slot];
+    }
+    private void resetAnimations() { for(FighterSprites a:actors) if(a!=null) a.reset(); }
+    private int rosterStep() { return 210; }
+    private int rosterLeft() { return (1280-session.getRosterSize()*rosterStep()+9)/2; }
     private BufferedImage frame;
     private Timer timer;
     private long lastTick;
-    private double animation;
     private int held = -1;
     private final AtomicBoolean pending = new AtomicBoolean();
     private final Handler ui = new Handler(message -> {
@@ -38,7 +49,7 @@ public class KofView extends View {
     private static final int[][] BUTTONS = {{32,625,66,56},{110,625,66,56},{188,625,82,56},{282,625,82,56},
         {748,625,96,56},{850,625,96,56},{1156,625,92,56},{1100,138,148,38},{32,138,150,38},{945,138,145,38},
         {952,625,96,56},{1054,625,96,56}};
-    private static final String[] LABELS = {"← A", "D →", "跳跃 W", "下蹲 S", "轻拳 J", "轻脚 K", "必杀 U", "PAUSE P", "MENU ESC", "SOUND M", "重拳 L", "重脚 ;"};
+    private static final String[] LABELS = {"← A", "D →", "跳跃 W", "下蹲 S", "轻拳 J", "轻脚 K", "重置 R", "PAUSE P", "MENU ESC", "SOUND M", "重拳 L", "重脚 ;"};
 
     public KofView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -53,10 +64,13 @@ public class KofView extends View {
     }
     public GameSession getSession() { return session; }
     public void advance(double dt) {
-        animation += Math.max(0, Math.min(.1, dt));
         syncControls();
         GameSession.Screen before = session.getScreen(); session.update(dt);
         if (before != session.getScreen()) clearInput();
+        if(session.getScreen()==GameSession.Screen.BATTLE && !session.getFight().isPaused()) {
+            actor(0,session.getSelected()).update(session.getFight().getPlayer(),dt);
+            if(!session.getFight().isTraining()) actor(1,session.getOpponent()).update(session.getFight().getEnemy(),dt);
+        }
     }
     private boolean attached() {
         View root = this;
@@ -80,7 +94,7 @@ public class KofView extends View {
     private double oy() { return (getHeight()-720*scale())/2; }
     private boolean inside(double x, double y, int[] b) { return x>=b[0] && y>=b[1] && x<b[0]+b[2] && y<b[1]+b[3]; }
     private int buttonAt(double x, double y) {
-        for (int i=0;i<BUTTONS.length;i++) if(inside(x,y,BUTTONS[i])) return i;
+        for (int i=0;i<BUTTONS.length;i++) if((i!=6||session.getMode()==GameSession.Mode.TRAINING)&&inside(x,y,BUTTONS[i])) return i;
         return -1;
     }
     @Override public boolean dispatchTouchEvent(MotionEvent e) {
@@ -95,7 +109,7 @@ public class KofView extends View {
                 }
                 for(int i=0;i<StageArt.NAMES.length;i++) if(inside(x,y,new int[]{48+i*199,584,188,90})) selectStage(i);
             } else if(session.getScreen()==GameSession.Screen.ROSTER) {
-                if(y>=535 && y<632 && x>=55 && x<1217) { int i=(int)((x-55)/117); if(x<55+i*117+108) choose(i); }
+                if(y>=535 && y<632 && x>=rosterLeft() && x<rosterLeft()+session.getRosterSize()*rosterStep()) { int i=(int)((x-rosterLeft())/rosterStep()); if(x<rosterLeft()+i*rosterStep()+rosterStep()-9) choose(i); }
                 else if(inside(x,y,new int[]{490,652,300,48})) startBattle();
                 else if(inside(x,y,new int[]{55,652,190,48})) returnToRoster();
                 else if(inside(x,y,new int[]{1035,652,190,48})) choose(activeCharacter()+1);
@@ -113,7 +127,7 @@ public class KofView extends View {
     private void openRoster() { clearInput(); session.openRoster(); audio.play(FightEngine.Sound.SELECT); }
     private void selectStage(int id) { session.selectStage(id); audio.play(FightEngine.Sound.SELECT); }
     private void choose(int index) { session.select(index); audio.play(FightEngine.Sound.SELECT); }
-    private void startBattle() { clearInput(); audio.clear(); audio.setPaused(false); session.start(); }
+    private void startBattle() { clearInput(); audio.clear(); audio.setPaused(false); session.start(); resetAnimations(); }
     private void returnToRoster() { clearInput(); session.back(); audio.clear(); audio.setPaused(false); }
     private void togglePause() { session.getFight().togglePause(); held = -1; session.getFight().releaseControls(); audio.setPaused(session.getFight().isPaused()); }
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
@@ -131,7 +145,8 @@ public class KofView extends View {
         } else if(session.getScreen()==GameSession.Screen.ROSTER) {
             if(k=='a'||k==KeyEvent.LEFT) choose(activeCharacter()-1);
             if(k=='d'||k==KeyEvent.RIGHT) choose(activeCharacter()+1);
-            if(k>='0'&&k<='9') choose(k=='0'?9:k-'1');
+            if(k=='1'||k=='2') choose(k-'1');
+            if(k==KeyEvent.END) choose(GameSession.SUNWUKONG);
             if(k==KeyEvent.ENTER||k==' ') startBattle();
             if(k==KeyEvent.ESCAPE) returnToRoster();
         } else if(session.getScreen()==GameSession.Screen.RESULT) {
@@ -144,18 +159,19 @@ public class KofView extends View {
             else if(k=='k') action(5);
             else if(k=='l') action(10);
             else if(k==';') action(11);
-            else if(k=='u') action(6);
-            else if(session.getMode()==GameSession.Mode.TRAINING&&k=='r') { clearInput(); audio.clear(); audio.setPaused(false); session.getFight().restart(); }
+            else if(session.getMode()==GameSession.Mode.TRAINING&&k=='r') resetTraining();
             else if(session.getMode()==GameSession.Mode.VERSUS) {
                 if(k==KeyEvent.ARROW_UP) session.getFight().enemyJump();
-                if(k=='1'||k==0xffb1) session.getFight().enemyAttack(FightEngine.Move.PUNCH);
-                if(k=='2'||k==0xffb2) session.getFight().enemyAttack(FightEngine.Move.KICK);
-                if(k=='3'||k==0xffb3) session.getFight().enemyAttack(FightEngine.Move.SPECIAL);
+                if(k=='1'||k==0xffb1) session.getFight().enemyAttack(FightEngine.Move.LIGHT_PUNCH);
+                if(k=='2'||k==0xffb2) session.getFight().enemyAttack(FightEngine.Move.LIGHT_KICK);
+                if(k=='3'||k==0xffb3) session.getFight().enemyAttack(FightEngine.Move.PUNCH);
+                if(k=='4'||k==0xffb4) session.getFight().enemyAttack(FightEngine.Move.KICK);
             }
             syncControls();
         }
         invalidate(); return true;
     }
+    private void resetTraining() { clearInput(); audio.clear(); audio.setPaused(false); session.getFight().restart(); resetAnimations(); }
     private void action(int index) {
         FightEngine f=session.getFight();
         switch(index) {
@@ -164,7 +180,7 @@ public class KofView extends View {
             case 11: f.attack(FightEngine.Move.KICK); break;
             case 4: f.attack(FightEngine.Move.LIGHT_PUNCH); break;
             case 5: f.attack(FightEngine.Move.LIGHT_KICK); break;
-            case 6: f.attack(FightEngine.Move.SPECIAL); break;
+            case 6: if(session.getMode()==GameSession.Mode.TRAINING) resetTraining(); break;
             case 7: togglePause(); break;
             case 8: returnToRoster(); break;
             case 9: audio.setMuted(!audio.isMuted()); break;
@@ -208,10 +224,7 @@ public class KofView extends View {
         text(g,title,x+w/2,y+h/2+6,16,accent,true);
     }
     private void portrait(Graphics2D g,int index,int x,int y,int w,int h) {
-        Graphics2D p=(Graphics2D)g.create();
-        p.clipRect(x,y,w,h);
-        p.setPaint(new GradientPaint(x,y,new Color(GameSession.COLORS[index]).darker(),x+w,y+h,new Color(0x111e30)));p.fillRect(x,y,w,h);
-        p.translate(x+w/2,y+h*2.07);p.scale(w/83.0,h/92.0);drawFighter(p,null,index,1,false);p.dispose();
+        sprites(index).portrait(g,x,y,w,h);
     }
     private void home(Graphics2D g) {
         stages.draw(g,session.getStage(),0,0,1280,720);
@@ -224,9 +237,9 @@ public class KofView extends View {
         text(g,"拳 皇",640,152,64,0xffe2a4,true);
         text(g,"THE KING OF FIGHTERS",640,184,16,0xa6b9c8,true);
         Graphics2D left=(Graphics2D)g.create();left.translate(232,512);left.scale(1.8,1.8);drawFighter(left,null,0,1,false);left.dispose();
-        Graphics2D right=(Graphics2D)g.create();right.translate(1048,512);right.scale(1.8,1.8);drawFighter(right,null,4,-1,false);right.dispose();
-        text(g,"KYO KUSANAGI",232,530,13,0x80d9e2,true);
-        text(g,"IORI YAGAMI",1048,530,13,0xe48f9f,true);
+        Graphics2D right=(Graphics2D)g.create();right.translate(1048,512);right.scale(1.8,1.8);drawFighter(right,null,GameSession.ZHUBAJIE,-1,false);right.dispose();
+        text(g,"孙悟空 / SUN WUKONG",232,530,13,0x80d9e2,true);
+        text(g,"猪八戒 / ZHU BAJIE",1048,530,13,0xe48f9f,true);
         for(int i=0;i<3;i++) {
             int x=440,y=215+i*95;boolean active=session.getMode().ordinal()==i;
             g.setPaint(new GradientPaint(x,y,new Color(active?0x4b3d2c:0x132334),x+400,y+80,new Color(0x101a2a)));
@@ -258,9 +271,9 @@ public class KofView extends View {
         text(g,"KOF / CHARACTER SELECT",48,44,16,0xbacbd8,false);
         text(g,"ESC 返回主菜单",1110,44,13,0x9cafbd,true);
         text(g,session.getMode().title+" / "+(session.getSelectingPlayer()==0?"1P 选择角色":"2P 选择角色"),640,145,24,0xffd68b,true);
-        
-        
-        int id=session.getSelected(), cpu=session.getMode()==GameSession.Mode.VERSUS?session.getOpponent():(id+4)%10;
+
+
+        int id=session.getSelected(), cpu=session.getMode()==GameSession.Mode.VERSUS?session.getOpponent():1-id;
         preview(g,id,true);
         if(session.getMode()==GameSession.Mode.TRAINING) {
             panel(g,650,205,520,270,0x446678);
@@ -278,16 +291,17 @@ public class KofView extends View {
             text(g,"60 SECONDS / ONE BOUT",640,395,12,0x849bb5,true);
         }
         text(g,session.getSelectingPlayer()==0?"1P  ROSTER":"2P  ROSTER",55,517,17,0xffda8e,false);
-        text(g,"A / D  OR  ARROWS TO SELECT     1 - 0  QUICK SELECT",775,517,12,0xb3c5d5,false);
-        for(int i=0;i<10;i++) {
-            int x=55+i*117;
-            panel(g,x,535,108,97,i==activeCharacter()?0xffce67:0x34475d);
-            portrait(g,i,x+4,539,100,68);
+        text(g,"A / D 或 ← → 选角   1 孙悟空   2 猪八戒",775,517,12,0xb3c5d5,false);
+        int step=rosterStep(),card=step-9;
+        for(int i=0;i<session.getRosterSize();i++) {
+            int x=rosterLeft()+i*step;
+            panel(g,x,535,card,97,i==activeCharacter()?0xffce67:0x34475d);
+            portrait(g,i,x+4,539,card-8,68);
             if(i==activeCharacter()) {
-                g.setColor(new Color(255,203,82,55));g.fillRect(x+4,539,100,68);
-                g.setStroke(new BasicStroke(3));g.setColor(new Color(0xffd369));g.drawRoundRect(x-2,533,112,101,8,8);
+                g.setColor(new Color(255,203,82,55));g.fillRect(x+4,539,card-8,68);
+                g.setStroke(new BasicStroke(3));g.setColor(new Color(0xffd369));g.drawRoundRect(x-2,533,card+4,101,8,8);
             }
-            text(g,GameSession.NAMES[i],x+54,624,11,i==activeCharacter()?0xffdc8e:0xa8bacd,true);
+            text(g,GameSession.NAMES[i],x+card/2,624,11,i==activeCharacter()?0xffdc8e:0xa8bacd,true);
         }
         button(g,55,652,190,48,"返回主菜单 / ESC",0x94c8e2,false);
         button(g,490,652,300,48,session.getMode()==GameSession.Mode.VERSUS&&session.getSelectingPlayer()==0?"确认 1P / 选择 2P":session.getMode()==GameSession.Mode.TRAINING?"开始练习 / ENTER":"开始对战 / ENTER",0xffcf73,true);
@@ -313,13 +327,16 @@ public class KofView extends View {
         hud(g);
         g.setColor(new Color(6,12,24,240));g.fillRect(0,608,1280,112);
         for(int i=0;i<BUTTONS.length;i++) {
+            if(i==6&&!f.isTraining()) continue;
             int[] b=BUTTONS[i];
             String label=i==7&&f.isPaused()?"RESUME  P":i==9?(audio.isMuted()?"SFX OFF  M":audio.isAvailable()?"SFX ON  M":"NO AUDIO"):LABELS[i];
             button(g,b[0],b[1],b[2],b[3],label,i<4?0x86cddd:i==6?0xffcf73:0xe9a494,held==i);
         }
         text(g,StageArt.NAMES[session.getStage()],550,641,14,0xffd28a,true);
         text(g,session.getMode().title,550,668,13,0x8ca4be,true);
-        text(g,session.getMode()==GameSession.Mode.VERSUS?"1P: A D 移动 W 跳 S 蹲 J 轻拳 K 轻脚 L 重拳 ; 重脚  |  2P: ← → 移动 ↑ 跳 ↓ 蹲 1 拳 2 脚 3 必杀 | 按后站防 后+下蹲防":"A 左  D 右  W 跳跃  S 下蹲  J 轻拳  K 轻脚  L 重拳  ; 重脚  U 必杀  后方向站防 后+S蹲防  P 暂停  ESC 菜单",640,705,12,0x819ab4,true);
+        text(g,session.getMode()==GameSession.Mode.VERSUS?
+            "1P: A D 移动 W 跳 S 蹲 J 轻拳 K 轻脚 L 重拳 ; 重脚 | 2P: 方向键移动跳蹲 1 轻拳 2 轻脚 3 重拳 4 重脚 | 后站防 后+下蹲防":
+            "A 左 D 右 W 跳跃 S 下蹲 J 轻拳 K 轻脚 L 重拳 ; 重脚  后站防 后+S蹲防  "+(f.isTraining()?"R 重置训练  ":"")+"P 暂停 ESC 菜单",640,705,12,0x819ab4,true);
         if(session.getScreen()==GameSession.Screen.RESULT) {
             shade(g);panel(g,390,238,500,232,0xf3c575);
             text(g,f.getMessage(),640,306,57,0xffd583,true);
@@ -381,54 +398,18 @@ public class KofView extends View {
         if(fighter.getHealth()==0){f.rotate(-fighter.getFacing()*Math.PI/2);f.translate(-8,0);}
         drawFighter(f,fighter,id,fighter.getFacing(),true); f.dispose();
     }
-    private void limb(Graphics2D g,int x,int y,int jx,int jy,int ex,int ey,int width,int color) {
-        g.setStroke(new BasicStroke(width+3,BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND));g.setColor(new Color(0x111728));
-        g.drawLine(x,y,jx,jy);g.drawLine(jx,jy,ex,ey);
-        g.setStroke(new BasicStroke(width,BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND));g.setColor(new Color(color));
-        g.drawLine(x,y,jx,jy);g.drawLine(jx,jy,ex,ey);
-    }
-    private void drawFighter(Graphics2D source,FightEngine.Fighter f,int id,int facing,boolean combat) {
-        Graphics2D g=(Graphics2D)source.create();
-        try {
-            g.scale(facing,1);
-            g.translate(0,Math.sin(animation*6+id)*2);
-            if(f!=null&&f.isCrouching()) g.scale(1,.67);
-            FightEngine.Move move=f==null?null:f.getMove();
-            double time=f==null?0:f.getAttackTime();
-            double reach=move==null?0:Math.sin(Math.min(1,time/.23)*Math.PI/2);
-            int extension=move!=null&&move.isLight()?44:78;
-            int arm=move!=null&&move.isKick()?0:(int)(reach*(extension-12)),leg=move!=null&&move.isKick()?(int)(reach*extension):0;
-            int jacket=f!=null&&f.isHit()?0xfff4d9:GameSession.COLORS[id];
-            int trousers=id==1?0xdedfe2:id==4?0x982b40:0x273249;
-            double walk=combat&&f!=null&&f.getMove()==null&&!f.isGuarding()&&!f.isCrouching()&&((f==session.getFight().getEnemy())||held==0||held==1||keys.contains((int)'a')||keys.contains((int)'d'))?Math.sin(animation*12)*8:0;
-            limb(g,-12,-55,-25+(int)walk,-30,-39+(int)walk,-5,20,trousers);
-            limb(g,12,-55,27+leg/2,-31-leg/2,36+leg-(int)walk,-7-leg,21,trousers);
-            g.setColor(new Color(0x101723));g.fillRoundRect(-54+(int)walk,-12,35,14,5,5);g.fillRoundRect(25+leg-(int)walk,-13-leg,37,15,5,5);
-            g.setColor(new Color(0x101723));g.fillPolygon(new int[]{-26,14,29,17,-24,-33},new int[]{-130,-131,-72,-52,-57,-104},6);
-            g.setColor(new Color(jacket));g.fillPolygon(new int[]{-23,12,25,14,-21,-29},new int[]{-127,-128,-73,-56,-60,-103},6);
-            g.setColor(new Color(0xf2e7d7));g.fillPolygon(new int[]{-7,5,15,6,-8},new int[]{-127,-128,-67,-59,-61},5);
-            g.setColor(new Color(0x192433));g.fillRect(-24,-67,45,8);g.setStroke(new BasicStroke(1));g.setColor(new Color(0xc0b99f));g.drawRect(0,-67,10,8);
-            limb(g,-23,-117,-41,-90,-12,-98,15,jacket);
-            boolean guard=f!=null&&f.isGuarding();int hx=guard?24:38+arm,hy=guard?-145:-112;
-            limb(g,14,-121,32+arm/2,-96-arm/5,hx,hy,16,jacket);
-            g.setColor(new Color(0xecc19d));g.fillOval(hx-10,hy-9,21,18);g.fillOval(-23,-107,19,16);
-            g.setColor(new Color(0x212638));g.fillRoundRect(hx-15,hy-9,8,19,3,3);
-            g.setColor(new Color(0xc49578));g.fillRect(-7,-137,19,18);g.setColor(new Color(0xefc8aa));g.fillOval(-19,-174,39,43);
-            g.setColor(new Color(GameSession.HAIR[id]));g.fillPolygon(new int[]{-23,-20,-10,-3,5,14,24,21,12,3,-9,-21},new int[]{-150,-176,-186,-179,-187,-181,-161,-147,-162,-156,-166,-147},12);
-            g.setColor(new Color(255,255,255,50));g.drawLine(-15,-174,3,-180);g.drawLine(-11,-172,9,-179);
-            g.setStroke(new BasicStroke(1));g.setColor(new Color(0x262039));g.fillRect(9,-151,7,3);g.drawLine(8,-138,15,-139);
-            if(id==0){g.setColor(new Color(0xe8d9c3));g.fillRect(-19,-157,37,4);}
-            if(id==7){g.setColor(new Color(GameSession.HAIR[id]));g.fillRoundRect(-27,-173,13,83,8,8);}
-            if(guard){g.setStroke(new BasicStroke(3));g.setColor(new Color(0x91e8ff));g.drawArc(-2,-179,70,130,-75,150);}
-            if(move==FightEngine.Move.SPECIAL){
-                g.setColor(new Color(255,176,62,85));g.fillOval(25,-171,155,125);
-                g.setColor(new Color(0xffc35e));g.fillOval(60,-142,80,63);g.setColor(new Color(0xfff4c5));g.fillOval(78,-128,44,35);
-                for(int i=0;i<6;i++)g.drawLine(-30-i*10,-155+i*16,70,-111);
-            }
-            if(f!=null&&f.isHit()&&f.getHealth()>0){
-                g.setStroke(new BasicStroke(3));g.setColor(new Color(0xffe3a0));
-                for(int i=0;i<12;i++){double a=i*Math.PI/6+animation;g.drawLine((int)(Math.cos(a)*14),-100+(int)(Math.sin(a)*14),(int)(Math.cos(a)*49),-100+(int)(Math.sin(a)*49));}
-            }
-        } finally {g.dispose();}
+    private void drawFighter(Graphics2D source,FightEngine.Fighter fighter,int id,int facing,boolean combat) {
+        FighterSprites animation=fighter==null?sprites(id):actor(fighter==session.getFight().getPlayer()?0:1,id);
+        if(fighter!=null) animation.update(fighter,0);
+        animation.draw(source,fighter,facing);
+        if(fighter!=null&&fighter.isGuarding()) {
+            Graphics2D g=(Graphics2D)source.create();g.scale(facing,1);
+            g.setStroke(new BasicStroke(3));g.setColor(new Color(0x91e8ff));
+            g.drawArc(5,fighter.isCrouching()?-115:-179,70,fighter.isCrouching()?90:130,-75,150);g.dispose();
+        }
+        if(fighter!=null&&fighter.isHit()&&fighter.getHealth()>0) {
+            Graphics2D g=(Graphics2D)source.create();g.setStroke(new BasicStroke(3));g.setColor(new Color(0xffe3a0));
+            for(int i=0;i<12;i++){double a=i*Math.PI/6;g.drawLine((int)(Math.cos(a)*14),-100+(int)(Math.sin(a)*14),(int)(Math.cos(a)*42),-100+(int)(Math.sin(a)*42));}g.dispose();
+        }
     }
 }

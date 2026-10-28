@@ -10,13 +10,14 @@ public final class GameSession {
         public final String title, english, description;
         Mode(String title, String english, String description) { this.title=title; this.english=english; this.description=description; }
     }
-    public static final String[] NAMES = {"KYO", "RYO", "ROBERT", "TAKUMA", "IORI", "KING", "DAIMON", "CHIZURU", "KENSOU", "BENIMARU"};
-    public static final int[] COLORS = {0x21b9c8, 0xeee8dc, 0x3877b2, 0x9cabc1, 0xd53945, 0x8f62be, 0xba7447, 0xe65470, 0x65aa64, 0x608ed7};
-    public static final int[] HAIR = {0x29202c, 0xe6b451, 0x172a3c, 0xc6cad3, 0x341e35, 0xe5cf84, 0x202c39, 0x171b2c, 0x86734a, 0xe5e7f1};
+    public static final int SUNWUKONG = 0, ZHUBAJIE = 1;
+    public static final String[] NAMES = {"孙悟空", "猪八戒"};
+    public static final String[] SPRITE_DIRECTORIES = {"sunwukong", "zhubajie"};
+    public int getRosterSize() { return NAMES.length; }
     private final FightEngine fight = new FightEngine(System.nanoTime());
     private Screen screen = Screen.SELECT;
     private Mode mode = Mode.CPU;
-    private int selected = 0, opponent = 4, stage, selectingPlayer;
+    private int selected = 0, opponent = ZHUBAJIE, stage, selectingPlayer;
     private double resultTime;
     public Screen getScreen() { return screen; }
     public Mode getMode() { return mode; }
@@ -26,20 +27,20 @@ public final class GameSession {
     public int getOpponent() { return opponent; }
     public FightEngine getFight() { return fight; }
     public double getResultTime() { return resultTime; }
-    public void setMode(Mode value) { if(screen==Screen.SELECT) mode=java.util.Objects.requireNonNull(value); }
+    public void setMode(Mode value) { if(screen==Screen.SELECT) { mode=java.util.Objects.requireNonNull(value); if(selected>=getRosterSize()) selected=0; } }
     public void selectStage(int index) { if(screen==Screen.SELECT) stage=Math.floorMod(index,StageArt.NAMES.length); }
     public void openRoster() { if(screen==Screen.SELECT) { screen=Screen.ROSTER; selectingPlayer=0; } }
     public void select(int index) {
         if(screen!=Screen.ROSTER) return;
-        if(selectingPlayer==0) selected=Math.floorMod(index,NAMES.length);
-        else opponent=Math.floorMod(index,NAMES.length);
+        if(selectingPlayer==0) selected=Math.floorMod(index,getRosterSize());
+        else opponent=Math.floorMod(index,getRosterSize());
     }
     public void start() {
         if(screen!=Screen.ROSTER) return;
         if(mode==Mode.VERSUS && selectingPlayer==0) { selectingPlayer=1; return; }
-        if(mode==Mode.CPU) opponent=(selected+4)%NAMES.length;
+        if(mode==Mode.CPU) opponent=1-selected;
         fight.setComputerEnabled(mode==Mode.CPU); fight.setTraining(mode==Mode.TRAINING);
-        fight.restart(); fight.setCharacters(selected,opponent); screen=Screen.BATTLE;
+        fight.setCharacters(selected,opponent); fight.restart(); screen=Screen.BATTLE;
     }
     public void back() { fight.releaseControls(); screen=Screen.SELECT; resultTime=0; selectingPlayer=0; }
     public void update(double dt) {
