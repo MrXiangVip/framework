@@ -7,7 +7,7 @@ import com.android.view.View;
 import com.android.view.ViewGroup;
 import com.android.view.WindowManager;
 
-public class WindowManagerService implements WindowManager {
+public class WindowManagerService  {
 
     private static WindowManagerService sInstance;
     static WindowManagerService getInstance() {
@@ -22,18 +22,20 @@ public class WindowManagerService implements WindowManager {
                                             ActivityTaskManagerService atm) {
         return  getInstance();
     }
-    @Override
-    public void addView(View view, ViewGroup.LayoutParams params) {
+
+    public void addWindow(View view, ViewGroup.LayoutParams params) {
 
     }
 
-    @Override
-    public void updateViewLayout(View view, ViewGroup.LayoutParams params) {
+    public void relayoutWindow(View view, ViewGroup.LayoutParams params) {
 
     }
 
-    @Override
-    public void removeView(View view) {
+    public void removeWindowToken(View view) {
+
+    }
+
+    public void finishDrawingWindow(View view ){
 
     }
 }
