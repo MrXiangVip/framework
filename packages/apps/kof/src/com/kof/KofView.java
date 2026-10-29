@@ -9,7 +9,6 @@ import com.android.view.MotionEvent;
 import com.android.view.KeyEvent;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -57,10 +56,7 @@ public class KofView extends View {
         session.getFight().setSoundListener(audio::play);
     }
     private Font loadFont() {
-        try (InputStream input=getContext().getClassLoader().getResourceAsStream("res/fonts/NotoSansCJKsc-Regular.otf")) {
-            if(input==null) throw new IllegalStateException("Missing KOF Chinese font");
-            return Font.createFont(Font.TRUETYPE_FONT,input);
-        } catch (java.io.IOException | FontFormatException error) { throw new IllegalStateException("Cannot load KOF font",error); }
+        return com.android.graphics.FontManager.getFont(Font.PLAIN, 20);
     }
     public GameSession getSession() { return session; }
     public void advance(double dt) {

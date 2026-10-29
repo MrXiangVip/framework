@@ -72,7 +72,7 @@ public class Handler {
     }
 
     public void dispatchMessage( Message msg) {
-        Log.d(TAG, "dispatchMessage");
+        Log.d(TAG, "dispatchMessage "+msg.toString());
         if (msg.callback != null) {
             handleCallback(msg);
         } else {

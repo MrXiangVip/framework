@@ -18,6 +18,8 @@ echo "Compile framework Java and JNI headers"
 mapfile -d '' -t FRAMEWORK_SOURCES < <(find com/android -name '*.java' -print0)
 javac -encoding UTF-8 -cp "$CP" -h . -d "$FRAMEWORK_CLASSES" "${FRAMEWORK_SOURCES[@]}"
 
+python3 "$REPO_ROOT/base/tools/install_fonts.py" --classes "$FRAMEWORK_CLASSES"
+
 echo "Build all applications in packages/apps"
 bash "$REPO_ROOT/packages/apps/build.sh" --framework-classes "$FRAMEWORK_CLASSES"
 

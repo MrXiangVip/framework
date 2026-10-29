@@ -7,8 +7,6 @@ import com.android.util.AttributeSet;
 import com.android.view.*;
 import com.android.widget.EditText;
 import com.android.widget.Button;
-import java.awt.Font;
-import java.awt.font.FontRenderContext;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
@@ -36,7 +34,7 @@ public class GalleryView extends ViewGroup {
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
         Thread worker = new Thread(r, "gallery-images"); worker.setDaemon(true); return worker;
     });
-    private static final FontRenderContext METRICS = new FontRenderContext(null, true, true);
+
 
     public GalleryView(Context context, AttributeSet attrs) {
         super(context, attrs); mBackground = 0xfff5f7fc;
@@ -215,10 +213,9 @@ public class GalleryView extends ViewGroup {
         canvas.drawText(fit(status, getWidth() - 2 * inset, 12), inset, getHeight() - (viewing ? 129 : 82), 12, 0xff39716a);
     }
     private static String fit(String value, int width, int size) {
-        Font font = new Font(Font.SANS_SERIF, Font.PLAIN, size);
-        if (font.getStringBounds(value, METRICS).getWidth() <= width) return value;
+        if (com.android.graphics.FontManager.measureText(value, size) <= width) return value;
         int end = value.length();
-        while (end > 0 && font.getStringBounds(value.substring(0, end) + "...", METRICS).getWidth() > width) end = value.offsetByCodePoints(end, -1);
+        while (end > 0 && com.android.graphics.FontManager.measureText(value.substring(0, end) + "...", size) > width) end = value.offsetByCodePoints(end, -1);
         return value.substring(0, end) + "...";
     }
     private final class Tile extends View {
@@ -266,8 +263,7 @@ public class GalleryView extends ViewGroup {
         @Override protected void onDraw(Canvas canvas) {
             if (isPressed()) canvas.fillRect(1, 1, getWidth() - 2, getHeight() - 2, 0xffc9d8ec);
             canvas.strokeRect(0, 0, getWidth(), getHeight(), 0xff8c99a8);
-            Font font = new Font(Font.SANS_SERIF, Font.PLAIN, 14);
-            int width = (int) font.getStringBounds(getText(), METRICS).getWidth();
+            int width = (int) com.android.graphics.FontManager.measureText(getText(), 14);
             canvas.drawText(getText(), Math.max(4, (getWidth() - width) / 2), (getHeight() - 14) / 2 + 13, 14, 0xff202124);
         }
     }

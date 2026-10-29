@@ -424,7 +424,7 @@ public class FightView extends View {
         text(g, subtitle, 360, 335, 15, 0xd2e2f6, true);
     }
     private void text(Graphics2D g, String text, int x, int y, int size, int color, boolean centered) {
-        g.setFont(new Font(Font.SANS_SERIF, size > 20 ? Font.BOLD : Font.PLAIN, size));
+        g.setFont(com.android.graphics.FontManager.getFont( size > 20 ? Font.BOLD : Font.PLAIN, size));
         g.setColor(new Color(color));
         g.drawString(text, centered ? x - g.getFontMetrics().stringWidth(text) / 2 : x, y);
     }

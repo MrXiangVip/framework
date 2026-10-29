@@ -63,8 +63,7 @@ public class Canvas implements AutoCloseable {
     }
     public void drawText(String text, int x, int baseline, int size, int color) {
         graphics.setColor(new Color(color, true));
-        graphics.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, size));
-        graphics.drawString(text, x, baseline);
+        if (!text.isEmpty()) FontManager.layout(text, size, Font.PLAIN).draw(graphics, x, baseline);
     }
     /** Draw a shaped glyph run while preserving this Canvas's translation and clip. */
     public void drawText(java.awt.font.TextLayout layout, int x, int baseline, int color) {

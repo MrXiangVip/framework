@@ -17,6 +17,8 @@ echo "编译 java 部分及 JNI 头文件"
 mapfile -d '' -t FRAMEWORK_SOURCES < <(find com/android -name '*.java' -print0)
 javac -encoding UTF-8 -cp "$CP" -h . -d "$FRAMEWORK_CLASSES" "${FRAMEWORK_SOURCES[@]}"
 
+python3 "$VPATH/tools/install_fonts.py" --classes "$FRAMEWORK_CLASSES"
+
 echo "Build all applications in packages/apps"
 bash "$VPATH/../packages/apps/build.sh" --framework-classes "$FRAMEWORK_CLASSES"
 

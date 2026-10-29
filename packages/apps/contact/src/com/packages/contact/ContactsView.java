@@ -6,8 +6,6 @@ import com.android.util.AttributeSet;
 import com.android.view.*;
 import com.android.widget.EditText;
 import com.android.widget.Button;
-import java.awt.Font;
-import java.awt.font.FontRenderContext;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -24,7 +22,7 @@ public class ContactsView extends ViewGroup {
     private boolean editing, confirmingDelete;
     private String editingId, status = "";
     private int page, pageSize = 6, inset;
-    private static final FontRenderContext METRICS = new FontRenderContext(null, true, true);
+
 
     public ContactsView(Context context, AttributeSet attrs) {
         super(context, attrs); mBackground = 0xfff5f7fc;
@@ -168,10 +166,9 @@ public class ContactsView extends ViewGroup {
         canvas.drawText(fit(status, Math.max(0, getWidth() - 2 * inset), 12), inset, getHeight() - 92, 12, 0xff39716a);
     }
     private static String fit(String value, int width, int size) {
-        Font font = new Font(Font.SANS_SERIF, Font.PLAIN, size);
-        if (font.getStringBounds(value, METRICS).getWidth() <= width) return value;
+        if (com.android.graphics.FontManager.measureText(value, size) <= width) return value;
         int end = value.length();
-        while (end > 0 && font.getStringBounds(value.substring(0, end) + "...", METRICS).getWidth() > width) end = value.offsetByCodePoints(end, -1);
+        while (end > 0 && com.android.graphics.FontManager.measureText(value.substring(0, end) + "...", size) > width) end = value.offsetByCodePoints(end, -1);
         return value.substring(0, end) + "...";
     }
     private final class Row extends View {

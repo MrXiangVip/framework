@@ -7,8 +7,6 @@ import com.android.util.AttributeSet;
 import com.android.view.*;
 import com.android.widget.EditText;
 import com.android.widget.Button;
-import java.awt.Font;
-import java.awt.font.FontRenderContext;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
@@ -35,7 +33,7 @@ public class VideoView extends ViewGroup {
         ((Runnable) message.obj).run(); return true;
     });
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> { Thread worker = new Thread(r, "video-library"); worker.setDaemon(true); return worker; });
-    private static final FontRenderContext METRICS = new FontRenderContext(null, true, true);
+
     private static final int INK = 0xffe8f0ff, MUTED = 0xff9cafca, ACCENT = 0xff83b6ff;
 
     public VideoView(Context context, AttributeSet attrs) {
@@ -203,8 +201,8 @@ public class VideoView extends ViewGroup {
     }
     private static String time(double seconds) { long value = Math.max(0, (long) seconds); return String.format(Locale.ROOT, "%02d:%02d:%02d", value / 3600, value / 60 % 60, value % 60); }
     private static String fit(String text, int width, int size) {
-        Font font = new Font(Font.SANS_SERIF, Font.PLAIN, size); int end = text.length();
-        while (end > 0 && font.getStringBounds(text.substring(0, end) + (end < text.length() ? "..." : ""), METRICS).getWidth() > width) end = text.offsetByCodePoints(end, -1);
+         int end = text.length();
+        while (end > 0 && com.android.graphics.FontManager.measureText(text.substring(0, end) + (end < text.length() ? "..." : ""), size) > width) end = text.offsetByCodePoints(end, -1);
         return text.substring(0, end) + (end < text.length() ? "..." : "");
     }
     private final class FileRow extends View {
@@ -251,7 +249,7 @@ public class VideoView extends ViewGroup {
         @Override protected void onDraw(Canvas canvas) {
             canvas.fillRect(0, 0, getWidth(), getHeight(), isPressed() ? 0xff345581 : 0xff213653); canvas.strokeRect(0, 0, getWidth(), getHeight(), 0xff47658c);
             String text = getId().equals("play") ? engine.getState().equals("Playing") || engine.getState().equals("Opening") ? "Pause" : "Play" : getId().equals("mute") && engine.isMuted() ? "Unmute" : label;
-            text = fit(text, getWidth() - 8, 13); int width = (int) new Font(Font.SANS_SERIF, Font.PLAIN, 13).getStringBounds(text, METRICS).getWidth(); canvas.drawText(text, Math.max(4, (getWidth() - width)/2), getHeight()/2 + 5, 13, INK);
+            text = fit(text, getWidth() - 8, 13); int width = (int) com.android.graphics.FontManager.measureText(text, 13); canvas.drawText(text, Math.max(4, (getWidth() - width)/2), getHeight()/2 + 5, 13, INK);
         }
     }
 

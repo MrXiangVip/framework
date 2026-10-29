@@ -131,4 +131,4 @@ CEF/JCEF 来源于 <https://github.com/jcefmaven/jcefbuild/releases/tag/1.0.71>�
 
 ## 中文字体
 
-浏览器自带 Noto Sans CJK SC 和 Noto Emoji，授权见 res/fonts/OFL-*.txt，无需系统预装中文字体。标题栏与地址栏使用 APK 内字体，Chromium 使用运行目录的私有 fonts.conf 并保留系统字体。网页编码仍由 HTTP 响应头与网页声明决定，不强制改成 UTF-8。重新构建后关闭并重开浏览器即可加载字体。
+浏览器使用 framework 统一提供的 Noto Sans CJK SC 和 Noto Emoji，字体和授权位于 base/res/fonts，无需系统预装中文字体。标题栏与地址栏通过 FontManager 使用公共字体；Chromium 的 fonts.conf 引用同一份 framework 字体目录并保留系统字体。网页编码仍由 HTTP 响应头与网页声明决定，不强制改成 UTF-8。重新构建后关闭并重开浏览器即可加载字体。

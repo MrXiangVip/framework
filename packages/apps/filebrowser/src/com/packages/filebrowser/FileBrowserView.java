@@ -7,8 +7,6 @@ import com.android.util.AttributeSet;
 import com.android.view.*;
 import com.android.widget.EditText;
 import com.android.widget.Button;
-import java.awt.Font;
-import java.awt.font.FontRenderContext;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
@@ -32,7 +30,7 @@ public class FileBrowserView extends ViewGroup {
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "filebrowser-io"); thread.setDaemon(true); return thread;
     });
-    private static final FontRenderContext METRICS = new FontRenderContext(null, true, true);
+
 
     public FileBrowserView(Context context, AttributeSet attrs) {
         super(context, attrs); mBackground = 0xfff5f7fc;
@@ -279,10 +277,9 @@ public class FileBrowserView extends ViewGroup {
             int start = 0;
             while (start < line.length()) {
                 int end = start;
-                Font font = new Font(Font.SANS_SERIF, Font.PLAIN, 15);
                 while (end < line.length()) {
                     int next = line.offsetByCodePoints(end, 1);
-                    if (end > start && font.getStringBounds(line.substring(start, next), METRICS).getWidth() > width) break;
+                    if (end > start && com.android.graphics.FontManager.measureText(line.substring(start, next), 15) > width) break;
                     end = next;
                 }
                 previewLines.add(line.substring(start, end)); start = end;
@@ -290,10 +287,9 @@ public class FileBrowserView extends ViewGroup {
         }
     }
     private static String fit(String value, int width, int size) {
-        Font font = new Font(Font.SANS_SERIF, Font.PLAIN, size);
-        if (font.getStringBounds(value, METRICS).getWidth() <= width) return value;
+        if (com.android.graphics.FontManager.measureText(value, size) <= width) return value;
         int end = value.length();
-        while (end > 0 && font.getStringBounds(value.substring(0, end) + "...", METRICS).getWidth() > width) end = value.offsetByCodePoints(end, -1);
+        while (end > 0 && com.android.graphics.FontManager.measureText(value.substring(0, end) + "...", size) > width) end = value.offsetByCodePoints(end, -1);
         return value.substring(0, end) + "...";
     }
     private static String size(long bytes) { return bytes < 1024 ? bytes + " B" : bytes < 1048576 ? String.format(Locale.ROOT, "%.1f KB", bytes / 1024.0) : String.format(Locale.ROOT, "%.1f MB", bytes / 1048576.0); }
@@ -302,8 +298,7 @@ public class FileBrowserView extends ViewGroup {
         @Override protected void onDraw(Canvas canvas) {
             if (isPressed()) canvas.fillRect(1, 1, getWidth() - 2, getHeight() - 2, 0xffc9d8ec);
             canvas.strokeRect(0, 0, getWidth(), getHeight(), 0xff8c99a8);
-            Font font = new Font(Font.SANS_SERIF, Font.PLAIN, 14);
-            int width = (int) font.getStringBounds(getText(), METRICS).getWidth();
+            int width = (int) com.android.graphics.FontManager.measureText(getText(), 14);
             canvas.drawText(getText(), Math.max(4, (getWidth() - width) / 2), (getHeight() - 14) / 2 + 13, 14, 0xff202124);
         }
     }

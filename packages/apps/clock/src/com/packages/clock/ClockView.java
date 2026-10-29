@@ -108,7 +108,7 @@ public class ClockView extends View {
         g.draw(new Line2D.Double(cx, cy, cx + Math.cos(angle) * length, cy + Math.sin(angle) * length));
     }
     private static void centered(Graphics2D g, String text, int x, int baseline, int size, int color) {
-        g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, size));
+        g.setFont(com.android.graphics.FontManager.getFont( Font.PLAIN, size));
         g.setColor(new Color(color));
         g.drawString(text, x - g.getFontMetrics().stringWidth(text) / 2, baseline);
     }

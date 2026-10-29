@@ -34,4 +34,4 @@ Linux 回归：python3 tests/tonghuashun_smoke.py。额外验证真实网络和�
 
 MarketStoreTest 验证账户持久化；QuoteTest 验证字段、异常响应、时间 / 标识校验、旧报价、确认价格与刷新合并；TonghuashunTest 验证实际 APK；NativeTest / LiveTest 验证 X11 事件和真实行情更新链路。
 
-字体：未修改的 Noto Sans CJK SC，SIL OFL 1.1 见 res/fonts/OFL-CJK.txt。图标由 tools/GenerateIcon.java 绘制，原参考图片不作为界面打包。
+字体：使用 framework 共享的 Noto Sans CJK SC 与 Emoji，SIL OFL 1.1 授权见 base/res/fonts/OFL-*.txt，APK 不再单独打包字体。图标由 tools/GenerateIcon.java 绘制，原参考图片不作为界面打包。

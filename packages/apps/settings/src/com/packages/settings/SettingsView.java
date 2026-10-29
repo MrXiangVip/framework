@@ -8,8 +8,6 @@ import com.android.util.AttributeSet;
 import com.android.view.*;
 import com.android.widget.EditText;
 import com.android.widget.Button;
-import java.awt.Font;
-import java.awt.font.FontRenderContext;
 import java.nio.file.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -32,7 +30,7 @@ public class SettingsView extends ViewGroup {
     private final EditText input;
     private final Handler ui = new Handler(message -> { ((Runnable) message.obj).run(); return true; });
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> { Thread worker = new Thread(r, "settings-io"); worker.setDaemon(true); return worker; });
-    private static final FontRenderContext METRICS = new FontRenderContext(null, true, true);
+
 
     public SettingsView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -207,9 +205,8 @@ public class SettingsView extends ViewGroup {
     }
     private static String fit(String value, int width, int size) {
         if (value == null) return "";
-        Font font = new Font(Font.SANS_SERIF, Font.PLAIN, size);
         int end = value.length();
-        while (end > 0 && font.getStringBounds(value.substring(0, end) + (end < value.length() ? "..." : ""), METRICS).getWidth() > width) end = value.offsetByCodePoints(end, -1);
+        while (end > 0 && com.android.graphics.FontManager.measureText(value.substring(0, end) + (end < value.length() ? "..." : ""), size) > width) end = value.offsetByCodePoints(end, -1);
         return value.substring(0, end) + (end < value.length() ? "..." : "");
     }
     private final class Row extends View {
@@ -236,7 +233,7 @@ public class SettingsView extends ViewGroup {
             canvas.strokeRect(0, 0, getWidth(), getHeight(), dark() ? 0xff41526d : 0xffcbd5e5);
             String text = id.equals("theme") ? dark() ? "Dark" : "Light" : id.equals("font") ? textSize + " px" : id.equals("clock") ? clock24 ? "24-hour" : "12-hour" : label;
             text = fit(text, getWidth() - 8, 13);
-            int width = (int) new Font(Font.SANS_SERIF, Font.PLAIN, 13).getStringBounds(text, METRICS).getWidth();
+            int width = (int) com.android.graphics.FontManager.measureText(text, 13);
             canvas.drawText(text, Math.max(4, (getWidth() - width) / 2), getHeight() / 2 + 5, 13, active || isPressed() ? dark() ? 0xff121d2e : 0xffffffff : ink());
         }
     }

@@ -7,8 +7,6 @@ import com.android.util.AttributeSet;
 import com.android.view.View;
 import com.android.view.ViewGroup;
 import com.android.widget.Button;
-import java.awt.Font;
-import java.awt.font.FontRenderContext;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -130,12 +128,11 @@ public class CameraView extends ViewGroup {
         drawWrapped(canvas, notification, previewBottom + 65, 2, 12, 0xff85d6b1);
     }
     private void drawWrapped(Canvas canvas, String text, int baseline, int lines, int size, int color) {
-        Font font = new Font(Font.SANS_SERIF, Font.PLAIN, size);
-        FontRenderContext metrics = new FontRenderContext(null, true, true);
+
         int start = 0, available = Math.max(1, getWidth() - 2 * inset);
         for (int line = 0; line < lines && start < text.length(); line++) {
             int end = start;
-            while (end < text.length() && font.getStringBounds(text.substring(start, end + 1), metrics).getWidth() <= available) end++;
+            while (end < text.length() && com.android.graphics.FontManager.measureText(text.substring(start, end + 1), size) <= available) end++;
             if (end == start) end++;
             String part = text.substring(start, end);
             if (line == lines - 1 && end < text.length()) part = part.substring(0, Math.max(0, part.length() - 3)) + "...";

@@ -117,9 +117,9 @@ public final class CameraCapture implements AutoCloseable {
                 g.setPaint(new GradientPaint(0, 0, new Color(0x294b72), WIDTH, HEIGHT, new Color(0x65c3b5)));
                 g.fillRect(0, 0, WIDTH, HEIGHT);
                 g.setColor(new Color(0xffdb83)); g.fillOval(60 + index % 420, 100, 80, 80);
-                g.setColor(Color.WHITE); g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 26));
+                g.setColor(Color.WHITE); g.setFont(com.android.graphics.FontManager.getFont( Font.BOLD, 26));
                 g.drawString("DEMO - NOT A CAMERA", 40, 55);
-                g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 20));
+                g.setFont(com.android.graphics.FontManager.getFont( Font.PLAIN, 20));
                 g.drawString(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")), 40, HEIGHT - 40);
             } finally { g.dispose(); }
             frame = image; status = "DEMO  |  Generated preview, not a camera";

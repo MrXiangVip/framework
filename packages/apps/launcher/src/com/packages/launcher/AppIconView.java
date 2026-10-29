@@ -5,8 +5,6 @@ import com.android.graphics.Canvas;
 import com.android.pm.LauncherActivityInfo;
 import com.android.util.Log;
 import com.android.view.View;
-import java.awt.Font;
-import java.awt.font.FontRenderContext;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
 import java.util.zip.ZipEntry;
@@ -17,7 +15,7 @@ import javax.imageio.ImageIO;
 final class AppIconView extends View {
     private final LauncherActivityInfo info;
     private BufferedImage image;
-    private static final FontRenderContext FONTS = new FontRenderContext(null, true, true);
+
 
     AppIconView(Context context, LauncherActivityInfo info) {
         super(context);
@@ -53,9 +51,8 @@ final class AppIconView extends View {
         }
         String label = info.label;
         int available = Math.max(0, getWidth() - 12);
-        Font font = new Font(Font.SANS_SERIF, Font.PLAIN, 18);
-        if (font.getStringBounds(label, FONTS).getWidth() > available) {
-            while (!label.isEmpty() && font.getStringBounds(label + "...", FONTS).getWidth() > available)
+        if (com.android.graphics.FontManager.measureText(label, 18) > available) {
+            while (!label.isEmpty() && com.android.graphics.FontManager.measureText(label + "...", 18) > available)
                 label = label.substring(0, label.offsetByCodePoints(label.length(), -1));
             label += "...";
         }
@@ -63,7 +60,7 @@ final class AppIconView extends View {
     }
 
     private void drawCentered(Canvas canvas, String text, int baseline, int size) {
-        int width = (int) new Font(Font.SANS_SERIF, Font.PLAIN, size).getStringBounds(text, FONTS).getWidth();
+        int width = (int) com.android.graphics.FontManager.measureText(text, size);
         canvas.drawText(text, (getWidth() - width) / 2, baseline, size, 0xff202124);
     }
 }

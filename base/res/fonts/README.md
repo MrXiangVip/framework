@@ -1,6 +1,6 @@
-# MQChat bundled fonts
+# Framework shared fonts
 
-These fonts are loaded directly from the application APK by `ChatText`; no host font installation or runtime download is required.
+FontManager loads these fonts once per JVM from the framework classloader. Build scripts install one shared copy under out/framework/classes/framework/fonts; applications do not package font files. Chromium fontconfig references this same directory. No system font installation or runtime download is required.
 
 - **Noto Sans CJK SC Regular**: https://github.com/notofonts/noto-cjk/blob/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf
   - Upstream license: https://github.com/notofonts/noto-cjk/blob/main/Sans/LICENSE

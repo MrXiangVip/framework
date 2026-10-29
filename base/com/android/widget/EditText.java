@@ -17,11 +17,9 @@ import com.android.graphics.Canvas;
 import com.android.util.AttributeSet;
 import com.android.view.KeyEvent;
 import com.android.view.MotionEvent;
-import java.awt.Font;
 import java.awt.Toolkit;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.StringSelection;
-import java.awt.font.FontRenderContext;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,7 +31,6 @@ import java.util.List;
  * InputType, spans, composing IME text and undo are not implemented here.
  */
 public class EditText extends TextView {
-    private static final FontRenderContext METRICS = new FontRenderContext(null, true, true);
     private int anchor, cursor, scrollX, scrollY;
     private int maxCodePoints = Integer.MAX_VALUE;
     private int maxLength = Integer.MAX_VALUE, minLines = 1, maxLines = Integer.MAX_VALUE;
@@ -256,9 +253,9 @@ public class EditText extends TextView {
     private int contentWidth() { return Math.max(1, getWidth() - 2 * mPadding - 2); }
     private int lineHeight() { return mTextSize + 8; }
     protected int measureText(String text) {
-        return (int) Math.ceil(new Font(Font.SANS_SERIF, Font.PLAIN, mTextSize).getStringBounds(text, METRICS).getWidth());
+        return (int) Math.ceil(com.android.graphics.FontManager.measureText(text, mTextSize));
     }
-    /** Override together with measureText to retain an application's bundled fonts. */
+    /** Override together with measureText when using a custom typeface. */
     protected void drawTextLine(Canvas canvas, String value, int x, int baseline, int color) {
         canvas.drawText(value, x, baseline, mTextSize, color);
     }

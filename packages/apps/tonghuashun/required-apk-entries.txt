@@ -1,6 +1,4 @@
 res/drawable/icon.png
-res/fonts/NotoSansCJKsc-Regular.otf
-res/fonts/OFL-CJK.txt
 com/packages/tonghuashun/MarketView.class
 com/packages/tonghuashun/QuoteClient.class
 com/packages/tonghuashun/QuoteFeed.class
