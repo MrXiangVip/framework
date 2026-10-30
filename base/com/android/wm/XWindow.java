@@ -5,6 +5,7 @@ import com.android.os.Message;
 import com.android.view.MotionEvent;
 import com.android.view.KeyEvent;
 import java.awt.image.BufferedImage;
+import java.nio.charset.StandardCharsets;
 import java.awt.image.DataBufferInt;
 import java.util.concurrent.*;
 
@@ -18,14 +19,16 @@ public final class XWindow implements AutoCloseable {
     }
     private long handle;
     private final ScheduledExecutorService events;
-    private static native long nativeOpen(int width, int height);
+    private static native long nativeOpen(int width, int height, byte[] title);
     private static native int[] nativePoll(long handle);
     private static native void nativePresent(long handle, int[] pixels, int width, int height);
     private static native void nativeClose(long handle);
 
     private Listener  mListener=null;
-    public XWindow(int width, int height) {
-        handle = nativeOpen(width, height);
+    public XWindow(int width, int height) { this(width, height, "Framework"); }
+    public XWindow(int width, int height, String title) {
+        String windowTitle = title == null || title.trim().isEmpty() ? "Framework" : title;
+        handle = nativeOpen(width, height, windowTitle.getBytes(StandardCharsets.UTF_8));
         if (handle == 0) throw new IllegalStateException("Cannot create X11 window; check DISPLAY");
         Handler ui = new Handler() {
             @Override public void handleMessage(Message message) {

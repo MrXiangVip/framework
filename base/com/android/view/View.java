@@ -106,6 +106,7 @@ public class View {
     public int getBottom() { return mBottom; }
     public int getWidth() { return mRight - mLeft; }
     public int getHeight() { return mBottom - mTop; }
+    public int getBaseline() { return -1; }
     public int getPadding() { return mPadding; }
     public void setPadding(int padding) {
         mPadding = Math.max(0, padding); requestLayout(); invalidate();

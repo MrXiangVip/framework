@@ -34,12 +34,15 @@ public class TextView extends View {
         setMeasuredDimension(resolveSize(width + 2 * mPadding + 2, widthSpec),
                 resolveSize(mTextSize + 8 + 2 * mPadding, heightSpec));
     }
+    @Override public int getBaseline() {
+        if (!centerText) return mPadding + mTextSize;
+        TextLayout metrics = FontManager.layout(mText.isEmpty() ? " " : mText, mTextSize, Font.PLAIN);
+        return Math.round((getMeasuredHeight() - metrics.getAscent() - metrics.getDescent() - metrics.getLeading()) / 2 + metrics.getAscent());
+    }
     @Override protected void onDraw(Canvas canvas) {
-        int x = mPadding, baseline = mPadding + mTextSize;
+        int x = mPadding, baseline = getBaseline();
         if (centerText) {
-            TextLayout metrics = FontManager.layout(mText.isEmpty() ? " " : mText, mTextSize, Font.PLAIN);
             x = (getWidth() - (int) Math.ceil(FontManager.measureText(mText, mTextSize))) / 2;
-            baseline = Math.round((getHeight() - metrics.getAscent() - metrics.getDescent() - metrics.getLeading()) / 2 + metrics.getAscent());
         }
         canvas.drawText(mText, x, baseline, mTextSize, mTextColor);
     }

@@ -10,10 +10,10 @@ extern "C" {
 /*
  * Class:     com_android_wm_XWindow
  * Method:    nativeOpen
- * Signature: (II)J
+ * Signature: (II[B)J
  */
 JNIEXPORT jlong JNICALL Java_com_android_wm_XWindow_nativeOpen
-  (JNIEnv *, jclass, jint, jint);
+  (JNIEnv *, jclass, jint, jint, jbyteArray);
 
 /*
  * Class:     com_android_wm_XWindow

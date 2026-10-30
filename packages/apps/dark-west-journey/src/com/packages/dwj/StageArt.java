@@ -1,4 +1,4 @@
-package com.packages.kof;
+package com.pacakges.dwj;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;

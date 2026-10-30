@@ -7,8 +7,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-import sys
-from xml.sax.saxutils import escape
 import subprocess
 import tarfile
 import time
@@ -80,10 +78,10 @@ def host_digest(root):
     # Recompile only when the host sources or shared IPC protocol change.
     sources = sorted((root / "hostsrc").rglob("*.java"))
     sources.append(root / "src/com/packages/browser/BrowserProtocol.java")
-    sources.extend(sorted((root.parents[2] / "base/res/fonts").glob("*")))
+    sources.extend(sorted((root / "res/fonts").glob("*")))
     digest = hashlib.sha256()
     for source in sources:
-        digest.update(os.path.relpath(source, root).replace(os.sep, "/").encode())
+        digest.update(str(source.relative_to(root)).encode())
         digest.update(source.read_bytes().replace(b"\r\n", b"\n"))
     digest.update(Path(__file__).read_bytes().replace(b"\r\n", b"\n"))
     return digest.hexdigest()
@@ -95,11 +93,9 @@ def installation_current(root, runtime):
         if metadata.get("tag") != TAG or metadata.get("sha256") != PIN_SHA256 or metadata.get("host_sources_sha256") != host_digest(root):
             return False
         required = ["host.jar", "bin/jcef.jar", "bin/lib/linux64/libcef.so", "bin/lib/linux64/libjcef.so",
-                    "bin/lib/linux64/resources.pak", "bin/lib/linux64/jcef_helper", "fonts.conf"]
+                    "bin/lib/linux64/resources.pak", "bin/lib/linux64/jcef_helper", "fonts.conf",
+                    "fonts/NotoSansCJKsc-Regular.otf", "fonts/NotoEmoji-Regular.ttf"]
         if not all((runtime / name).is_file() for name in required):
-            return False
-        shared = root.parents[2] / "out/framework/classes/framework/fonts"
-        if not all((shared / name).is_file() for name in ("NotoSansCJKsc-Regular.otf", "NotoEmoji-Regular.ttf", "OFL-CJK.txt", "OFL-Emoji.txt")):
             return False
         java = Path((runtime / "java.path").read_text().strip())
         configured = os.environ.get("BROWSER_JAVA_HOME")
@@ -167,7 +163,18 @@ def install(root, runtime, cache, archive=None):
     if native != expected:
         expected.mkdir(parents=True, exist_ok=True)
         shutil.copytree(native, expected, dirs_exist_ok=True)
-    configure_fonts(root, runtime)
+    # Relative paths keep the private font installation relocatable with the runtime.
+    shutil.copytree(root / "res/fonts", runtime / "fonts", dirs_exist_ok=True)
+    (runtime / "fonts.conf").write_text('''<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+  <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
+  <dir prefix="relative">fonts</dir>
+  <cachedir prefix="xdg">fontconfig</cachedir>
+  <alias><family>sans-serif</family><prefer><family>Noto Sans CJK SC</family></prefer></alias>
+  <alias><family>emoji</family><prefer><family>Noto Emoji</family></prefer></alias>
+</fontconfig>
+''', encoding="utf-8")
     java_home = Path(os.environ.get("BROWSER_JAVA_HOME", "/usr/lib/jvm/java-17-openjdk-amd64"))
     if not (java_home / "bin/javac").is_file():
         raise RuntimeError("Install openjdk-17-jdk and openjdk-17-jre, or set BROWSER_JAVA_HOME to a full JDK 17+")

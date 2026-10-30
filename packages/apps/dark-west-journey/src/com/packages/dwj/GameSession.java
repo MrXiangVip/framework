@@ -1,4 +1,4 @@
-package com.packages.kof;
+package com.pacakges.dwj;
 
 /** Home -> character selection -> bout -> result. All mutations run on the UI thread. */
 public final class GameSession {

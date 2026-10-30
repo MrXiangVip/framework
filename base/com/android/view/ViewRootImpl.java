@@ -28,12 +28,13 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
         if (attrs != null) {
             mWindowAttributes.width = attrs.width;
             mWindowAttributes.height = attrs.height;
+            mWindowAttributes.setTitle(attrs.getTitle());
             if (attrs.width > 0) mWidth = attrs.width;
             if (attrs.height > 0) mHeight = attrs.height;
         }
 //      1.创建窗口
         if (mWindow == null) {
-            mWindow = new XWindow(mWidth, mHeight);
+            mWindow = new XWindow(mWidth, mHeight, mWindowAttributes.getTitle());
         }
 //      2.将图像画到窗口上
         requestLayout();
@@ -69,7 +70,7 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     }
     private void performTraversals() {
         if (mWindow == null) {
-            mWindow = new XWindow(mWidth, mHeight );
+            mWindow = new XWindow(mWidth, mHeight, mWindowAttributes.getTitle());
         }
         mWindow.present(renderToImage(mView, mWidth, mHeight));
     }

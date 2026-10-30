@@ -70,7 +70,7 @@ static void fail(JNIEnv *env, const char *message) {
 }
 
 JNIEXPORT jlong JNICALL Java_com_android_wm_XWindow_nativeOpen
-  (JNIEnv *env, jclass type, jint width, jint height) {
+  (JNIEnv *env, jclass type, jint width, jint height, jbyteArray title) {
     (void)type;
     if (width <= 0 || height <= 0) { fail(env, "Invalid X11 window size"); return 0; }
     /* The Java object serializes display access; XInitThreads also enables Xlib thread bookkeeping. */
@@ -90,7 +90,24 @@ JNIEXPORT jlong JNICALL Java_com_android_wm_XWindow_nativeOpen
     s->gc = XCreateGC(s->display, s->window, 0, NULL);
     s->delete_window = XInternAtom(s->display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(s->display, s->window, &s->delete_window, 1);
-    XStoreName(s->display, s->window, "Launcher - framework View tree");
+    /* Standard UTF-8 (not JNI modified UTF-8) also preserves supplementary characters. */
+    Atom utf8 = XInternAtom(s->display, "UTF8_STRING", False);
+    jsize title_length = title ? (*env)->GetArrayLength(env, title) : 0;
+    jbyte *title_bytes = title ? (*env)->GetByteArrayElements(env, title, NULL) : NULL;
+    if (title && !title_bytes) {
+        XFreeGC(s->display, s->gc); XDestroyWindow(s->display, s->window);
+        free(s->text); XCloseDisplay(s->display); free(s); return 0;
+    }
+    const unsigned char *name = title_bytes ? (const unsigned char *)title_bytes
+        : (const unsigned char *)"Framework";
+    int name_length = title_bytes ? title_length : 9;
+    Atom name_properties[] = { XA_WM_NAME, XA_WM_ICON_NAME,
+        XInternAtom(s->display, "_NET_WM_NAME", False),
+        XInternAtom(s->display, "_NET_WM_ICON_NAME", False) };
+    for (unsigned int i = 0; i < sizeof(name_properties) / sizeof(name_properties[0]); i++)
+        XChangeProperty(s->display, s->window, name_properties[i], utf8, 8,
+            PropModeReplace, name, name_length);
+    if (title_bytes) (*env)->ReleaseByteArrayElements(env, title, title_bytes, JNI_ABORT);
     XSelectInput(s->display, s->window, window_events);
     /* Let window managers and integration checks associate the window with its application process. */
     unsigned long pid = (unsigned long)getpid();

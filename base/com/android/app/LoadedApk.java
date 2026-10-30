@@ -1,6 +1,8 @@
 package com.android.app;
 
 import com.android.os.ApplicationStartInfo;
+import com.android.pm.ParsedPackage;
+import com.android.pm.ParsingPackageUtils;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -23,6 +25,15 @@ public final class LoadedApk implements Closeable {
             throw new IllegalArgumentException("Cannot load application " + info.packageName
                     + " from " + info.apkPath, e);
         }
+    }
+
+    /** Uses the same activity/application label resolution as the launcher. */
+    public String getActivityLabel(String activityName) {
+        ParsedPackage parsed = new ParsingPackageUtils().parsePackage(apkFile);
+        for (ParsedPackage.ActivityInfo activity : parsed.getActivities()) {
+            if (activity.getName().equals(activityName)) return activity.getLabel();
+        }
+        return parsed.getPackageName();
     }
 
     public File getApkFile() { return apkFile; }
