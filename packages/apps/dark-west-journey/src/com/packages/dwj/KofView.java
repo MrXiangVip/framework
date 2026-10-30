@@ -230,7 +230,6 @@ public class KofView extends View {
         text(g,"KOF  /  THE KING OF FIGHTERS",48,44,16,0xdfe8ef,false);
         text(g,"ARCADE COLLECTION     /     LOCAL PLAY",1090,44,12,0x9cafbd,true);
         g.setColor(new Color(0xf8c573));g.fillRect(609,80,62,3);
-        text(g,"拳 皇",640,152,64,0xffe2a4,true);
         text(g,"THE KING OF FIGHTERS",640,184,16,0xa6b9c8,true);
         Graphics2D left=(Graphics2D)g.create();left.translate(232,512);left.scale(1.8,1.8);drawFighter(left,null,0,1,false);left.dispose();
         Graphics2D right=(Graphics2D)g.create();right.translate(1048,512);right.scale(1.8,1.8);drawFighter(right,null,GameSession.ZHUBAJIE,-1,false);right.dispose();
