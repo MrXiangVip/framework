@@ -14,12 +14,13 @@ import com.android.policy.PhoneWindowManager;
 import com.android.util.Log;
 import com.android.wm.WindowManagerService;
 
+import java.io.IOException;
+
 public final class SystemServer {
 
     private static String TAG = "SystemServer.";
     private ActivityManagerService mActivityManagerService;
     private PackageManagerService mPackageManagerService;
-    private com.android.am.ActivityManagerSocketServer mActivityServer;
     private WindowManagerService wm = null;
 
     private Context mSystemContext;
@@ -54,8 +55,11 @@ public final class SystemServer {
     }
 
     private void startBootstrapServices() {
-        mActivityManagerService = ActivityManagerService.getInstance();
-
+        try {
+            mActivityManagerService = ActivityManagerService.getInstance();
+        } catch (IOException e) {
+            throw new IllegalStateException("Cannot publish ActivityManager service", e);
+        }
         installer = new Installer();
         mPackageManagerService = PackageManagerService.main(mSystemContext, installer, false, mOnlyCore);
         mActivityManagerService.setPackageManagerService(mPackageManagerService);
@@ -68,11 +72,6 @@ public final class SystemServer {
     private void startOtherServices() {
         final Context context = mSystemContext;
 
-        try {
-            mActivityServer = new com.android.am.ActivityManagerSocketServer(mActivityManagerService);
-        } catch (java.io.IOException e) {
-            throw new IllegalStateException("Cannot publish ActivityManager service", e);
-        }
         mActivityManagerService.systemReady();
         WindowManagerService wm = null;
         wm = WindowManagerService.main(context, inputManager, !mFirstBoot, mOnlyCore,

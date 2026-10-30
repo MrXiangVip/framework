@@ -8,12 +8,20 @@ import com.android.os.ApplicationStartInfo;
 import com.android.os.Process.*;
 import com.android.wm.ActivityTaskManagerService;
 
-public class ActivityManagerService {
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class ActivityManagerService  implements AutoCloseable{
 
     private static ActivityManagerService  ams;
     public ActivityTaskManagerService mActivityTaskManager;
-
-    public static ActivityManagerService getInstance( ){
+    private final ServerSocket server;
+    private Thread worker =null;
+    public static ActivityManagerService getInstance( ) throws IOException {
         if (ams == null) {
             ams = new ActivityManagerService( );
         }
@@ -21,12 +29,51 @@ public class ActivityManagerService {
     }
     private PackageManagerService mPackageManagerService;
 
+
+    public ActivityManagerService( ) throws IOException {
+        int port=Integer.getInteger("framework.ams.port", 10001);
+        server = new ServerSocket(port, 50, InetAddress.getLoopbackAddress());
+
+    }
+    private void run() {
+        while (!server.isClosed()) {
+            try (Socket client = server.accept()) {
+                client.setSoTimeout(5000);
+                DataOutputStream output = new DataOutputStream(client.getOutputStream());
+                try {
+                    DataInputStream input = new DataInputStream(client.getInputStream());
+                    int operation = input.readInt();
+                    if (operation == 1) {
+                        startActivity(input.readUTF());
+                        output.writeInt(0);
+                    } else if (operation == 2) {
+                        java.util.List<com.android.pm.LauncherActivityInfo> entries = getLauncherActivities();
+                        output.writeInt(0);
+                        output.writeInt(entries.size());
+                        for (com.android.pm.LauncherActivityInfo entry : entries) entry.writeTo(output);
+                    } else throw new IOException("Unsupported ActivityManager protocol");
+                } catch (IOException | RuntimeException e) {
+                    output.writeInt(1);
+                    String message = String.valueOf(e.getMessage());
+                    output.writeUTF(message.substring(0, Math.min(message.length(), 4000)));
+                }
+                output.flush();
+            } catch (IOException e) {
+                if (!server.isClosed()) Log.w("ActivityManager request failed: " + e);
+            }
+        }
+    }
     public void setPackageManagerService(PackageManagerService packageManagerService) {
         mPackageManagerService = java.util.Objects.requireNonNull(packageManagerService);
     }
 
-    public void systemReady() {
 
+    public void systemReady() {
+        if( worker == null ){
+            worker = new Thread(this::run, "activity-manager-requests");
+            worker.setDaemon(true);
+            worker.start();
+        }
         startHomeActivityLocked( "systemReady");
 
     }
@@ -79,4 +126,8 @@ public class ActivityManagerService {
         return Process.start(getApplicationStartInfo(callingPackageClass));
     }
 
+    @Override
+    public void close() throws Exception {
+        server.close();
+    }
 }
