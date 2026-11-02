@@ -8,9 +8,10 @@ import com.android.util.Log;
 import com.android.am.ActivityManagerClient;
 import java.io.File;
 
-public class Activity extends ContextThemeWrapper {
+public class Activity extends ContextThemeWrapper implements Window.Callback {
     private static Activity activity;
 
+    private boolean mResumed, mResumeRequested, mWindowMinimized;
     private Window mWindow;
     private WindowManager mWindowManager;
     View mDecor = null;
@@ -45,6 +46,7 @@ public class Activity extends ContextThemeWrapper {
         mMainThread = aThread;
 
         mWindow = new PhoneWindow(this, window);
+        mWindow.setCallback(this);
         mWindow.setWindowManager( new WindowManagerImpl(context),  null, false);
         mWindowManager = mWindow.getWindowManager();
 
@@ -57,6 +59,31 @@ public class Activity extends ContextThemeWrapper {
 
     protected void onCreate() {
         Log.d(TAG, "onCreate");
+    }
+
+    /** Framework entry points; window events run on the Activity UI thread. */
+    public final void performResume() {
+        mResumeRequested = true;
+        if (mResumed || mWindowMinimized) return;
+        mResumed = true;
+        onResume();
+    }
+
+    public final void performPause() {
+        if (!mResumed) return;
+        mResumed = false;
+        onPause();
+    }
+
+    @Override public final void onWindowMinimizedChanged(boolean minimized) {
+        if (mWindowMinimized == minimized) return;
+        mWindowMinimized = minimized;
+        if (minimized) performPause();
+        else if (mResumeRequested) performResume();
+    }
+
+    protected void onPause() {
+        Log.d(TAG, "onPause");
     }
 
     protected void onResume() {

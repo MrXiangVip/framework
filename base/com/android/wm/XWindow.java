@@ -16,8 +16,9 @@ public final class XWindow implements AutoCloseable {
         void onEvent(int width, int height, boolean closed);
         default void onInput(MotionEvent event) {}
         default void onKeyInput(KeyEvent event) {}
+        default void onMinimizedChanged(boolean minimized) {}
     }
-    private long handle;
+    private long handle;// 窗口指针
     private final ScheduledExecutorService events;
     private static native long nativeOpen(int width, int height, byte[] title);
     private static native int[] nativePoll(long handle);
@@ -44,6 +45,8 @@ public final class XWindow implements AutoCloseable {
                         if(mListener!=null){
                             mListener.onEvent(x, y, true);
                         }
+                    } else if (kind == 16) {
+                        if (mListener != null) mListener.onMinimizedChanged(x != 0);
                     } else if (kind == 7 || kind == 8 || kind == 9) {
                        if(mListener!=null ){
                            mListener.onKeyInput(new KeyEvent(kind == 7 ? KeyEvent.TEXT : kind == 8 ? KeyEvent.DOWN : KeyEvent.UP, x, y));

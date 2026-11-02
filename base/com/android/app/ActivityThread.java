@@ -134,7 +134,7 @@ public class ActivityThread {
         }
     }
     public ActivityClientRecord performResumeActivity(ActivityClientRecord r, String reason) {
-        r.activity.onResume();
+        r.activity.performResume();
         return  r;
     }
     private ContextImpl createBaseContextForActivity(ActivityClientRecord r) {

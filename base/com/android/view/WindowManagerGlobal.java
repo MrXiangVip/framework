@@ -14,6 +14,7 @@ public final class WindowManagerGlobal {
         WindowManager.LayoutParams windowParams = params == null ? new WindowManager.LayoutParams()
                 : (WindowManager.LayoutParams) params;
         ViewRootImpl root = new ViewRootImpl(view.getContext(), display);
+        root.setWindowCallback(parentWindow == null ? null : parentWindow.getCallback());
         roots.put(view, root);
         try { root.setView(view, windowParams, null, userId); }
         catch (RuntimeException e) { roots.remove(view); root.close(); throw e; }

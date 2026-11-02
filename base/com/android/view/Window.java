@@ -6,6 +6,13 @@ import com.android.util.Log;
 public abstract  class Window {
     private final Context mContext;
     private WindowManager mWindowManager;
+    public interface Callback {
+        void onWindowMinimizedChanged(boolean minimized);
+    }
+    private Callback mCallback;
+
+    public final void setCallback(Callback callback) { mCallback = callback; }
+    public final Callback getCallback() { return mCallback; }
     private String TAG="Window.";
 
     public Window(Context context) {

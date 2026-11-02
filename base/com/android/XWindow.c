@@ -14,7 +14,8 @@ typedef struct {
     Display *display;
     Window window;
     GC gc;
-    Atom delete_window;
+    Atom delete_window, wm_state, net_wm_state, net_wm_hidden;
+    int minimized;
     XIM input_method;
     XIC input_context;
     unsigned char *text;
@@ -23,7 +24,7 @@ typedef struct {
     int width, height, destroyed, closing;
 } XSurface;
 
-static const long window_events = ExposureMask | StructureNotifyMask | ButtonPressMask
+static const long window_events = ExposureMask | StructureNotifyMask | PropertyChangeMask | ButtonPressMask
     | ButtonReleaseMask | PointerMotionMask | FocusChangeMask | KeyPressMask | KeyReleaseMask;
 
 static void input_method_destroyed(XIM method, XPointer client, XPointer data) {
@@ -88,6 +89,9 @@ JNIEXPORT jlong JNICALL Java_com_android_wm_XWindow_nativeOpen
         0, 0, (unsigned)width, (unsigned)height, 0,
         BlackPixel(s->display, screen), WhitePixel(s->display, screen));
     s->gc = XCreateGC(s->display, s->window, 0, NULL);
+    s->wm_state = XInternAtom(s->display, "WM_STATE", False);
+    s->net_wm_state = XInternAtom(s->display, "_NET_WM_STATE", False);
+    s->net_wm_hidden = XInternAtom(s->display, "_NET_WM_STATE_HIDDEN", False);
     s->delete_window = XInternAtom(s->display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(s->display, s->window, &s->delete_window, 1);
     /* Standard UTF-8 (not JNI modified UTF-8) also preserves supplementary characters. */
@@ -122,6 +126,37 @@ JNIEXPORT jlong JNICALL Java_com_android_wm_XWindow_nativeOpen
     XMapWindow(s->display, s->window);
     XFlush(s->display);
     return (jlong)(intptr_t)s;
+}
+
+/* Read WM-owned state, never infer minimization from focus or unmapping alone.
+ * Unknown/deleted/malformed properties leave the previous state unchanged. */
+static int read_minimized(XSurface *s) {
+    Atom type = None;
+    int format = 0, result = -1;
+    unsigned long count = 0, after = 0;
+    unsigned char *data = NULL;
+    if (XGetWindowProperty(s->display, s->window, s->wm_state, 0, 2, False,
+            s->wm_state, &type, &format, &count, &after, &data) == Success &&
+            type == s->wm_state && format == 32 && count >= 2 && data) {
+        unsigned long state = ((unsigned long *)data)[0];
+        if (state == IconicState) result = 1;
+        else if (state == NormalState) result = 0;
+        else if (state == WithdrawnState) { XFree(data); return -1; }
+    }
+    if (data) XFree(data);
+    if (result >= 0) return result;
+    data = NULL;
+    /* EWMH fallback for hosts that do not expose ICCCM WM_STATE. */
+    if (XGetWindowProperty(s->display, s->window, s->net_wm_state, 0, 1024, False,
+            XA_ATOM, &type, &format, &count, &after, &data) == Success &&
+            type == XA_ATOM && format == 32 && after == 0) {
+        result = 0;
+        for (unsigned long i = 0; data && i < count; i++) {
+            if (((Atom *)data)[i] == s->net_wm_hidden) { result = 1; break; }
+        }
+    }
+    if (data) XFree(data);
+    return result;
 }
 
 JNIEXPORT jintArray JNICALL Java_com_android_wm_XWindow_nativePoll
@@ -211,6 +246,16 @@ JNIEXPORT jintArray JNICALL Java_com_android_wm_XWindow_nativePoll
             x = event.xmotion.x; y = event.xmotion.y;
         }
         if (event.type == FocusOut) kind = 6;
+        if ((event.type == PropertyNotify && event.xproperty.window == s->window &&
+                (event.xproperty.atom == s->wm_state || event.xproperty.atom == s->net_wm_state)) ||
+                (event.type == MapNotify && event.xmap.window == s->window) ||
+                (event.type == UnmapNotify && event.xunmap.window == s->window)) {
+            int minimized = read_minimized(s);
+            if (minimized >= 0 && minimized != s->minimized) {
+                s->minimized = minimized;
+                kind = 16; x = minimized; y = 0;
+            }
+        }
         if (event.type == ClientMessage && (Atom)event.xclient.data.l[0] == s->delete_window) s->closing = 1;
         if (event.type == DestroyNotify) { s->destroyed = 1; s->closing = 1; }
         if (s->closing) { kind = 2; x = s->width; y = s->height; }

@@ -9,6 +9,10 @@ import java.util.Objects;
 /** Coordinates a View tree, software frames and an X11 surface on the UI thread. */
 public class ViewRootImpl implements ViewParent, AutoCloseable {
     private View mView;
+    private Window.Callback mWindowCallback;
+    private boolean mMinimized;
+
+    void setWindowCallback(Window.Callback callback) { mWindowCallback = callback; }
     private final Choreographer mChoreographer;
     private XWindow mWindow;
     private int mWidth = 600, mHeight = 800;
@@ -46,8 +50,20 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
                 mWidth = Math.max(1, width); mHeight = Math.max(1, height);
                 scheduleTraversals();
             }
-            @Override public void onKeyInput(KeyEvent event) { mView.dispatchKeyEvent(event); }
+            @Override public void onMinimizedChanged(boolean minimized) {
+                if (mClosed || mMinimized == minimized) return;
+                mMinimized = minimized;
+                if (minimized) {
+                    mView.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
+                }
+                if (mWindowCallback != null) mWindowCallback.onWindowMinimizedChanged(minimized);
+                if (!minimized) scheduleTraversals();
+            }
+            @Override public void onKeyInput(KeyEvent event) {
+                if (!mMinimized) mView.dispatchKeyEvent(event);
+            }
             @Override public void onInput(MotionEvent event) {
+                if (mMinimized) return;
                 // A resize and press may arrive in the same native batch.
                 if (mView.getWidth() != mWidth || mView.getHeight() != mHeight) {
                     mView.measure(View.MeasureSpec.makeMeasureSpec(mWidth, View.MeasureSpec.EXACTLY),
@@ -61,11 +77,11 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     @Override public void requestLayout() { scheduleTraversals(); }
     @Override public void invalidate() { scheduleTraversals(); }
     void scheduleTraversals() {
-        if (mClosed || mTraversalScheduled) return;
+        if (mClosed || mMinimized || mTraversalScheduled) return;
         mTraversalScheduled = true;
         mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSAL, () -> {
             mTraversalScheduled = false;
-            if (!mClosed) performTraversals();
+            if (!mClosed && !mMinimized) performTraversals();
         }, null);
     }
     private void performTraversals() {
@@ -90,6 +106,7 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     @Override public void close() {
         if (mClosed) return;
         mClosed = true;
+        mWindowCallback = null;
         if (mWindow != null) mWindow.close();
         if (mView != null) {
             mView.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
