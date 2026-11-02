@@ -11,7 +11,7 @@ import java.io.File;
 public class Activity extends ContextThemeWrapper implements Window.Callback {
     private static Activity activity;
 
-    private boolean mResumed, mResumeRequested, mWindowMinimized;
+    private boolean mResumed, mResumeRequested, mWindowMinimized, mDestroyed;
     private Window mWindow;
     private WindowManager mWindowManager;
     View mDecor = null;
@@ -63,6 +63,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback {
 
     /** Framework entry points; window events run on the Activity UI thread. */
     public final void performResume() {
+        if (mDestroyed) return;
         mResumeRequested = true;
         if (mResumed || mWindowMinimized) return;
         mResumed = true;
@@ -76,10 +77,39 @@ public class Activity extends ContextThemeWrapper implements Window.Callback {
     }
 
     @Override public final void onWindowMinimizedChanged(boolean minimized) {
-        if (mWindowMinimized == minimized) return;
+        if (mDestroyed || mWindowMinimized == minimized) return;
         mWindowMinimized = minimized;
         if (minimized) performPause();
         else if (mResumeRequested) performResume();
+    }
+
+    @Override public final void onWindowClosed() {
+        performDestroy();
+    }
+
+    public final boolean isDestroyed() { return mDestroyed; }
+
+    /** Destroy once, including when callbacks re-enter window removal. */
+    public final void performDestroy() {
+        if (mDestroyed) return;
+        mDestroyed = true;
+        mResumeRequested = false;
+        try {
+            performPause();
+        } finally {
+            try {
+                onDestroy();
+            } finally {
+                if (mWindow != null) mWindow.setCallback(null);
+                mDecor = null;
+                if (mMainThread != null) mMainThread.onActivityDestroyed(this);
+                mMainThread = null;
+            }
+        }
+    }
+
+    protected void onDestroy() {
+        Log.d(TAG, "onDestroy");
     }
 
     protected void onPause() {

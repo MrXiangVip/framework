@@ -137,6 +137,14 @@ public class ActivityThread {
         r.activity.performResume();
         return  r;
     }
+    void onActivityDestroyed(Activity activity) {
+        if (r != null && r.activity == activity) {
+            r.activity = null;
+            r.window = null;
+            r = null;
+        }
+    }
+
     private ContextImpl createBaseContextForActivity(ActivityClientRecord r) {
         final int displayId=0;
         ContextImpl appContext = ContextImpl.createActivityContext(

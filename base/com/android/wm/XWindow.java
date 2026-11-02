@@ -41,9 +41,10 @@ public final class XWindow implements AutoCloseable {
                             mListener.onEvent(x, y, false);
                         }
                     } else if (kind == 2) {
-                        close();
-                        if(mListener!=null){
-                            mListener.onEvent(x, y, true);
+                        try {
+                            if (mListener != null) mListener.onEvent(x, y, true);
+                        } finally {
+                            close();
                         }
                     } else if (kind == 16) {
                         if (mListener != null) mListener.onMinimizedChanged(x != 0);

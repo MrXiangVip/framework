@@ -8,6 +8,7 @@ public abstract  class Window {
     private WindowManager mWindowManager;
     public interface Callback {
         void onWindowMinimizedChanged(boolean minimized);
+        default void onWindowClosed() {}
     }
     private Callback mCallback;
 
