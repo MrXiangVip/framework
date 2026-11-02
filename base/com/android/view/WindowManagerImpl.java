@@ -26,7 +26,7 @@ public final  class WindowManagerImpl implements WindowManager {
 
     @Override
     public void updateViewLayout(View view, ViewGroup.LayoutParams params) {
-
+        mGlobal.updateViewLayout(view, params);
     }
 
     @Override

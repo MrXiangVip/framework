@@ -3,6 +3,7 @@ package com.android.view;
 import com.android.content.Context;
 import com.android.graphics.Canvas;
 import com.android.wm.XWindow;
+import com.android.wm.WindowManagerService;
 import java.awt.image.BufferedImage;
 import java.util.Objects;
 
@@ -15,7 +16,8 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     void setWindowCallback(Window.Callback callback) { mWindowCallback = callback; }
     private final Choreographer mChoreographer;
     private XWindow mWindow;
-    private int mWidth = 600, mHeight = 800;
+    private int mWidth, mHeight;
+    private boolean mWindowSizeDirty = true;
     private boolean mTraversalScheduled, mClosed;
     public final WindowManager.LayoutParams mWindowAttributes = new WindowManager.LayoutParams();
 
@@ -33,9 +35,9 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
             mWindowAttributes.width = attrs.width;
             mWindowAttributes.height = attrs.height;
             mWindowAttributes.setTitle(attrs.getTitle());
-            if (attrs.width > 0) mWidth = attrs.width;
-            if (attrs.height > 0) mHeight = attrs.height;
+
         }
+        resolveWindowSize();
 //      1.创建窗口
         if (mWindow == null) {
             mWindow = new XWindow(mWidth, mHeight, mWindowAttributes.getTitle());
@@ -74,7 +76,24 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
             }
         } );
     }
-    @Override public void requestLayout() { scheduleTraversals(); }
+    public void setLayoutParams(WindowManager.LayoutParams attrs) {
+        mWindowAttributes.width = attrs.width;
+        mWindowAttributes.height = attrs.height;
+        mWindowAttributes.x = attrs.x;
+        mWindowAttributes.y = attrs.y;
+        mWindowAttributes.setTitle(attrs.getTitle());
+        requestLayout();
+    }
+    private void resolveWindowSize() {
+        int[] display = XWindow.getDisplaySize();
+        int[] size = WindowManagerService.getInstance().computeWindowSize(
+                mView, mWindowAttributes, display[0], display[1]);
+        if (mWindow != null && (size[0] != mWidth || size[1] != mHeight))
+            mWindow.resize(size[0], size[1]);
+        mWidth = size[0]; mHeight = size[1];
+        mWindowSizeDirty = false;
+    }
+    @Override public void requestLayout() { mWindowSizeDirty = true; scheduleTraversals(); }
     @Override public void invalidate() { scheduleTraversals(); }
     void scheduleTraversals() {
         if (mClosed || mMinimized || mTraversalScheduled) return;
@@ -85,6 +104,7 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
         }, null);
     }
     private void performTraversals() {
+        if (mWindowSizeDirty) resolveWindowSize();
         if (mWindow == null) {
             mWindow = new XWindow(mWidth, mHeight, mWindowAttributes.getTitle());
         }

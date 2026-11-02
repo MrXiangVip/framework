@@ -19,6 +19,13 @@ public final class WindowManagerGlobal {
         try { root.setView(view, windowParams, null, userId); }
         catch (RuntimeException e) { roots.remove(view); root.close(); throw e; }
     }
+    public void updateViewLayout(View view, ViewGroup.LayoutParams params) {
+        if (!(params instanceof WindowManager.LayoutParams))
+            throw new IllegalArgumentException("Expected WindowManager.LayoutParams");
+        ViewRootImpl root = roots.get(view);
+        if (root == null) throw new IllegalArgumentException("Window not added");
+        root.setLayoutParams((WindowManager.LayoutParams) params);
+    }
     public void removeView(View view) {
         ViewRootImpl root = roots.remove(view);
         if (root != null) root.close();

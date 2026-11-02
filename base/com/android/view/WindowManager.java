@@ -14,6 +14,7 @@ public interface WindowManager extends ViewManager {
         private String title = "";
         public void setTitle(CharSequence value) { title = value == null ? "" : value.toString(); }
         public String getTitle() { return title; }
+        public LayoutParams(int width, int height) { super(width, height); }
         public LayoutParams() {
             super(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
         }

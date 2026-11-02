@@ -325,3 +325,28 @@ JNIEXPORT void JNICALL Java_com_android_wm_XWindow_nativeClose
     free(s->text);
     free(s);
 }
+
+/* Display bounds are logical X11 pixels; desktop panels/insets are not subtracted yet. */
+JNIEXPORT jintArray JNICALL Java_com_android_wm_XWindow_getDisplaySize
+  (JNIEnv *env, jclass type) {
+    (void)type;
+    if (!XInitThreads()) { fail(env, "XInitThreads failed"); return NULL; }
+    Display *display = XOpenDisplay(NULL);
+    if (!display) { fail(env, "Cannot open X11 display; check DISPLAY"); return NULL; }
+    int screen = DefaultScreen(display);
+    jint size[2] = { DisplayWidth(display, screen), DisplayHeight(display, screen) };
+    XCloseDisplay(display);
+    jintArray result = (*env)->NewIntArray(env, 2);
+    if (result) (*env)->SetIntArrayRegion(env, result, 0, 2, size);
+    return result;
+}
+
+JNIEXPORT void JNICALL Java_com_android_wm_XWindow_nativeResize
+  (JNIEnv *env, jclass type, jlong handle, jint width, jint height) {
+    (void)type;
+    XSurface *s = (XSurface *)(intptr_t)handle;
+    if (!s || s->destroyed || s->closing) return;
+    if (width <= 0 || height <= 0) { fail(env, "Invalid X11 window size"); return; }
+    XResizeWindow(s->display, s->window, (unsigned)width, (unsigned)height);
+    XFlush(s->display);
+}

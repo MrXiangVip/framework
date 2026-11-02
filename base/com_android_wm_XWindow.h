@@ -17,6 +17,22 @@ JNIEXPORT jlong JNICALL Java_com_android_wm_XWindow_nativeOpen
 
 /*
  * Class:     com_android_wm_XWindow
+ * Method:    getDisplaySize
+ * Signature: ()[I
+ */
+JNIEXPORT jintArray JNICALL Java_com_android_wm_XWindow_getDisplaySize
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     com_android_wm_XWindow
+ * Method:    nativeResize
+ * Signature: (JII)V
+ */
+JNIEXPORT void JNICALL Java_com_android_wm_XWindow_nativeResize
+  (JNIEnv *, jclass, jlong, jint, jint);
+
+/*
+ * Class:     com_android_wm_XWindow
  * Method:    nativePoll
  * Signature: (J)[I
  */

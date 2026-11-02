@@ -21,6 +21,8 @@ public final class XWindow implements AutoCloseable {
     private long handle;// 窗口指针
     private final ScheduledExecutorService events;
     private static native long nativeOpen(int width, int height, byte[] title);
+    public static native int[] getDisplaySize();
+    private static native void nativeResize(long handle, int width, int height);
     private static native int[] nativePoll(long handle);
     private static native void nativePresent(long handle, int[] pixels, int width, int height);
     private static native void nativeClose(long handle);
@@ -76,6 +78,11 @@ public final class XWindow implements AutoCloseable {
         }, 0, 25, TimeUnit.MILLISECONDS);
     }
 
+
+    public synchronized void resize(int width, int height) {
+        if (width <= 0 || height <= 0) throw new IllegalArgumentException("Invalid window size");
+        if (handle != 0) nativeResize(handle, width, height);
+    }
 
     private synchronized int[] poll() { return handle == 0 ? null : nativePoll(handle); }
     public synchronized boolean isClosed() { return handle == 0; }
