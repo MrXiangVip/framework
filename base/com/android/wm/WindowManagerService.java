@@ -23,27 +23,7 @@ public class WindowManagerService  {
         return  getInstance();
     }
 
-    /** Resolve client size in pixels within the supplied display area. No X11 dependency. */
-    public int[] computeWindowSize(View view, WindowManager.LayoutParams params,
-                                   int availableWidth, int availableHeight) {
-        if (availableWidth <= 0 || availableHeight <= 0)
-            throw new IllegalArgumentException("Display area must be positive");
-        int widthSpec = makeWindowMeasureSpec(params.width, availableWidth);
-        int heightSpec = makeWindowMeasureSpec(params.height, availableHeight);
-        view.measure(widthSpec, heightSpec);
-        // X11 windows require at least one pixel, even for empty WRAP_CONTENT views.
-        return new int[] { Math.max(1, Math.min(availableWidth, view.getMeasuredWidth())),
-                Math.max(1, Math.min(availableHeight, view.getMeasuredHeight())) };
-    }
 
-    private static int makeWindowMeasureSpec(int requested, int available) {
-        if (requested < ViewGroup.LayoutParams.WRAP_CONTENT)
-            throw new IllegalArgumentException("Invalid window dimension: " + requested);
-        return View.MeasureSpec.makeMeasureSpec(
-                requested >= 0 ? Math.min(requested, available) : available,
-                requested == ViewGroup.LayoutParams.WRAP_CONTENT
-                        ? View.MeasureSpec.AT_MOST : View.MeasureSpec.EXACTLY);
-    }
 
 //    增加窗口
     public void addWindow(View view, ViewGroup.LayoutParams params) {

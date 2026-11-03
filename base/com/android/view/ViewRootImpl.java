@@ -3,7 +3,7 @@ package com.android.view;
 import com.android.content.Context;
 import com.android.graphics.Canvas;
 import com.android.wm.XWindow;
-import com.android.wm.WindowManagerService;
+//import com.android.wm.WindowManagerService;
 import java.awt.image.BufferedImage;
 import java.util.Objects;
 
@@ -37,6 +37,7 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
             mWindowAttributes.setTitle(attrs.getTitle());
 
         }
+//      1. 计算窗口大小
         resolveWindowSize();
 //      1.创建窗口
         if (mWindow == null) {
@@ -86,13 +87,35 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     }
     private void resolveWindowSize() {
         int[] display = XWindow.getDisplaySize();
-        int[] size = WindowManagerService.getInstance().computeWindowSize(
+        int[] size = computeWindowSize(
                 mView, mWindowAttributes, display[0], display[1]);
         if (mWindow != null && (size[0] != mWidth || size[1] != mHeight))
             mWindow.resize(size[0], size[1]);
         mWidth = size[0]; mHeight = size[1];
         mWindowSizeDirty = false;
     }
+    /** Resolve client size in pixels within the supplied display area. No X11 dependency. */
+    public int[] computeWindowSize(View view, WindowManager.LayoutParams params,
+                                   int availableWidth, int availableHeight) {
+        if (availableWidth <= 0 || availableHeight <= 0)
+            throw new IllegalArgumentException("Display area must be positive");
+        int widthSpec = makeWindowMeasureSpec(params.width, availableWidth);
+        int heightSpec = makeWindowMeasureSpec(params.height, availableHeight);
+        view.measure(widthSpec, heightSpec);
+        // X11 windows require at least one pixel, even for empty WRAP_CONTENT views.
+        return new int[] { Math.max(1, Math.min(availableWidth, view.getMeasuredWidth())),
+                Math.max(1, Math.min(availableHeight, view.getMeasuredHeight())) };
+    }
+
+    private static int makeWindowMeasureSpec(int requested, int available) {
+        if (requested < ViewGroup.LayoutParams.WRAP_CONTENT)
+            throw new IllegalArgumentException("Invalid window dimension: " + requested);
+        return View.MeasureSpec.makeMeasureSpec(
+                requested >= 0 ? Math.min(requested, available) : available,
+                requested == ViewGroup.LayoutParams.WRAP_CONTENT
+                        ? View.MeasureSpec.AT_MOST : View.MeasureSpec.EXACTLY);
+    }
+
     @Override public void requestLayout() { mWindowSizeDirty = true; scheduleTraversals(); }
     @Override public void invalidate() { scheduleTraversals(); }
     void scheduleTraversals() {
