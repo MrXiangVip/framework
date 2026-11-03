@@ -149,11 +149,22 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     @Override public void close() {
         if (mClosed) return;
         mClosed = true;
+        Window.Callback callback = mWindowCallback;
         mWindowCallback = null;
-        if (mWindow != null) mWindow.close();
-        if (mView != null) {
-            mView.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
-            mView.mParent = null;
+        try {
+            if (mWindow != null) mWindow.close();
+        } finally {
+            try {
+                if (mView != null) {
+                    try {
+                        mView.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
+                    } finally {
+                        mView.mParent = null;
+                    }
+                }
+            } finally {
+                if (callback != null) callback.onWindowClosed();
+            }
         }
     }
 }
