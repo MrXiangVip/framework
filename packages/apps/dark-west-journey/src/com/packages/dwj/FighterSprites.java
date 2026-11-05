@@ -43,6 +43,7 @@ final class FighterSprites {
         clips=new EnumMap<>(Action.class);
         String directory=GameSession.SPRITE_DIRECTORIES[character];
         boolean monkey=character==GameSession.SUNWUKONG;
+        boolean daheitian=character==GameSession.DAHEITIAN;
         crouchHold=monkey?7:4;
         int bodyHeight=320;
         for(Action a:Action.values()) {
@@ -52,17 +53,38 @@ final class FighterSprites {
                 if(input==null)throw new IllegalStateException("Missing fighter sprite: "+directory+"/"+name);
                 image=ImageIO.read(input);if(image==null)throw new IOException("Invalid PNG");
             }catch(IOException error){throw new IllegalStateException("Cannot load fighter sprite: "+directory+"/"+name,error);}
-            image=removeMatte(image);
-            if(!monkey) image=cleanOpaqueBackground(image);
+            image=daheitian?removeDaheitianBackground(image):removeMatte(image);
+            if(!monkey&&!daheitian) image=cleanOpaqueBackground(image);
             int[] cuts;
             if(!monkey&&a==Action.IDLE) bodyHeight=new Frame(mainFigure(image.getSubimage(0,0,image.getWidth()/6,image.getHeight()))).bounds.height;
             int reference=bodyHeight;
-            if(!monkey) cuts=pigCuts(a);
+            if(daheitian) cuts=daheitianCuts(a);
+            else if(!monkey) cuts=pigCuts(a);
             else if(a==Action.HEAVY_KICK){cuts=new int[]{0,720,1440,2240,3070,3660,4352};reference=520;}
             else if(a==Action.LIGHT_KICK){cuts=new int[]{0,490,980,1575,2200,2570,3104};reference=640;}
             else {cuts=new int[9];for(int i=0;i<=8;i++)cuts[i]=i*image.getWidth()/8;}
-            clips.put(a,new Clip(image,cuts,reference,!monkey||reference!=320));
+            Clip clip=new Clip(image,cuts,reference,!daheitian&&(!monkey||reference!=320));
+            clips.put(a,clip);
         }
+    }
+    /** Preserve warm skin and disconnected attack effects while removing the cool gray matte. */
+    private static BufferedImage removeDaheitianBackground(BufferedImage image) {
+        int w=image.getWidth(),h=image.getHeight();
+        int[] pixels=image.getRGB(0,0,w,h,null,0,w);
+        for(int i=0;i<pixels.length;i++) {
+            int c=pixels[i],r=c>>16&255,g=c>>8&255,b=c&255;
+            int min=Math.min(r,Math.min(g,b)),max=Math.max(r,Math.max(g,b));
+            if(min>140&&max-min<32&&!(r>b+7&&r>g+3)) pixels[i]=0;
+        }
+        BufferedImage clean=new BufferedImage(w,h,BufferedImage.TYPE_INT_ARGB);
+        clean.setRGB(0,0,w,h,pixels,0,w);return clean;
+    }
+    /** Supplied Daheitian strips: seven jump/light-punch poses, six for other actions. */
+    private static int[] daheitianCuts(Action action) {
+        if(action==Action.LIGHT_PUNCH) return new int[]{0,643,1289,1943,2565,3161,3774,4352};
+        if(action==Action.JUMP) return new int[]{0,660,1230,1835,2445,2985,3535,4352};
+        int[] cuts=new int[7];for(int i=0;i<=6;i++)cuts[i]=i*4352/6;
+        return cuts;
     }
     /** The supplied images contain six irregularly spaced poses, not eight equal cells. */
     private static int[] pigCuts(Action action) {

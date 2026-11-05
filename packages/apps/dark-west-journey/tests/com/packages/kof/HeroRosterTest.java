@@ -1,4 +1,4 @@
-package com.packages.kof;
+package com.pacakges.dwj;
 import com.android.content.*;
 import com.android.res.Resources;
 import com.android.os.Looper;
@@ -22,21 +22,21 @@ public final class HeroRosterTest {
  private static void roster(KofView v,GameSession.Mode mode,int id){v.getSession().back();v.getSession().setMode(mode);press(v,KeyEvent.ENTER);press(v,'1'+id);}
  public static void main(String[] args)throws Exception{
   Looper.prepareMainLooper();System.setProperty("framework.kof.sound","false");File dir=new File(args[0]);dir.mkdirs();
-  for(GameSession.Mode mode:GameSession.Mode.values())for(int id=0;id<2;id++){
-   GameSession s=new GameSession();s.setMode(mode);s.openRoster();check(s.getRosterSize()==2,"both heroes available in "+mode);s.select(id);s.start();
+  for(GameSession.Mode mode:GameSession.Mode.values())for(int id=0;id<GameSession.NAMES.length;id++){
+   GameSession s=new GameSession();s.setMode(mode);s.openRoster();check(s.getRosterSize()==3,"three heroes available in "+mode);s.select(id);s.start();
    if(mode==GameSession.Mode.VERSUS){check(s.getScreen()==GameSession.Screen.ROSTER&&s.getSelectingPlayer()==1,"versus confirms 1P before 2P");s.select(id);s.start();check(s.getOpponent()==id,"mirror matches allowed for "+id);}
    check(s.getSelected()==id&&s.getScreen()==GameSession.Screen.BATTLE,"hero starts "+mode+" "+id);
-   if(mode==GameSession.Mode.CPU)check(s.getOpponent()==1-id,"CPU picks the other hero");
+   if(mode==GameSession.Mode.CPU)check(s.getOpponent()==GameSession.computerOpponent(id),"CPU picks the other hero");
   }
   KofView v=new KofView(CONTEXT,null);render(v,dir,"heroes-home");
   int[] attackKeys={'j','k','l',';'};
   FighterSprites.Action[] attackActions={FighterSprites.Action.LIGHT_PUNCH,FighterSprites.Action.LIGHT_KICK,FighterSprites.Action.HEAVY_PUNCH,FighterSprites.Action.HEAVY_KICK};
-  for(int id=0;id<2;id++){
+  for(int id=0;id<GameSession.NAMES.length;id++){
    String name=GameSession.SPRITE_DIRECTORIES[id];roster(v,GameSession.Mode.TRAINING,id);
-   click(v,id==0?530:740,577);check(v.getSession().getSelected()==id,"mouse selects "+name);render(v,dir,name+"-roster");
+   click(v,329+id*210+100,577);check(v.getSession().getSelected()==id,"mouse selects "+name);render(v,dir,name+"-roster");
    press(v,KeyEvent.ENTER);tick(v,2);FightEngine f=v.getSession().getFight();FighterSprites sprites=actor(v,0);
    check(f.isTraining()&&f.getState()==FightEngine.State.FIGHT,"solo training "+name);
-   for(FighterSprites.Action a:FighterSprites.Action.values())check(sprites.frameCount(a)==(id==0&&a!=FighterSprites.Action.LIGHT_KICK&&a!=FighterSprites.Action.HEAVY_KICK?8:6),"real frame count "+name+"/"+a);
+   for(FighterSprites.Action a:FighterSprites.Action.values())check(sprites.frameCount(a)==(id==0&&a!=FighterSprites.Action.LIGHT_KICK&&a!=FighterSprites.Action.HEAVY_KICK?8:id==2&&(a==FighterSprites.Action.JUMP||a==FighterSprites.Action.LIGHT_PUNCH)?7:6),"real frame count "+name+"/"+a);
    render(v,dir,name+"-idle");int first=sprites.frameIndex(f.getPlayer());tick(v,10);check(sprites.frameIndex(f.getPlayer())!=first,"idle animates "+name);
    down(v,'d');tick(v,9);check(sprites.getAction()==FighterSprites.Action.WALK&&f.getPlayer().isMoving(),"walking animation "+name);render(v,dir,name+"-walk");up(v,'d');tick(v,1);
    down(v,'a');tick(v,4);check(f.getPlayer().getFacing()==-1,"left-facing mirror "+name);render(v,dir,name+"-left");up(v,'a');press(v,'r');
@@ -58,12 +58,12 @@ public final class HeroRosterTest {
    tick(v,4000);check(v.getSession().getScreen()==GameSession.Screen.BATTLE&&f.getSeconds()==0&&f.getEnemy().getHealth()==100,"practice remains solo and untimed "+name);
    click(v,1200,650);check(f.getPlayer().getX()==360&&sprites.getAction()==FighterSprites.Action.IDLE,"training reset "+name);
   }
-  for(int id=0;id<2;id++){
-   roster(v,GameSession.Mode.CPU,id);press(v,KeyEvent.ENTER);tick(v,90);check(v.getSession().getOpponent()==1-id,"real CPU pairing "+id);render(v,dir,"cpu-"+id);
+  for(int id=0;id<GameSession.NAMES.length;id++){
+   roster(v,GameSession.Mode.CPU,id);press(v,KeyEvent.ENTER);tick(v,90);check(v.getSession().getOpponent()==GameSession.computerOpponent(id),"real CPU pairing "+id);render(v,dir,"cpu-"+id);
    boolean attacked=false;for(int t=0;t<180;t++){tick(v,1);FightEngine.Move move=v.getSession().getFight().getEnemy().getMove();check(move!=FightEngine.Move.SPECIAL,"CPU uses supplied attack actions");attacked|=move!=null;}
    check(attacked,"CPU controls sprite opponent "+id);double x=v.getSession().getFight().getPlayer().getX();click(v,1200,650);check(v.getSession().getFight().getPlayer().getX()==x,"hidden training reset cannot restart CPU bout");
   }
-  for(int id=0;id<2;id++){
+  for(int id=0;id<GameSession.NAMES.length;id++){
    roster(v,GameSession.Mode.VERSUS,id);press(v,KeyEvent.ENTER);press(v,'1'+id);press(v,KeyEvent.ENTER);tick(v,90);FightEngine f=v.getSession().getFight();
    FighterSprites p=actor(v,0),q=actor(v,1);check(p!=q,"mirror fighters have independent animation players "+id);
    down(v,'s');press(v,KeyEvent.ARROW_UP);tick(v,10);check(p.getAction()==FighterSprites.Action.CROUCH&&q.getAction()==FighterSprites.Action.JUMP,"independent simultaneous crouch/jump "+id);render(v,dir,"versus-mirror-"+id);up(v,'s');tick(v,70);

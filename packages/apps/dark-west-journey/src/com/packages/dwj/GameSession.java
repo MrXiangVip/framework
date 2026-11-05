@@ -10,9 +10,10 @@ public final class GameSession {
         public final String title, english, description;
         Mode(String title, String english, String description) { this.title=title; this.english=english; this.description=description; }
     }
-    public static final int SUNWUKONG = 0, ZHUBAJIE = 1;
-    public static final String[] NAMES = {"孙悟空", "猪八戒"};
-    public static final String[] SPRITE_DIRECTORIES = {"sunwukong", "zhubajie"};
+    public static final int SUNWUKONG = 0, ZHUBAJIE = 1, DAHEITIAN = 2;
+    public static final String[] NAMES = {"孙悟空", "猪八戒", "大黑天"};
+    public static final String[] SPRITE_DIRECTORIES = {"sunwukong", "zhubajie", "daheitian"};
+    public static int computerOpponent(int selected) { return (selected+1)%NAMES.length; }
     public int getRosterSize() { return NAMES.length; }
     private final FightEngine fight = new FightEngine(System.nanoTime());
     private Screen screen = Screen.SELECT;
@@ -38,7 +39,7 @@ public final class GameSession {
     public void start() {
         if(screen!=Screen.ROSTER) return;
         if(mode==Mode.VERSUS && selectingPlayer==0) { selectingPlayer=1; return; }
-        if(mode==Mode.CPU) opponent=1-selected;
+        if(mode==Mode.CPU) opponent=computerOpponent(selected);
         fight.setComputerEnabled(mode==Mode.CPU); fight.setTraining(mode==Mode.TRAINING);
         fight.setCharacters(selected,opponent); fight.restart(); screen=Screen.BATTLE;
     }

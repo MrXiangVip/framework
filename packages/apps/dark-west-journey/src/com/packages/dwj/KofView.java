@@ -141,7 +141,7 @@ public class KofView extends View {
         } else if(session.getScreen()==GameSession.Screen.ROSTER) {
             if(k=='a'||k==KeyEvent.LEFT) choose(activeCharacter()-1);
             if(k=='d'||k==KeyEvent.RIGHT) choose(activeCharacter()+1);
-            if(k=='1'||k=='2') choose(k-'1');
+            if(k>='1'&&k<'1'+session.getRosterSize()) choose(k-'1');
             if(k==KeyEvent.END) choose(GameSession.SUNWUKONG);
             if(k==KeyEvent.ENTER||k==' ') startBattle();
             if(k==KeyEvent.ESCAPE) returnToRoster();
@@ -268,7 +268,7 @@ public class KofView extends View {
         text(g,session.getMode().title+" / "+(session.getSelectingPlayer()==0?"1P 选择角色":"2P 选择角色"),640,145,24,0xffd68b,true);
 
 
-        int id=session.getSelected(), cpu=session.getMode()==GameSession.Mode.VERSUS?session.getOpponent():1-id;
+        int id=session.getSelected(), cpu=session.getMode()==GameSession.Mode.VERSUS?session.getOpponent():GameSession.computerOpponent(id);
         preview(g,id,true);
         if(session.getMode()==GameSession.Mode.TRAINING) {
             panel(g,650,205,520,270,0x446678);
@@ -286,7 +286,7 @@ public class KofView extends View {
             text(g,"60 SECONDS / ONE BOUT",640,395,12,0x849bb5,true);
         }
         text(g,session.getSelectingPlayer()==0?"1P  ROSTER":"2P  ROSTER",55,517,17,0xffda8e,false);
-        text(g,"A / D 或 ← → 选角   1 孙悟空   2 猪八戒",775,517,12,0xb3c5d5,false);
+        text(g,"A / D 或 ← → 选角   1 孙悟空   2 猪八戒   3 大黑天",775,517,12,0xb3c5d5,false);
         int step=rosterStep(),card=step-9;
         for(int i=0;i<session.getRosterSize();i++) {
             int x=rosterLeft()+i*step;
