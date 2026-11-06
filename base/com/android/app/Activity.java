@@ -41,6 +41,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback {
         return mWindowManager;
     }
 
+    @Override public void onWindowAttributesChanged(WindowManager.LayoutParams attrs) {
+        if (mDecor != null && mDecor.getParent() != null) {
+            mWindowManager.updateViewLayout(mDecor, attrs);
+        }
+    }
+
     public void attach(Context context, ActivityThread aThread, Configuration config, Window window) {
         attachBaseContext(context);
         mMainThread = aThread;

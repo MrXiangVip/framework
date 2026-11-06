@@ -126,7 +126,7 @@ public class ActivityThread {
             View decor = r.window.getDecorView();
 //            decor.setVisibility(View.INVISIBLE);
             ViewManager wm = a.getWindowManager();
-            WindowManager.LayoutParams l = new WindowManager.LayoutParams();
+            WindowManager.LayoutParams l = r.window.getAttributes();
             l.setTitle(mLoadedApk.getActivityLabel(r.className));
             a.mDecor = decor;
             wm.addView(decor, l);
