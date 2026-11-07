@@ -13,3 +13,5 @@ java -Djava.awt.headless=true -Duser.home="$TEST_HOME" -cp 'out/ebook-tests/clas
 java -Djava.awt.headless=true -Duser.home="$TEST_HOME/imports" -cp 'out/ebook-tests/classes:out/framework/classes:out/system/app/ebook/ebook.apk:libs/*' com.packages.ebook.BookImportTest
 
 java -Djava.awt.headless=true -Duser.home="$TEST_HOME/markdown" -cp 'out/ebook-tests/classes:out/framework/classes:out/system/app/ebook/ebook.apk:libs/*' com.packages.ebook.MarkdownImportTest
+
+java -Djava.awt.headless=true -Duser.home="$TEST_HOME/pdf" -cp 'out/ebook-tests/classes:out/framework/classes:out/system/app/ebook/ebook.apk:libs/*' com.packages.ebook.PdfImportTest

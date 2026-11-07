@@ -1,0 +1,8 @@
+org/apache/pdfbox/Loader.class
+org/apache/pdfbox/rendering/PDFRenderer.class
+org/apache/fontbox/ttf/TrueTypeFont.class
+org/apache/commons/logging/LogFactory.class
+META-INF/LICENSE
+META-INF/NOTICE
+com/github/jaiimageio/jpeg2000/impl/J2KImageReader.class
+META-INF/services/javax.imageio.spi.ImageReaderSpi

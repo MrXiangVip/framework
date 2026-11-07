@@ -29,10 +29,21 @@ public final class EbookView extends View {
     private boolean choosing, importing;
     private volatile boolean closed;
     private Thread importWorker;
+    private final java.util.concurrent.ExecutorService pdfWorker=java.util.concurrent.Executors.newSingleThreadExecutor(r->{Thread t=new Thread(r,"ebook-pdf");t.setDaemon(true);return t;});
+    private BufferedImage pdfImage;
+    private volatile String pdfRequest="";
+    private String pdfError="";
+    private java.util.concurrent.Future<?> pdfTask;
+    private double pdfZoom=1, pdfX, pdfY;
+    private boolean pdfBook(){return book>=TITLES.length&&"PDF".equals(imported.get(book-TITLES.length).format);}
+    private int totalPages(){return pdfBook()?Integer.parseInt(imported.get(book-TITLES.length).text):pages.size();}
+    private void resetPdf(){if(pdfTask!=null)pdfTask.cancel(false);pdfRequest="";pdfImage=null;pdfError="";pdfX=pdfY=0;}
+    private void zoomPdf(double factor){pdfZoom=Math.max(1,Math.min(4,pdfZoom*factor));resetPdf();invalidate();}
+
     private File folder = new File(System.getProperty("user.home"));
     private String filePath = folder.getAbsolutePath();
     private int filePage;
-    private String fileNotice = "选择 UTF-8 TXT、MD 或 EPUB 文件";
+    private String fileNotice = "选择 TXT、MD、EPUB 或 PDF 文件";
     private int tab, book = -1, page, fontSize = 22, scroll, maxScroll;
     private boolean night, search;
     private String query = "", notice = "";
@@ -60,7 +71,7 @@ public final class EbookView extends View {
     private int bookCount() { return TITLES.length + imported.size(); }
     private String title(int id) { return id < TITLES.length ? TITLES[id] : imported.get(id-TITLES.length).title; }
     private String bookKey(int id) { return id < TITLES.length ? ""+id : imported.get(id-TITLES.length).id; }
-    public void close() { closed=true; if(importWorker!=null)importWorker.interrupt(); save(); }
+    public void close() { closed=true; pdfWorker.shutdownNow(); if(importWorker!=null)importWorker.interrupt(); save(); }
     public void save() {
         if(book>=0) state.setProperty("page."+bookKey(book),Integer.toString(page));
         state.setProperty("font",Integer.toString(fontSize)); state.setProperty("night",Boolean.toString(night));
@@ -97,7 +108,7 @@ public final class EbookView extends View {
     private void changeTab(int target) {tab=target;scroll=0;search=false;notice="";invalidate();}
     private void shelf(Graphics2D g) {
         text(g,TABS[tab],28,63,36,0x171717);
-        button(g,"导入",width-230,25,64,42,()->{choosing=true;fileNotice="选择 UTF-8 TXT、MD 或 EPUB 文件";invalidate();});
+        button(g,"导入",width-230,25,64,42,()->{choosing=true;fileNotice="选择 TXT、MD、EPUB 或 PDF 文件";invalidate();});
         button(g,"搜索",width-156,25,64,42,()->{search=!search;query="";scroll=0;invalidate();});
         button(g,"帮助",width-82,25,64,42,()->{notice="点击封面阅读 · 滚轮浏览 · 左右键翻页";invalidate();});
         if(tab==3) {
@@ -153,7 +164,7 @@ public final class EbookView extends View {
         for(int i=0;i<bookCount();i++)if(bookKey(i).equals(last))return i;
         return 0;
     }
-    private void open(int id) { book=id;page=Math.max(0,number("page."+bookKey(id),0));state.setProperty("last",bookKey(id));pageWidth=0;notice="";invalidate(); }
+    private void open(int id) { resetPdf();pdfZoom=1;book=id;page=Math.max(0,number("page."+bookKey(id),0));state.setProperty("last",bookKey(id));pageWidth=0;notice="";invalidate(); }
     void addImported(BookLibrary.Book added) {
         for(int i=0;i<imported.size();i++)if(imported.get(i).id.equals(added.id)) {
             choosing=false;tab=0;search=false;query="";open(TITLES.length+i);notice="书籍已在书架中";save();return;
@@ -174,7 +185,7 @@ public final class EbookView extends View {
     }
     private void selectFile(File file) {
         if(importing)return;
-        if(file.isDirectory()){folder=file;filePath=file.getAbsolutePath();filePage=0;fileNotice="选择 UTF-8 TXT、MD 或 EPUB 文件";invalidate();}
+        if(file.isDirectory()){folder=file;filePath=file.getAbsolutePath();filePage=0;fileNotice="选择 TXT、MD、EPUB 或 PDF 文件";invalidate();}
         else startImport(file);
     }
     private void filePicker(Graphics2D g) {
@@ -237,28 +248,55 @@ public final class EbookView extends View {
         if(pages.isEmpty())pages.add("");
         page=Math.max(0,Math.min(page,pages.size()-1));
     }
-    private void turn(int delta){page=Math.max(0,Math.min(pages.size()-1,page+delta));save();invalidate();}
+    private void turn(int delta){page=Math.max(0,Math.min(totalPages()-1,page+delta));if(pdfBook())resetPdf();save();invalidate();}
     private void reader(Graphics2D g) {
-        paginate(g);int ink=night?0xd9d2c5:0x403b34;
-        button(g,"‹ 书架",20,18,92,38,()->{save();book=-1;invalidate();});
-        button(g,"A−",width-202,18,50,38,()->{fontSize=Math.max(16,fontSize-2);save();invalidate();});
-        button(g,"A+",width-144,18,50,38,()->{fontSize=Math.min(32,fontSize+2);save();invalidate();});
+        if(!pdfBook())paginate(g);else page=Math.max(0,Math.min(totalPages()-1,page));int ink=night?0xd9d2c5:0x403b34;
+        button(g,"‹ 书架",20,18,92,38,()->{save();resetPdf();book=-1;invalidate();});
+        button(g,pdfBook()?"缩−":"A−",width-202,18,50,38,()->{if(pdfBook()){zoomPdf(1/1.5);return;}fontSize=Math.max(16,fontSize-2);save();invalidate();});
+        button(g,pdfBook()?"缩+":"A+",width-144,18,50,38,()->{if(pdfBook()){zoomPdf(1.5);return;}fontSize=Math.min(32,fontSize+2);save();invalidate();});
         button(g,night?"日间":"夜间",width-86,18,66,38,()->{night=!night;save();invalidate();});
         String readerTitle=title(book);
         int titleWidth=state.containsKey("mark."+bookKey(book))?width-190:width-64;
         while(readerTitle.length()>1&&FontManager.measureText(readerTitle,18)>titleWidth)readerTitle=readerTitle.substring(0,readerTitle.length()-2)+"…";
         text(g,readerTitle,32,100,18,ink);
-        if(markdownPages!=null) {
+        if(pdfBook())drawPdf(g);else if(markdownPages!=null) {
             int y=122;Shape clip=g.getClip();g.clipRect(32,122,width-64,Math.max(1,height-220));
             for(MarkdownReader.Line line:markdownPages.get(page)){line.draw(g,32,y,width-64,night);y+=line.height;}
             g.setClip(clip);
         }else {int y=145;for(String line:pages.get(page).split("\n",-1)){text(g,line,32,y,fontSize,ink);y+=fontSize+13;}}
-        text(g,(page+1)+" / "+pages.size()+" 页",width/2-42,height-88,15,ink);
+        text(g,(page+1)+" / "+totalPages()+" 页",width/2-42,height-88,15,ink);
         button(g,"上一页",25,height-65,100,42,()->turn(-1));
         button(g,"书签",width/2-37,height-65,74,42,()->{state.setProperty("mark."+bookKey(book),""+page);save();notice="已添加书签";invalidate();});
         button(g,"下一页",width-125,height-65,100,42,()->turn(1));
-        if(state.containsKey("mark."+bookKey(book)))button(g,"转到书签",width-130,73,110,34,()->{page=Math.max(0,Math.min(pages.size()-1,number("mark."+bookKey(book),0)));save();invalidate();});
+        if(state.containsKey("mark."+bookKey(book)))button(g,"转到书签",width-130,73,110,34,()->{page=Math.max(0,Math.min(totalPages()-1,number("mark."+bookKey(book),0)));if(pdfBook())resetPdf();save();invalidate();});
         if(!notice.isEmpty())text(g,notice,32,height-88,14,ink);
+    }
+    private void drawPdf(Graphics2D g) {
+        int vw=width-64,vh=Math.max(1,height-230);
+        String key=bookKey(book)+":"+page+":"+getWidth()+":"+getHeight()+":"+pdfZoom;
+        if(!key.equals(pdfRequest)) {
+            pdfRequest=key;pdfImage=null;pdfError="";
+            final File file=imported.get(book-TITLES.length).assets;
+            final int requestedPage=page,rw=Math.max(1,(int)(vw*scale)),rh=Math.max(1,(int)(vh*scale));final double zoom=pdfZoom;
+            final com.android.os.Handler handler=new com.android.os.Handler(message->{((Runnable)message.obj).run();return true;});
+            if(pdfTask!=null)pdfTask.cancel(false);
+            pdfTask=pdfWorker.submit(()->{
+                if(closed||!key.equals(pdfRequest))return;
+                BufferedImage result=null;String error="";
+                try{result=PdfReader.render(file,requestedPage,rw,rh,zoom);}catch(Exception e){error="PDF 页面读取失败";}
+                final BufferedImage image=result;final String failure=error;
+                handler.sendMessage(handler.obtainMessage(0,(Runnable)()->{if(!closed&&key.equals(pdfRequest)){pdfImage=image;pdfError=failure;invalidate();}}));
+            });
+        }
+        Shape old=g.getClip();g.clipRect(32,122,vw,vh);
+        if(pdfImage!=null){
+            int iw=(int)(pdfImage.getWidth()/scale),ih=(int)(pdfImage.getHeight()/scale);
+            double mx=Math.max(0,(iw-vw)/2.0),my=Math.max(0,(ih-vh)/2.0);
+            pdfX=Math.max(-mx,Math.min(mx,pdfX));pdfY=Math.max(-my,Math.min(my,pdfY));
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(pdfImage,32+(vw-iw)/2+(int)pdfX,122+(vh-ih)/2+(int)pdfY,iw,ih,null);
+        }else text(g,pdfError.isEmpty()?"正在加载 PDF 页面…":pdfError,42,160,18,night?0xdddddd:0x555555);
+        g.setClip(old);
     }
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
         if(e.getType()==KeyEvent.UP)return false;
@@ -275,7 +313,7 @@ public final class EbookView extends View {
             return true;
         }
         if(e.getType()==KeyEvent.DOWN) {
-            if(key==KeyEvent.ESCAPE){if(book>=0){save();book=-1;}else{search=false;query="";}invalidate();return true;}
+            if(key==KeyEvent.ESCAPE){if(book>=0){save();resetPdf();book=-1;}else{search=false;query="";}invalidate();return true;}
             if(book>=0&&(key==KeyEvent.RIGHT||key==KeyEvent.LEFT)){turn(key==KeyEvent.RIGHT?1:-1);return true;}
             if(search&&key==KeyEvent.BACKSPACE){if(!query.isEmpty())query=query.substring(0,query.offsetByCodePoints(query.length(),-1));scroll=0;invalidate();return true;}
         }
@@ -288,6 +326,9 @@ public final class EbookView extends View {
         if(e.getButton()!=1)return false;
         if(e.getAction()==MotionEvent.ACTION_DOWN){requestFocus();downX=(float)(e.getX()/scale);downY=(float)(e.getY()/scale);return true;}
         if(e.getAction()==MotionEvent.ACTION_UP){int x=(int)(e.getX()/scale),y=(int)(e.getY()/scale);
+            if(book>=0&&pdfBook()&&pdfZoom>1&&downY>=122&&downY<height-108&&(Math.abs(y-downY)>8||Math.abs(x-downX)>8)){
+                pdfX+=x-downX;pdfY+=y-downY;invalidate();return true;
+            }
             if(Math.abs(y-downY)>35){if(book<0&&!choosing){scroll=Math.max(0,Math.min(maxScroll,scroll+(int)downY-y));invalidate();}return true;}
             if(Math.abs(x-downX)>20)return true;
             for(Hit hit:new ArrayList<>(hits))if(hit.box.contains(x,y)){hit.action.run();return true;}

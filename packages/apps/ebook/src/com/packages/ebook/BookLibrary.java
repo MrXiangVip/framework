@@ -26,21 +26,28 @@ final class BookLibrary {
         for(File file:files)try(InputStream in=new FileInputStream(file)) {
             Properties p=new Properties();p.load(in);
             String id=file.getName().replace(".properties","");
+            if("PDF".equals(p.getProperty("format"))) {
+                File pdf=new File(directory,id+".pdf");
+                int count=Integer.parseInt(p.getProperty("pages","0"));
+                if(pdf.isFile()&&count>0)books.add(new Book(id,p.getProperty("title","未命名"),""+count,"PDF",pdf));
+                continue;
+            }
             File textFile=new File(directory,id+".txt");
             if(textFile.length()>EpubReader.MAX_TEXT)continue;
             String text=utf8(Files.readAllBytes(textFile.toPath()));
             if(!text.trim().isEmpty())books.add(new Book(id,p.getProperty("title","未命名"),text,p.getProperty("format","TXT"),new File(directory,id+"-assets")));
-        }catch(IOException ignored) { /* A damaged entry must not hide other books. */ }
+        }catch(IOException | NumberFormatException ignored) { /* A damaged entry must not hide other books. */ }
         return books;
     }
     static boolean supported(String name) {
         String lower=name.toLowerCase(Locale.ROOT);
-        return lower.endsWith(".txt")||lower.endsWith(".epub")||lower.endsWith(".md")||lower.endsWith(".markdown");
+        return lower.endsWith(".pdf")||lower.endsWith(".txt")||lower.endsWith(".epub")||lower.endsWith(".md")||lower.endsWith(".markdown");
     }
     Book importFile(File source)throws IOException {
         if(!source.isFile()||!source.canRead())throw new IOException("文件不存在或无法读取");
         String name=source.getName(),lower=name.toLowerCase(Locale.ROOT);
-        if(!supported(name))throw new IOException("请选择 TXT、EPUB 或 Markdown 文件");
+        if(!supported(name))throw new IOException("请选择 TXT、EPUB、Markdown 或 PDF 文件");
+        if(lower.endsWith(".pdf"))return importPdf(source);
         if(source.length()>MAX_SOURCE)throw new IOException("文件过大，最大支持 32 MB");
         byte[] original;
         try(InputStream in=new FileInputStream(source)){original=EpubReader.readLimited(in,(int)MAX_SOURCE);}
@@ -69,6 +76,28 @@ final class BookLibrary {
         ByteArrayOutputStream meta=new ByteArrayOutputStream();p.store(meta,"Imported ebook");
         writeAtomic(new File(directory,id+".properties"),meta.toByteArray());
         return new Book(id,title,text,format,assets);
+    }
+    private Book importPdf(File source)throws IOException {
+        if(source.length()>256L*1024*1024)throw new IOException("PDF 最大支持 256 MB");
+        Files.createDirectories(directory.toPath());
+        Path temp=Files.createTempFile(directory.toPath(),"pdf-",".tmp");
+        try {
+            MessageDigest hash;
+            try{hash=MessageDigest.getInstance("SHA-256");}catch(java.security.NoSuchAlgorithmException e){throw new IOException(e);}
+            try(InputStream in=new FileInputStream(source);OutputStream out=Files.newOutputStream(temp)) {
+                byte[] buffer=new byte[65536];int n;long total=0;
+                while((n=in.read(buffer))!=-1){total+=n;if(total>256L*1024*1024)throw new IOException("PDF 最大支持 256 MB");hash.update(buffer,0,n);out.write(buffer,0,n);}
+            }
+            int count=PdfReader.pageCount(temp.toFile());
+            StringBuilder hex=new StringBuilder();for(byte b:hash.digest())hex.append(String.format("%02x",b&255));
+            String id=hex.toString(),title=source.getName().substring(0,source.getName().lastIndexOf('.'));
+            File target=new File(directory,id+".pdf");
+            Files.move(temp,target.toPath(),StandardCopyOption.REPLACE_EXISTING);
+            Properties meta=new Properties();meta.setProperty("title",title);meta.setProperty("format","PDF");meta.setProperty("pages",""+count);
+            ByteArrayOutputStream bytes=new ByteArrayOutputStream();meta.store(bytes,"Imported PDF");
+            writeAtomic(new File(directory,id+".properties"),bytes.toByteArray());
+            return new Book(id,title,""+count,"PDF",target);
+        }finally{Files.deleteIfExists(temp);}
     }
     private static void writeAtomic(File target,byte[] data)throws IOException {
         File temp=File.createTempFile("import-",".tmp",target.getParentFile());
