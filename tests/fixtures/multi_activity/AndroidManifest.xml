@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="fixture.multi">
+    <application android:label="Multi Activity Test">
+        <activity android:name=".First" android:label="First" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".Second" android:label="Second" android:exported="true" />
+        <activity android:name=".Broken" android:exported="true" />
+    </application>
+</manifest>

@@ -1,0 +1,15 @@
+Use case: stylized-concept
+Asset type: production fighting game sprite atlas, exactly 6 columns and 8 rows, 48 full-body poses.
+Input image: reference for Daheitian's character identity ONLY. Ignore screenshot UI, lettering, background and other characters.
+Subject: the adult Chinese goddess in the reference: long black hair, ornate golden crown, white flowing sleeves, ivory and pale jade dress, gold armor filigree, jade gemstones. Recreate as polished hand-painted 2D fighting-game sprites, three-quarter side view facing RIGHT. Full body including shoes in every cell. Same character, costume, size, camera and consistent foot baseline in each cell.
+Composition: canvas exactly 2304x3072, each of the 48 cells exactly 384x384, no drawn grid. Six evenly spaced frames in every row, each centered in its own cell, ample empty margins, no overlap. Character standing height about 310 pixels. Solid pure magenta #FF00FF backdrop everywhere, no shadows on ground, no text, no labels, no UI, no checkerboard.
+Rows top to bottom, each SIX successive animation frames:
+1 idle breathing loop with subtle sleeve and hair movement, feet planted.
+2 walking right complete cycle.
+3 jump: anticipation, launch, rising, apex, falling, landing.
+4 crouch: lowering then hold low crouch in frames 4,5,6.
+5 light punch right: ready, windup, quick palm strike, extension, recovery, ready.
+6 light kick right: ready, windup, quick forward kick, extension, recovery, ready.
+7 heavy punch right: ready, large windup, powerful palm thrust, full extension, recovery, ready.
+8 heavy kick right: ready, windup, high strong side kick, full extension, recovery, ready.
+Keep all limbs and fabric inside the cell. No extra accessories, effects, weapons or additional characters. Preserve facial identity, crown and costume across every pose.
