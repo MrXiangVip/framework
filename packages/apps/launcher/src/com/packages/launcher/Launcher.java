@@ -18,6 +18,7 @@ public class Launcher extends Activity {
 
     @Override protected void onCreate() {
         super.onCreate();
+        getWindow().setLayout(640, 800);
         loadDesktop();
     }
 
