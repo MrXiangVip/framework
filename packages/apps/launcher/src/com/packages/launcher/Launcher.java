@@ -27,6 +27,7 @@ public class Launcher extends Activity {
             apps = ActivityManagerClient.getLauncherActivities();
             GridLayout grid = (GridLayout) LayoutInflater.from(this).inflate("res/layout/activity_main.xml", null, false);
             desktop = new DesktopPages(this, grid, apps.size() > PAGE_SIZE);
+            desktop.setPageListener(this::showPage);
             desktop.previous.setOnClickListener(view -> showPage(page - 1));
             desktop.next.setOnClickListener(view -> showPage(page + 1));
             setContentView(desktop);
@@ -61,7 +62,7 @@ public class Launcher extends Activity {
             empty.setText("No applications");
             desktop.grid.addView(empty, new ViewGroup.LayoutParams(-2, -2));
         }
-        desktop.indicator.setText((page + 1) + " / " + pages);
+        desktop.setPage(page, pages);
         desktop.invalidate();
     }
 }

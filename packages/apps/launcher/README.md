@@ -25,3 +25,16 @@ Android APK signature. PMS scans the output directory and passes the APK path
 through AMS/Zygote to ActivityThread, which loads application classes separately.
 Run build.sh on Linux to build all packages/apps applications and start the framework. The standalone
 application build scripts only build the package.
+
+The desktop supports horizontal swipes (or left-button mouse drags) across icons
+and empty grid space to change pages. Each page holds nine apps. Drag at least
+one sixth of the window width (minimum 48 pixels), then release to change one
+page. Short drags return to the current page; vertical drags and cancelled
+pointers do not change pages or launch an app. Normal taps still launch apps.
+The previous/next buttons and page indicator remain available.
+
+Run gesture regression checks with:
+
+```bash
+bash packages/apps/launcher/tests/run-tests.sh
+```
