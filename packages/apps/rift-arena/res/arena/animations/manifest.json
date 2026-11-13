@@ -1,0 +1,102 @@
+[
+  {
+    "source": "external/extracted/characters/dwarves/animation/Infantry/DWF_infantry_01_idle.FBX",
+    "output": "animations/infantry-idle.fbx",
+    "sha256": "86fe99b49889b9eacf26a37e061ebeefc3117dbe6399c804d16ecea46e0eb8f9"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Infantry/DWF_infantry_03_run.FBX",
+    "output": "animations/infantry-run.fbx",
+    "sha256": "1250aaf6779fa55c05a173b382098ea92ac6e16e0d7ce91b0f1aaf636b9b7fb1"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Infantry/DWF_infantry_07_attack_A.FBX",
+    "output": "animations/infantry-attack.fbx",
+    "sha256": "e79ca9d3ac8c88dd335ec29295b8eddb7a281f256d864a54fa745fa099eebb5a"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Infantry/DWF_infantry_09_take_damage.FBX",
+    "output": "animations/infantry-hurt.fbx",
+    "sha256": "6ee89886977b3c556806dcd94c12518e0b9ba74e446e11dcd80982f34bef5d1f"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Infantry/DWF_infantry_10_death_A.FBX",
+    "output": "animations/infantry-death.fbx",
+    "sha256": "7b8bcde1bad4dfebfdaf0b493c0c57724b1bb074b751bd100188c6bb94e33605"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Infantry/DWF_infantry_04_charge.FBX",
+    "output": "animations/infantry-charge.fbx",
+    "sha256": "817a07e2ad3f24fa49a73d329d6d2c6c0977ffefea10ef47d828df013dea8ba6"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Infantry/DWF_infantry_08_attack_B.FBX",
+    "output": "animations/infantry-attack2.fbx",
+    "sha256": "898136d8d8aa4682a52d355dd55f3318813c400aa821b36b6b2e0dd08f91da7b"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Infantry/DWF_infantry_05_combat_idle.FBX",
+    "output": "animations/infantry-combat-idle.fbx",
+    "sha256": "2e6b4ded6c51584dca0933b85810c7d39ad57fdaccfe9c0ef38e2831b2d89246"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Infantry/DWF_infantry_06_combat_walk.FBX",
+    "output": "animations/infantry-combat-walk.fbx",
+    "sha256": "e59d7e87394551c84557ef4cef8caec7440be17a9751cb554e70291d37f16699"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Archer/DWF_archer_01_idle.FBX",
+    "output": "animations/archer-idle.fbx",
+    "sha256": "de9f3de3db4de53304dddfdadbb8834412e1292352111d496829edfd12762387"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Archer/DWF_archer_03_run.FBX",
+    "output": "animations/archer-run.fbx",
+    "sha256": "20d343c6d0bfee36ecbab7d1234f48147b3cc5111f09d45660e7d19a1fbc0a9b"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Archer/DWF_archer_07_attack.FBX",
+    "output": "animations/archer-attack.fbx",
+    "sha256": "06b28f752ff2919a2a0044cbd4cbc989ab774d38accf62ba5bd91f2fade63893"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Archer/DWF_archer_09_take_damage.FBX",
+    "output": "animations/archer-hurt.fbx",
+    "sha256": "3b47d372356892eb21e56cf51b7cbb01bb9b37a062304b17e30bbeda7a77144e"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Archer/DWF_archer_10_death_A.FBX",
+    "output": "animations/archer-death.fbx",
+    "sha256": "2cb55c444c4b4f506652ce6b0cf7b2b764b606813803cd002dee29e4ae4aa0ea"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Archer/DWF_archer_06_combat_walk.FBX",
+    "output": "animations/archer-retreat.fbx",
+    "sha256": "bf28ced2073bbe470912cae43e49cbef7f1ec12d50e5c245c4d6e52408919472"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Mage/DWF_mage_01_idle.FBX",
+    "output": "animations/mage-idle.fbx",
+    "sha256": "d3573e59e0e7113409946fc71135c191a2f1278adc92ce0053c4a5e38ee72244"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Mage/DWF_mage_03_run.FBX",
+    "output": "animations/mage-run.fbx",
+    "sha256": "d84b38e783b8ea15e70156cd3d98aa179e7620f8e5445114629dcfc1f8467e04"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Mage/DWF_mage_07_attack_A.FBX",
+    "output": "animations/mage-attack.fbx",
+    "sha256": "0a0ee4dd6d377822b61756c24c0386a19baca87229a47b2905a66dd8beae62df"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Mage/DWF_mage_09_take_damage.FBX",
+    "output": "animations/mage-hurt.fbx",
+    "sha256": "aaa868bbd11599ae4601e4fa2854012a3e49fd8e180ab19e8675c26a0347450c"
+  },
+  {
+    "source": "external/extracted/characters/dwarves/animation/Mage/DWF_mage_10_death_A.FBX",
+    "output": "animations/mage-death.fbx",
+    "sha256": "c9b8bd4d718da99af7ed2bb355c5cbedff22f0d000832a583c8fc213f3ab1571"
+  }
+]

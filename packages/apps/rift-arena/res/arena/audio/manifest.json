@@ -1,0 +1,16 @@
+{
+  "origin": "Original procedural composition for Rift Arena; synthesized without external samples.",
+  "bpm": 112,
+  "tracks": [
+    {
+      "file": "menu.wav",
+      "sha256": "b805d4dd9d64e178c3c4092a02ac2268d53ffbea9057909708a3ac9502128c1f",
+      "seconds": 34.285714285714285
+    },
+    {
+      "file": "battle.wav",
+      "sha256": "b50f40dd56f4ccf8c229c2a1aec07ed4139c89fd544c4baacf67d4f28fad5eb9",
+      "seconds": 34.285714285714285
+    }
+  ]
+}

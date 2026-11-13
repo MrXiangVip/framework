@@ -1,0 +1,176 @@
+{
+  "source_package": "POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
+  "assets": [
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Prop_Sword_Stone_01.fbx",
+      "output": "models/swordstone.fbx",
+      "sha256": "c7dd67129c68ff84c55d62874007f4e839f901d9be14e4977436b046b97f1da8"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/FX/FX_Models/FX_Butterfly_Mesh_01.fbx",
+      "output": "models/butterfly.fbx",
+      "sha256": "be0a111698b0c16c7429abe37d2c3524fd3acac15547b9da82d0e61ed19a3915"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Env_Rock_Round_01.fbx",
+      "output": "models/roundrock.fbx",
+      "sha256": "435d82d263c9045e8f826b181cbd72ab83dbe403a56ed1333cd5f8c2c3393563"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Textures/Plants/Branches_01.tga",
+      "output": "textures/Branches_01.png",
+      "sha256": "db23961153a7be2cf844416ec589629d0ffbdea198b7b3f3704aae4c63002a86"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Textures/Plants/Grass_Mid_01.tga",
+      "output": "textures/Grass_Mid_01.png",
+      "sha256": "5746f2e0254440174b1fa6001fbde85683adb54893faa6de7f816091811644d1"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Env_Wildflowers_Patch_01.fbx",
+      "output": "models/flowers.fbx",
+      "sha256": "8995c27059d3316e4475b07d1c92567306ba340546b83edd84d07f8d88f16d13"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Prop_Mushroom_Group_03.fbx",
+      "output": "models/mushrooms.fbx",
+      "sha256": "741c14d9e83da36481001b9ac3dda6456596ad4f6c9da373ff4eb06587777cd7"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Textures/Plants/leafPatch_04.tga",
+      "output": "textures/leafPatch_04.png",
+      "sha256": "e1f9b5e6b93b4030cd4a91a0cfb448f9d7e503d52d4d4a0736c2e09b2fb002e3"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Env_Rock_01.fbx",
+      "output": "models/rock.fbx",
+      "sha256": "a0d4442dcbce89c87d93ecf3eee62e8149fbb8e8ebc7f6244564776614fb83de"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Env_Tree_Birch_01.fbx",
+      "output": "models/birch.fbx",
+      "sha256": "3423534b45d0be5ef5b58ea3015f6beb848ed3ad7612885e6b1f642c6f81e23c"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Env_Grass_Med_Clump_01.fbx",
+      "output": "models/grass.fbx",
+      "sha256": "678a736b90fbe3692905bfbc48a338d19396481853445baa0f085104db27e64c"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Bld_Stone_Cabin_01.fbx",
+      "output": "models/cabin.fbx",
+      "sha256": "3c1a77f93543740e911fa2c37c9020f341050d4bdb339d26bcad0d650061036b"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Textures/PolygonNatureBiomes_Meadow_Texture_01.png",
+      "output": "textures/PolygonNatureBiomes_Meadow_Texture_01.png",
+      "sha256": "0d39f3950838eaec5833f2143ff8284daccc293bf3abc659721affb5d46a0d1a"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Textures/Plants/leafPatch_01.tga",
+      "output": "textures/leafPatch_01.png",
+      "sha256": "e2a8f72b1c3942f7338d2a39afc97ffd0c370d66567bf9beaa087b351f3f3924"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Env_Tree_Meadow_01.fbx",
+      "output": "models/tree.fbx",
+      "sha256": "dc9daf313558bf176427087a413ea5218cd39c75cd54a92569a49563364a3916"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Textures/Plants/leafPatch_02.tga",
+      "output": "textures/leafPatch_02.png",
+      "sha256": "ce12cf6d584fb7a00ab36f0a9e53ee2371b19adc2b8796fe29157245ac0c6f0d"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Textures/Plants/WildFlowers_01.tga",
+      "output": "textures/WildFlowers_01.png",
+      "sha256": "e0382a745ffd8e1ac882a9fea4954aaf26f2768c8a1fd708ce24401fdabb8972"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/FX/FX_Textures/Butterfly_01.png",
+      "output": "textures/butterfly.png",
+      "sha256": "fd100d51ac683e842b973dd78ae6f835c6a1cf12ffebb0453a3b2d1f95cd5fe9"
+    },
+    {
+      "source": "Assets/Toon_RTS/Dwarves/models/Materials/Colors/Textures/DWF_Units_Blue.tga",
+      "output": "textures/DWF_Units_Blue.png",
+      "sha256": "f321f5b781763b7a6b0cafbca6df813c1adc3d3add8d4467d3f11b7124666a7f"
+    },
+    {
+      "source": "Assets/Toon_RTS/Dwarves/models/single_mesh/DWF_SM_Archer_A.FBX",
+      "output": "models/archer.fbx",
+      "sha256": "8fa66a22bdb9ea1947108614ac074d43ac8f013af913862f3e631ace5d65eff5"
+    },
+    {
+      "source": "Assets/Toon_RTS/Dwarves/models/single_mesh/DWF_SM_Priest_A.FBX",
+      "output": "models/mage.fbx",
+      "sha256": "bbbb02e38191261e6e46f28bf66cadd10a4866fe27c64018a0e8e5e883f30dd5"
+    },
+    {
+      "source": "Assets/Toon_RTS/Dwarves/models/single_mesh/DWF_SM_Heavy_Infantry_A.FBX",
+      "output": "models/warrior.fbx",
+      "sha256": "4433b99e2ebb3bf0bcf44592d03a5fd18933e14c3480083b044b8340b01ebf03"
+    },
+    {
+      "source": "Assets/Toon_RTS/Dwarves/models/single_mesh/DWF_SM_Light_Infantry_A.FBX",
+      "output": "models/soldier.fbx",
+      "sha256": "502fef6b6b1d8a5670acc8e1d673f96a61b8ee4f76c5ebafcf379a2910bc83bd"
+    },
+    {
+      "source": "Assets/Toon_RTS/Dwarves/models/Materials/Colors/Textures/DWF_Units_Red.tga",
+      "output": "textures/DWF_Units_Red.png",
+      "sha256": "d05d80e7fd05717130d7eb1e67fce8734e233037a684cae3084a22d679c31a87"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Prop_Stonewall_Pillar_01.fbx",
+      "output": "models/watchpillar.fbx",
+      "sha256": "4be990cb1bdb14b45e14e49824802e93f3158d5a245ecc6b13326f7b7ceec513"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Prop_StoneRunes_01.fbx",
+      "output": "models/runestone.fbx",
+      "sha256": "42939b4d8ab872d7c1d146ed1d0ccca7a73ed58b0e89678ca55ace234971e89f"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Prop_Well_01.fbx",
+      "output": "models/well.fbx",
+      "sha256": "93d2dc9802604c7a88b28fcbddc040d50cbe49d7a1e63bb85888b8f42aacea37"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Prop_Bridge_01.fbx",
+      "output": "models/bridge.fbx",
+      "sha256": "1e8cb8470bddc16b70d6fa2ef19490bff50f4298c5e0fab7e9d0ca153ae302fd"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Env_Rock_Cliff_01.fbx",
+      "output": "models/cliff.fbx",
+      "sha256": "66dc92e57118dfdfbf39c8823f303730d7118b7fff568f8a8651b85be1937dbf"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Env_Rock_Pile_01.fbx",
+      "output": "models/rockpile.fbx",
+      "sha256": "205d93570228618d65d85a27b60f8715dadcf022f0dd0aba6d9238172d96e3fc"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Terrain/Grass_Texture_01.png",
+      "output": "textures/ground-grass.png",
+      "sha256": "9c0dae75ed39f27c00ae169fc138fcb6b436feda5382545e758d70cd642be6dc"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Terrain/Dirt_Texture_01.png",
+      "output": "textures/ground-dirt.png",
+      "sha256": "a68b1b8f4a05b4f733af603a5298d3e97da889ab543d1a33b599998930251dd0"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Terrain/Footpath_Tiles_Texture_01.png",
+      "output": "textures/ground-stone.png",
+      "sha256": "6cab283be9f10ab7fce118600c08c672f9218adbc526cc7d3b94798ee3b88bbb"
+    },
+    {
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Terrain/Gravel_Texture_01.png",
+      "output": "textures/ground-gravel.png",
+      "sha256": "2456bdd043dc4e384de30ccf917b305a417d573e59bc4544bea2ece9b6117ae3"
+    }
+  ],
+  "character_source_package": "Toon RTS Units - Dwarves 1.0.unitypackage"
+}

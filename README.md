@@ -40,6 +40,9 @@ xshx@xshx:~/IdeaProjects/framework$ ./build.sh
 
 Browser: [build and usage](packages/apps/browser/README.md)
 
+星隙竞技场：[基于当前 Java / OpenGL 框架的 3D 单路 MOBA 与运行方法](packages/apps/rift-arena/README.md)。从 Launcher 直接进入游戏，无需 Unity。
+由 Launcher 启动独立 Linux Unity Player；需要先安装 Unity 编辑器并导出游戏。
+
 ![browser-preview.png](out/browser-preview.png)
 
 窗口大小：应用可以通过 `WindowManager.LayoutParams` 提交客户端尺寸（像素）：
@@ -67,3 +70,5 @@ wm.updateViewLayout(decor, params);
 javac -cp "$FRAMEWORK_CLASSES" -d /tmp/window-tests tests/com/android/wm/WindowSizeTest.java
 java -cp "$FRAMEWORK_CLASSES:/tmp/window-tests" com.android.wm.WindowSizeTest
 ```
+
+游戏原始 Unity 资源包和完整导出库统一放在根目录 `external/`，目录约定、导入命令与现有素材清单见 [external/README.md](external/README.md)。

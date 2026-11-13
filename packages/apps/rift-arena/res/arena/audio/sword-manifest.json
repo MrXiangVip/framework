@@ -1,0 +1,65 @@
+{
+  "origin": "Original synthesized effects for Rift Arena; no external audio samples.",
+  "effects": [
+    {
+      "file": "scatter-release.wav",
+      "seconds": 0.2,
+      "sha256": "6b147cb55ff04d5a55ac8d05d098ea52c85b99ca990e315f32e7e2e5088647fc"
+    },
+    {
+      "file": "bow-release.wav",
+      "seconds": 0.18,
+      "sha256": "471f57a95e5567660b6b8e51f2234c0ef03d8861bc24c96147d4b881e9c1523a"
+    },
+    {
+      "file": "arrow-hit.wav",
+      "seconds": 0.18,
+      "sha256": "309aaf3c25baa1162eb67197a5fb612019ca5a2bac18cd678506d7c035d2fca6"
+    },
+    {
+      "file": "sword-swing.wav",
+      "seconds": 0.18,
+      "sha256": "84d11144587e4ef9ba724e7232d3fa2b18bd34ff1acfc650a7195fcfb9c136c1"
+    },
+    {
+      "file": "sword-hit.wav",
+      "seconds": 0.2,
+      "sha256": "cfd2e9191af72b09948b5885a9637a18ce11dde0a980056e330755a8724735a6"
+    },
+    {
+      "file": "stone-hit.wav",
+      "seconds": 0.16,
+      "sha256": "ba902c0f1993647a1c1adac77022319b7c60051dee32640797b6c50fa8196807"
+    },
+    {
+      "file": "kill-hit.wav",
+      "seconds": 0.28,
+      "sha256": "f97831cfefd556c23fc8a6a0213c6d5ced614b9758cbc621b8bea0c869eed719"
+    },
+    {
+      "file": "slam-charge.wav",
+      "seconds": 0.23,
+      "sha256": "edb6bb0e50a651a1ce45e08a690692ef90379d28d189c93a4aa283bc82fa95e0"
+    },
+    {
+      "file": "slam-impact.wav",
+      "seconds": 0.38,
+      "sha256": "13da4ede34d83834fe71d07f233790baaa8e2ac9c8f7543cc1bd04e0fd8c9a10"
+    },
+    {
+      "file": "dash-whoosh.wav",
+      "seconds": 0.23,
+      "sha256": "88d4a284884d118e9333a7cec325508ac1eb663daa93102178d82d70d84800b1"
+    },
+    {
+      "file": "meteor-charge.wav",
+      "seconds": 0.24,
+      "sha256": "cdfc6d2ea6335de72201ab70dd47c7f076d2c603644764e51d5114acbd4b1b9c"
+    },
+    {
+      "file": "meteor-impact.wav",
+      "seconds": 0.55,
+      "sha256": "f9e8bd09d8b74f437cc015a24d81c630eb31a37ec2d87b38215bf0abef65acd2"
+    }
+  ]
+}

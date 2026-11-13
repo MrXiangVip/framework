@@ -1,4 +1,8 @@
-./out
 out/
+external/
 *.class
 .idea
+
+# Local licensed source packages and extracted libraries
+/external/unity/
+/external/extracted/
