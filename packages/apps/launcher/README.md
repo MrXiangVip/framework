@@ -29,7 +29,10 @@ application build scripts only build the package.
 The desktop supports horizontal swipes (or left-button mouse drags) across icons
 and empty grid space to change pages. Each page holds nine apps. Drag at least
 one sixth of the window width (minimum 48 pixels), then release to change one
-page. Short drags return to the current page; vertical drags and cancelled
+page. A quick horizontal flick of at least 40 pixels can also turn a page.
+Adjacent pages move together and remain visible throughout the drag. Releasing
+animates the track into place over 200 ms; short drags spring back. Page grids
+and icons are loaded once, and only visible pages are drawn. Vertical drags and cancelled
 pointers do not change pages or launch an app. Normal taps still launch apps.
 The previous/next buttons and page indicator remain available.
 
