@@ -8,6 +8,28 @@ import java.util.concurrent.atomic.*;
 public final class ArenaOptimizationTest {
     static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
     public static void main(String[] args)throws Exception{
+        ArenaInput input=new ArenaInput();input.add(com.android.view.KeyEvent.RIGHT);check(ArenaInput.x(input.snapshot())==1,"Initial direction is held");
+        input.add(com.android.view.KeyEvent.LEFT);check(ArenaInput.x(input.snapshot())==-1,"New opposite direction wins without releasing the old key");
+        for(int i=0;i<100;i++)input.add(com.android.view.KeyEvent.RIGHT);
+        check(ArenaInput.x(input.snapshot())==-1,"Old key repeats cannot steal direction priority");
+        input.add('w');check(ArenaInput.x(input.snapshot())==-1&&ArenaInput.z(input.snapshot())==-1,"Per-axis direction priority preserves diagonals");
+        input.remove(com.android.view.KeyEvent.LEFT);check(ArenaInput.x(input.snapshot())==1,"Releasing latest direction resumes the still-held key");
+        input.add('a');check(ArenaInput.x(input.snapshot())==-1,"WASD and arrow aliases share priority");
+        input.add(32);check((input.snapshot()&16)!=0,"Continuous attack shares coherent input snapshot");
+        input.clear();check(ArenaInput.x(input.snapshot())==0&&ArenaInput.z(input.snapshot())==0&&(input.snapshot()&16)==0,"Focus loss clears all input");
+        ArenaWorld smooth=ArenaSwordTest.fresh();ArenaClock smoothClock=new ArenaClock();ArenaPresentation presentation=new ArenaPresentation();
+        double wall=0;
+        for(double delta:new double[]{.017,.015,.019,.014,.018,.016,.021}){
+            wall+=delta;smoothClock.advance(delta,true,()->{presentation.capture(smooth);smooth.update(ArenaClock.STEP,1,0,false);});
+            double simulationX=smooth.player.x,simulationTravel=smooth.player.travel;
+            presentation.apply(smooth,smoothClock.alpha());
+            try{check(Math.abs(smooth.player.x-smooth.player.speed*(wall-ArenaClock.STEP))<1e-8,"Walking position follows presentation time despite uneven render intervals");check(Math.abs(smooth.player.travel-smooth.player.x)<1e-8,"Stride and position interpolate together");}
+            finally{presentation.restore();}
+            check(smooth.player.x==simulationX&&smooth.player.travel==simulationTravel,"Presentation restores exact authoritative movement");
+        }
+        double simulatedX=smooth.player.x;smooth.screen=ArenaWorld.Screen.PAUSED;presentation.apply(smooth,.1);check(smooth.player.x==simulatedX,"Pause presents exact frozen position");presentation.restore();
+        smooth.screen=ArenaWorld.Screen.PLAYING;presentation.capture(smooth);smooth.update(ArenaClock.STEP,0,0,false);smooth.player.x=30;presentation.apply(smooth,.2);check(smooth.player.x==30,"Teleports do not slide");presentation.restore();
+        smooth.reset(0);simulatedX=smooth.player.x;presentation.apply(smooth,.2);check(smooth.player.x==simulatedX,"Restart discards old presentation history");presentation.restore();
         ArenaFramePool pool=new ArenaFramePool(64,64);BufferedImage first=pool.beginWrite();pool.publish(first);pool.retain(first);BufferedImage second=pool.beginWrite();check(second!=first,"Cannot overwrite reader");pool.publish(second);pool.retain(second);BufferedImage third=pool.beginWrite();pool.publish(third);check(pool.beginWrite()==null,"Backpressure instead of overwrite/allocation");pool.release(first);check(pool.beginWrite()==first,"Released slot recycled");pool.publish(first);pool.release(second);
         AtomicReference<BufferedImage> current=new AtomicReference<>();AtomicReference<Throwable> failure=new AtomicReference<>();AtomicBoolean done=new AtomicBoolean();Set<BufferedImage> allocated=Collections.newSetFromMap(new IdentityHashMap<BufferedImage,Boolean>());
         Thread producer=new Thread(()->{try{for(int n=1;n<=1000;n++){BufferedImage target;while((target=pool.beginWrite())==null)Thread.yield();allocated.add(target);Arrays.fill(((DataBufferInt)target.getRaster().getDataBuffer()).getData(),n);synchronized(pool){pool.publish(target);current.set(target);}Thread.yield();}}catch(Throwable e){failure.set(e);}finally{done.set(true);}});

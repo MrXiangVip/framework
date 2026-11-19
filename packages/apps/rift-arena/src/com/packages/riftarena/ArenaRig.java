@@ -50,6 +50,7 @@ final class ArenaRig {
     }
     final List<Node> nodes=new ArrayList<>();final List<Mesh> meshes=new ArrayList<>();
     final Map<String,Integer> nodeIds=new HashMap<>();final Map<String,Clip> clips=new HashMap<>();
+    private final Map<String,Double> strides=new HashMap<>();
     double minX=Double.POSITIVE_INFINITY,minY=minX,minZ=minX,maxX=-minX,maxY=-minX,maxZ=-minX;
     int boneCount;
     double[][] weaponPath,weaponPath2;
@@ -74,6 +75,7 @@ final class ArenaRig {
             for(String action:new String[]{"combat-idle","combat-walk"})try(Scene source=open(assets,"animations/infantry-"+action+".fbx")){rig.readClip(source.scene,action);}
             rig.weaponPath=rig.prepareWeaponTrail("attack");rig.weaponPath2=rig.prepareWeaponTrail("attack2");
         }
+        rig.measureStride("run");if(rig.clips.containsKey("combat-walk"))rig.measureStride("combat-walk");
         return rig;
     }
     private static int component(int[] parents,int vertex){
@@ -205,6 +207,26 @@ final class ArenaRig {
         clips.put(action,new Clip(animation.mDuration()/ticks,channels));
     }
     double[][] bindPose(){double[][] pose=new double[nodes.size()][];for(int i=0;i<pose.length;i++)pose[i]=nodes.get(i).bind.clone();return pose;}
+    /** World distance per cycle, measured from the backward motion of planted feet. */
+    double stride(String action,double displayHeight){return strides.getOrDefault(action,1.25)*displayHeight;}
+    private void measureStride(String action){
+        Integer left=nodeIds.get("Bip001 L Foot"),right=nodeIds.get("Bip001 R Foot");
+        if(left==null||right==null)return;
+        final int count=120;int[] feet={left,right};double[][] ys=new double[2][count+1],zs=new double[2][count+1];
+        double[][] pose=bindPose(),global=new double[nodes.size()][16];double[] local=new double[16];
+        for(int i=0;i<=count;i++){
+            sample(action,clips.get(action).duration*i/count,false,pose);globals(pose,global,local);
+            for(int foot=0;foot<2;foot++){ys[foot][i]=global[feet[foot]][7];zs[foot][i]=global[feet[foot]][11];}
+        }
+        double[] slopes=new double[count*2];int used=0;
+        for(int foot=0;foot<2;foot++){
+            double low=Double.POSITIVE_INFINITY,high=Double.NEGATIVE_INFINITY;
+            for(double y:ys[foot]){low=Math.min(low,y);high=Math.max(high,y);}
+            double contact=low+(high-low)*.25;
+            for(int i=1;i<=count;i++)if(ys[foot][i-1]<=contact&&ys[foot][i]<=contact&&zs[foot][i]<zs[foot][i-1])slopes[used++]=(zs[foot][i-1]-zs[foot][i])*count;
+        }
+        if(used>0){Arrays.sort(slopes,0,used);strides.put(action,slopes[used/2]/height());}
+    }
     void sample(String action,double seconds,boolean loop,double[][] pose){
         Clip clip=clips.get(action);double time=loop?((seconds%clip.duration)+clip.duration)%clip.duration:ArenaWorld.clamp(seconds,0,clip.duration);
         for(int i=0;i<nodes.size();i++){

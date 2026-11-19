@@ -15,6 +15,7 @@ final class ArenaAnimator {
     final List<ArenaRig.Skinning> skinning=new ArrayList<>();
     String action="";
     double renderFacing, facingTime=Double.NaN;
+    double gaitCycles;
     double started,blendStarted,lastTime=Double.NaN,lastTravel,lastAttack=-1,lastHit=-1,lastSlam=-1,lastDash=-1,lastMeteor=-1;
     ArenaAnimator(ArenaRig rig){
         this.rig=rig;globals=new double[rig.nodes.size()][16];pose=rig.bindPose();previous=rig.bindPose();brake=rig.bindPose();
@@ -29,9 +30,10 @@ final class ArenaAnimator {
         else {double delta=((targetFacing-renderFacing)%360+540)%360-180;renderFacing+=ArenaWorld.clamp(delta,-1800*turnDt,1800*turnDt);}
         facingTime=now;
         double wallNow=now;now-=unit.hitPauseTotal;
-        if(now==lastTime&&unit.hitSerial==lastHit&&unit.attackSerial==lastAttack&&unit.slamSerial==lastSlam&&unit.dashSerial==lastDash&&unit.meteorSerial==lastMeteor&&unit.alive())return;
+        if(now==lastTime&&unit.travel==lastTravel&&unit.hitSerial==lastHit&&unit.attackSerial==lastAttack&&unit.slamSerial==lastSlam&&unit.dashSerial==lastDash&&unit.meteorSerial==lastMeteor&&unit.alive())return;
         boolean combat=unit.combatTime>0&&rig.clips.containsKey("combat-idle");
-        String next=!unit.alive()?"death":unit.dashTime>0?"charge":unit.meteorTime>0?"meteor":unit.slamTime>0?"slam":unit.attackTime>0?"attack":(unit.hurtTime>0||unit.hitFlash>0)&&!(unit.player&&moved)?"hurt":moved?(combat?"combat-walk":"run"):(combat?"combat-idle":"idle");
+        // A guarded shuffle is suitable for slow movement, not an eight-unit/second run.
+        String next=!unit.alive()?"death":unit.dashTime>0?"charge":unit.meteorTime>0?"meteor":unit.slamTime>0?"slam":unit.attackTime>0?"attack":(unit.hurtTime>0||unit.hitFlash>0)&&!(unit.player&&moved)?"hurt":moved?(combat&&unit.speed<=4?"combat-walk":"run"):(combat?"combat-idle":"idle");
         boolean restart=(next.equals("meteor")&&unit.meteorSerial!=lastMeteor)||(next.equals("charge")&&unit.dashSerial!=lastDash)||(next.equals("slam")&&unit.slamSerial!=lastSlam)||(next.equals("attack")&&unit.attackSerial!=lastAttack)||(next.equals("hurt")&&unit.hitSerial!=lastHit);
         if(!next.equals(action)||restart||now<lastTime){
             for(int i=0;i<pose.length;i++)System.arraycopy(pose[i],0,previous[i],0,10);
@@ -44,7 +46,10 @@ final class ArenaAnimator {
         else if(action.equals("meteor"))clipTime=ArenaWorld.meteorPosePhase(unit)*clip.duration;
         else if(action.equals("slam"))clipTime=ArenaWorld.slamPosePhase(ArenaWorld.slamAge(unit))*clip.duration;
         else if(action.equals("attack"))clipTime=(1-unit.attackTime/ArenaWorld.attackDuration(unit))*clip.duration;
-        else if(action.equals("run")||action.equals("combat-walk"))clipTime=unit.travel/(action.equals("run")?5:2.5)*clip.duration;
+        else if(action.equals("run")||action.equals("combat-walk")){
+            gaitCycles=(gaitCycles+Math.max(0,unit.travel-lastTravel)/rig.stride(action,unit.kind==ArenaWorld.Kind.HERO?4:2.3))%1;
+            clipTime=gaitCycles*clip.duration;
+        }
         else if(action.equals("hurt"))clipTime=(unit.hurtTime>0?(.12+.88*(1-unit.hurtTime/ArenaWorld.HURT_SECONDS)):(1-unit.hitFlash/.18))*clip.duration;
         else if(action.equals("death")&&unit.deathAt>=0)clipTime=wallNow-unit.deathAt;
         else clipTime=now-started;

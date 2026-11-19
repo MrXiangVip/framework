@@ -6,9 +6,30 @@ import java.io.*;
 
 /** Actual OpenGL snapshots of the four imported skinned characters, not synthetic test geometry. */
 public final class ArenaAnimationRenderTest {
+    static void walkingGif(ArenaRenderer renderer)throws Exception{
+        ArenaWorld walk=ArenaSwordTest.fresh();walk.units.remove(1);walk.player.x=-10;walk.player.combatTime=3;
+        javax.imageio.ImageWriter writer=ImageIO.getImageWritersByFormatName("gif").next();
+        try(javax.imageio.stream.ImageOutputStream output=ImageIO.createImageOutputStream(new File("out/rift-arena-tests/walking-warrior.gif"))){
+            writer.setOutput(output);writer.prepareWriteSequence(null);
+            for(int i=0;i<80;i++){
+                walk.update(.02,1,0,false);BufferedImage scene=renderer.render(walk);
+                BufferedImage closeup=new BufferedImage(600,380,BufferedImage.TYPE_INT_RGB);Graphics2D g=closeup.createGraphics();
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g.drawImage(scene,0,0,600,380,300,180,600,370,null);g.dispose();
+                javax.imageio.metadata.IIOMetadata metadata=writer.getDefaultImageMetadata(new javax.imageio.ImageTypeSpecifier(closeup),null);
+                String format=metadata.getNativeMetadataFormatName();javax.imageio.metadata.IIOMetadataNode root=(javax.imageio.metadata.IIOMetadataNode)metadata.getAsTree(format);
+                javax.imageio.metadata.IIOMetadataNode control=(javax.imageio.metadata.IIOMetadataNode)root.getElementsByTagName("GraphicControlExtension").item(0);
+                control.setAttribute("delayTime","2");control.setAttribute("disposalMethod","none");
+                if(i==0){javax.imageio.metadata.IIOMetadataNode extensions=new javax.imageio.metadata.IIOMetadataNode("ApplicationExtensions"),loop=new javax.imageio.metadata.IIOMetadataNode("ApplicationExtension");loop.setAttribute("applicationID","NETSCAPE");loop.setAttribute("authenticationCode","2.0");loop.setUserObject(new byte[]{1,0,0});extensions.appendChild(loop);root.appendChild(extensions);}
+                metadata.setFromTree(format,root);writer.writeToSequence(new javax.imageio.IIOImage(closeup,null,metadata),null);
+            }
+            writer.endWriteSequence();
+        }finally{writer.dispose();}
+    }
     public static void main(String[] args)throws Exception{
         ArenaRenderer renderer=new ArenaRenderer();renderer.open(ArenaAnimationRenderTest.class.getClassLoader(),900,600);
         try{
+            walkingGif(renderer);
             ArenaWorld bow=ArenaSwordTest.fresh();bow.configure(bow.player,1);ArenaSwordTest.dummy(bow).x=7;
             renderer.render(bow);ArenaSwordTest.begin(bow);
             BufferedImage bowSheet=new BufferedImage(1080,480,BufferedImage.TYPE_INT_RGB);Graphics2D bg=bowSheet.createGraphics();

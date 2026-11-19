@@ -12,4 +12,5 @@ final class ArenaClock {
         double available=Math.max(0,elapsed);droppedSeconds+=Math.max(0,available-.2);accumulated+=Math.min(.2,available);
         int count=0;while(accumulated+1e-12>=STEP&&count<24){step.run();accumulated-=STEP;count++;}return count;
     }
+    double alpha(){return Math.max(0,Math.min(1,accumulated/STEP));}
 }

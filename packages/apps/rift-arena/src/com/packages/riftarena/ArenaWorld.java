@@ -404,7 +404,10 @@ final class ArenaWorld {
                 &&swordStrikes.stream().noneMatch(strike->strike.attacker==u&&strike.serial==u.attackSerial);
             if((newIntent||swordRecovery)&&u.attackTime>0){u.attackTime=0;u.attackSerial++;shots.removeIf(shot->shot.source==u&&shot.melee);}
         }
-        double step=Math.min(d,u.speed*dt);u.travel+=step;u.lastMovedAt=elapsed;u.x=clamp(u.x+dx/d*step,-LIMIT_X,LIMIT_X);u.z=clamp(u.z+dz/d*step,-LIMIT_Z,LIMIT_Z);u.facing=Math.toDegrees(Math.atan2(dx,dz));}
+        double step=Math.min(d,u.speed*dt),oldX=u.x,oldZ=u.z;
+        u.x=clamp(u.x+dx/d*step,-LIMIT_X,LIMIT_X);u.z=clamp(u.z+dz/d*step,-LIMIT_Z,LIMIT_Z);
+        double traveled=Math.hypot(u.x-oldX,u.z-oldZ);u.travel+=traveled;if(traveled>1e-10)u.lastMovedAt=elapsed;
+        u.facing=Math.toDegrees(Math.atan2(dx,dz));}
     void strike(Unit u,Unit target){if(u.cooldown>0||u.slamTime>0||u.meteorTime>0||!u.alive()||!target.alive())return;u.cooldown=u.kind==Kind.TOWER?1:0.72;u.facing=Math.toDegrees(Math.atan2(target.x-u.x,target.z-u.z));attackShot(u,target,target.x,target.z);if(swordsman(u))swordStrikes.add(new SwordStrike(u,target));else if(!archer(u))damage(target,u.attack,u.team,u);if(u.player)recall=0;}
     void damage(Unit u,double amount,int team){damage(u,amount,team,null);}
     void damage(Unit u,double amount,int team,Unit source){

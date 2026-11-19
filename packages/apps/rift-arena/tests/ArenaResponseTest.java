@@ -38,6 +38,11 @@ public final class ArenaResponseTest {
         for(int i=0;i<34;i++)w.update(.01,1,0,false);
         check(w.player.slamLanded&&w.player.x>startX&&w.player.slamTime==0,"Held movement resumes immediately after slam contact");
         w.update(.01,0,1,false);check(w.player.slamTime==0,"Fresh direction can cancel planted recovery immediately");
+        w=ArenaSwordTest.fresh();w.player.x=ArenaWorld.LIMIT_X;double edgeTravel=w.player.travel;
+        for(int i=0;i<120;i++)w.update(1.0/120,1,0,false);
+        check(w.player.travel==edgeTravel&&w.elapsed-w.player.lastMovedAt>.9,"Blocked movement cannot advance walking cycles");
+        double edgeZ=w.player.z;w.update(.01,1,1,false);
+        check(Math.abs(w.player.travel-Math.abs(w.player.z-edgeZ))<1e-8,"At an edge, stride follows actual displacement instead of requested diagonal movement");
         w=ArenaSwordTest.fresh();w.requestAttack();w.update(.01,0,0,false);
         check(w.player.combatTime>2,"Attack enters combat stance");
         double combat=w.player.combatTime;w.pause();w.update(.2,0,0,false);

@@ -75,7 +75,7 @@ public final class XWindow implements AutoCloseable {
         events.scheduleWithFixedDelay(() -> {
             int[] batch = poll();
             if (batch != null && batch.length != 0) ui.sendMessage(ui.obtainMessage(0, batch));
-        }, 0, 25, TimeUnit.MILLISECONDS);
+        }, 0, 8, TimeUnit.MILLISECONDS);
     }
 
 

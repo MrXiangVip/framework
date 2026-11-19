@@ -3,6 +3,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
+#include <X11/XKBlib.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -81,6 +82,10 @@ JNIEXPORT jlong JNICALL Java_com_android_wm_XWindow_nativeOpen
     if (!s) { fail(env, "Cannot allocate X11 surface"); return 0; }
     s->display = XOpenDisplay(NULL);
     if (!s->display) { free(s); fail(env, "Cannot open X11 display; check DISPLAY"); return 0; }
+    /* Per-client mode: repeat sends presses only, never a synthetic release that
+     * can split across poll batches and briefly clear a game's held-key state. */
+    Bool detectable_repeat = False;
+    XkbSetDetectableAutoRepeat(s->display, True, &detectable_repeat);
     s->text_capacity = 4096;
     s->text = malloc((size_t)s->text_capacity);
     if (!s->text) { XCloseDisplay(s->display); free(s); fail(env, "Cannot allocate input buffer"); return 0; }

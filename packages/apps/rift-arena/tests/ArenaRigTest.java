@@ -40,6 +40,13 @@ public final class ArenaRigTest {
         ArenaAssets assets=new ArenaAssets(ArenaRigTest.class.getClassLoader());
         for(String name:new String[]{"warrior","archer","mage","soldier"}){
             ArenaRig rig=ArenaRig.load(assets,name);check(rig.boneCount>=17&&rig.clips.size()==(name.equals("warrior")?9:name.equals("archer")?6:5),"Complete skeleton and clips: "+name);
+            double displayHeight=name.equals("soldier")?2.3:4;
+            double stride=rig.stride("run",displayHeight);check(stride>displayHeight*.8&&stride<displayHeight*1.5,"Run stride scales to actual character height");
+            double[][] planted=rig.bindPose();double duration=rig.clips.get("run").duration;
+            rig.sample("run",duration*.21,false,planted);double footBefore=rig.globals(planted)[rig.nodeIds.get("Bip001 L Foot")][11];
+            rig.sample("run",duration*.29,false,planted);double footAfter=rig.globals(planted)[rig.nodeIds.get("Bip001 L Foot")][11];
+            double groundSlip=stride*.08+(footAfter-footBefore)*displayHeight/rig.height();
+            check(Math.abs(groundSlip)<displayHeight*.035,"Planted foot stays near its ground contact while the body advances: "+name);
             List<String> actual=new ArrayList<>();double[][] bind=rig.globals(rig.bindPose());
             for(ArenaRig.Mesh mesh:rig.meshes){float[] out=new float[mesh.vertices.length];rig.skin(mesh,bind,out);for(int index:mesh.indices)actual.add(key(out[index*8],out[index*8+1],out[index*8+2]));for(float[] weights:mesh.weights){double sum=0;for(float w:weights)sum+=w;check(weights.length==0||Math.abs(sum-1)<.0001,"Normalized skin weights");}}
             Collections.sort(actual);List<String> expected=positions(assets.load(name));
@@ -84,6 +91,10 @@ public final class ArenaRigTest {
             }
             ArenaAnimator animator=new ArenaAnimator(rig);ArenaWorld w=new ArenaWorld();w.reset(0);ArenaWorld.Unit u=w.player;
             animator.update(u,0);u.travel=1;u.lastMovedAt=.2;animator.update(u,.2);check(animator.action.equals("run"),"Run state");
+            u.lastMovedAt=.24;u.travel=1.1;animator.update(u,.24);float[] firstStride=animator.vertices.get(0).clone();
+            u.travel=1.2;animator.update(u,.24);double strideChange=0;
+            for(int i=0;i<firstStride.length;i+=8)for(int axis=0;axis<3;axis++)strideChange+=Math.abs(firstStride[i+axis]-animator.vertices.get(0)[i+axis]);
+            check(strideChange/rig.height()>.001,"Interpolated walking pose advances between fixed simulation ticks");
             u.attackTime=.3;u.attackSerial++;animator.update(u,.3);check(animator.action.equals("attack"),"Attack overrides run");
             u.hp=0;animator.update(u,.4);check(animator.action.equals("death"),"Death interrupts attack");
             u.hp=u.maxHp;u.attackTime=0;u.hitFlash=0;animator.update(u,.6);check(animator.action.equals("idle"),"Respawn leaves death pose");
@@ -115,11 +126,12 @@ public final class ArenaRigTest {
                 u.lastMovedAt=-100;u.facing=170;animator.update(u,3);
                 check(animator.action.equals("combat-idle"),"Recovery returns to combat idle");
                 u.facing=-170;u.lastMovedAt=3.005;u.travel+=.04;animator.update(u,3.005);
-                check(animator.action.equals("combat-walk"),"Movement selects actual combat walk clip");
+                check(animator.action.equals("run"),"Full-speed combat movement uses run instead of a sped-up shuffle");
                 check(animator.renderFacing==-170,"Player walking turns immediately across wrap");
-                u.hitFlash=.15;u.lastMovedAt=3.015;animator.update(u,3.015);check(animator.action.equals("combat-walk"),"Hit flash does not override player locomotion");u.hitFlash=0;
+                u.hitFlash=.15;u.lastMovedAt=3.015;animator.update(u,3.015);check(animator.action.equals("run"),"Hit flash does not override player locomotion");u.hitFlash=0;
                 u.lastMovedAt=3.025;animator.update(u,3.025);
                 check(Math.abs(animator.renderFacing+170)<.001,"Visual turn settles without delaying movement");
+                u.speed=3;u.lastMovedAt=3.026;u.travel+=.003;animator.update(u,3.026);check(animator.action.equals("combat-walk"),"Slow combat movement retains guarded walk");u.speed=8;
                 u.attackTime=.4;u.attackSerial++;u.attackFacing=40;animator.update(u,3.03);
                 check(animator.action.equals("attack")&&animator.renderFacing==40,"Attack immediately locks exact hit direction");
                 u.attackTime=0;u.lastMovedAt=-100;animator.update(u,3.04);

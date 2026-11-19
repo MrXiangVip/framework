@@ -16,7 +16,7 @@ import java.util.concurrent.locks.LockSupport;
 public final class ArenaView extends View implements AutoCloseable {
     private final ArenaWorld world=new ArenaWorld();
     private final ArenaMusic music=new ArenaMusic(ArenaView.class.getClassLoader());
-    private final Set<Integer> keys=ConcurrentHashMap.newKeySet();
+    private final ArenaInput keys=new ArenaInput();
     private final ConcurrentLinkedQueue<Runnable> commands=new ConcurrentLinkedQueue<>();
     private final AtomicBoolean pending=new AtomicBoolean();
     private volatile boolean closed;
@@ -61,14 +61,14 @@ public final class ArenaView extends View implements AutoCloseable {
         worker=new Thread(()->{
             ArenaRenderer renderer=new ArenaRenderer();
             try{
-                renderer.open(ArenaView.class.getClassLoader(),900,600);long last=System.nanoTime(),nextRender=last;ArenaClock clock=new ArenaClock();boolean wasCharging=false,wasMeteorCharging=false;
+                renderer.open(ArenaView.class.getClassLoader(),900,600);long last=System.nanoTime(),nextRender=last;ArenaClock clock=new ArenaClock();ArenaPresentation presentation=new ArenaPresentation();boolean wasCharging=false,wasMeteorCharging=false;
                 while(!closed){long begin=System.nanoTime();double dt=(begin-last)/1e9;last=begin;
                     applyAim();
                     long input=inputAt.getAndSet(0);if(input!=0)metrics.record(4,begin-input);
                     Runnable r;while((r=commands.poll())!=null)r.run();
                     applyAim();
                     long simulationBegin=System.nanoTime();
-                    clock.advance(dt,world.screen==ArenaWorld.Screen.PLAYING,()->world.update(ArenaClock.STEP,(key('d')||keys.contains(KeyEvent.RIGHT)?1:0)-(key('a')||keys.contains(KeyEvent.LEFT)?1:0),(key('s')||keys.contains(KeyEvent.ARROW_DOWN)?1:0)-(key('w')||keys.contains(KeyEvent.ARROW_UP)?1:0),keys.contains(32)));
+                    clock.advance(dt,world.screen==ArenaWorld.Screen.PLAYING,()->{int state=keys.snapshot();presentation.capture(world);world.update(ArenaClock.STEP,ArenaInput.x(state),ArenaInput.z(state),(state&16)!=0);});
                     metrics.record(0,System.nanoTime()-simulationBegin);
                     music.update(world.screen);
                     boolean charging=world.screen==ArenaWorld.Screen.PLAYING&&world.player.slamTime>0&&!world.player.slamLanded;
@@ -80,8 +80,10 @@ public final class ArenaView extends View implements AutoCloseable {
                     if(wasMeteorCharging&&!meteorCharging)music.stopEffect("meteor-charge");wasMeteorCharging=meteorCharging;
                     if(begin>=nextRender||frame==null||frame.screen!=world.screen){
                         BufferedImage target=frames.beginWrite();
-                        if(target!=null){long renderBegin=System.nanoTime();renderer.render(world,target);metrics.record(1,System.nanoTime()-renderBegin);
-                            Frame next=new Frame(target,world,renderer);
+                        if(target!=null){long renderBegin=System.nanoTime();Frame next;
+                            presentation.apply(world,clock.alpha());
+                            try{renderer.render(world,target);next=new Frame(target,world,renderer);}finally{presentation.restore();}
+                            metrics.record(1,System.nanoTime()-renderBegin);
                             synchronized(frames){frames.publish(target);frame=next;}
                             if(pending.compareAndSet(false,true))ui.sendMessage(ui.obtainMessage(0,null));
                         }
@@ -98,7 +100,6 @@ public final class ArenaView extends View implements AutoCloseable {
         },"rift-arena-render");worker.setDaemon(true);worker.start();
     }
     private void wakeRenderer(){inputAt.compareAndSet(0,System.nanoTime());Thread active=worker;if(active!=null)LockSupport.unpark(active);}
-    private boolean key(char c){return keys.contains((int)c);}
     public void pause(){keys.clear();music.update(ArenaWorld.Screen.PAUSED);commands.add(world::pause);wakeRenderer();}
     @Override protected void onFocusChanged(boolean focused){if(!focused)pause();}
     @Override public void close(){music.close();closed=true;keys.clear();commands.clear();if(worker!=null)worker.interrupt();}
