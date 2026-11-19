@@ -14,6 +14,7 @@ typedef struct {
     Display *display;
     Window window;
     GC gc;
+    XImage *frame_image;
     Atom delete_window, wm_state, net_wm_state, net_wm_hidden;
     int minimized;
     XIM input_method;
@@ -277,24 +278,38 @@ static unsigned long component(unsigned int value, unsigned long mask) {
     return (((unsigned long)value * mask / 255) << shift);
 }
 
+/* Keep the previous buffer if allocating its replacement fails. */
+static XImage *ensure_frame_image(JNIEnv *env, XSurface *s, int width, int height) {
+    if (s->frame_image && s->frame_image->width == width && s->frame_image->height == height)
+        return s->frame_image;
+    int screen = DefaultScreen(s->display);
+    XImage *image = XCreateImage(s->display, DefaultVisual(s->display, screen),
+        (unsigned)DefaultDepth(s->display, screen), ZPixmap, 0, NULL,
+        (unsigned)width, (unsigned)height, 32, 0);
+    if (!image) { fail(env, "XCreateImage failed"); return NULL; }
+    if (image->bytes_per_line <= 0 || (size_t)height > SIZE_MAX / (size_t)image->bytes_per_line) {
+        XDestroyImage(image); fail(env, "Invalid X11 image size"); return NULL;
+    }
+    image->data = calloc((size_t)image->bytes_per_line, (size_t)height);
+    if (!image->data) { XDestroyImage(image); fail(env, "Cannot allocate X11 image"); return NULL; }
+    if (s->frame_image) XDestroyImage(s->frame_image);
+    s->frame_image = image;
+    return image;
+}
+
 JNIEXPORT void JNICALL Java_com_android_wm_XWindow_nativePresent
   (JNIEnv *env, jclass type, jlong handle, jintArray pixels, jint width, jint height) {
     (void)type;
     XSurface *s = (XSurface *)(intptr_t)handle;
     if (s->closing || s->destroyed) return;
-    if (width <= 0 || height <= 0 || width > INT_MAX / height
+    if (!pixels || width <= 0 || height <= 0 || width > INT_MAX / height
             || (*env)->GetArrayLength(env, pixels) < width * height) {
         fail(env, "Invalid X11 frame buffer"); return;
     }
-    int screen = DefaultScreen(s->display);
-    XImage *image = XCreateImage(s->display, DefaultVisual(s->display, screen),
-        (unsigned)DefaultDepth(s->display, screen), ZPixmap, 0, NULL,
-        (unsigned)width, (unsigned)height, 32, 0);
-    if (!image) { fail(env, "XCreateImage failed"); return; }
-    image->data = calloc((size_t)image->bytes_per_line, (size_t)height);
-    if (!image->data) { XDestroyImage(image); fail(env, "Cannot allocate X11 image"); return; }
+    XImage *image = ensure_frame_image(env, s, width, height);
+    if (!image) return;
     jint *data = (*env)->GetIntArrayElements(env, pixels, NULL);
-    if (!data) { XDestroyImage(image); return; }
+    if (!data) return;
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             unsigned int rgb = (unsigned int)data[y * width + x];
@@ -307,7 +322,7 @@ JNIEXPORT void JNICALL Java_com_android_wm_XWindow_nativePresent
     (*env)->ReleaseIntArrayElements(env, pixels, data, JNI_ABORT);
     XPutImage(s->display, s->window, s->gc, image, 0, 0, 0, 0, (unsigned)width, (unsigned)height);
     XFlush(s->display);
-    XDestroyImage(image);
+    /* Ordinary XPutImage consumes the source synchronously, so the next frame can reuse it. */
 }
 
 JNIEXPORT void JNICALL Java_com_android_wm_XWindow_nativeClose
@@ -319,6 +334,7 @@ JNIEXPORT void JNICALL Java_com_android_wm_XWindow_nativeClose
         open_input_method, (XPointer)s);
     if (s->input_context) XDestroyIC(s->input_context);
     if (s->input_method) XCloseIM(s->input_method);
+    if (s->frame_image) XDestroyImage(s->frame_image);
     XFreeGC(s->display, s->gc);
     if (!s->destroyed) XDestroyWindow(s->display, s->window);
     XCloseDisplay(s->display);
