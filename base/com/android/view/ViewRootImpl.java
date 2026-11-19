@@ -16,6 +16,7 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     void setWindowCallback(Window.Callback callback) { mWindowCallback = callback; }
     private final Choreographer mChoreographer;
     private XWindow mWindow;
+    private BufferedImage mFrameBuffer;
     private int mWidth, mHeight;
     private boolean mWindowSizeDirty = true;
     private boolean mTraversalScheduled, mClosed;
@@ -131,24 +132,35 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
         if (mWindow == null) {
             mWindow = new XWindow(mWidth, mHeight, mWindowAttributes.getTitle());
         }
-        mWindow.present(renderToImage(mView, mWidth, mHeight));
+        if (mFrameBuffer == null || mFrameBuffer.getWidth() != mWidth
+                || mFrameBuffer.getHeight() != mHeight) {
+            mFrameBuffer = new BufferedImage(mWidth, mHeight, BufferedImage.TYPE_INT_RGB);
+        }
+        renderIntoImage(mView, mFrameBuffer);
+        // nativePresent copies pixels synchronously; the image is reusable on return.
+        mWindow.present(mFrameBuffer);
     }
     /** Also used by headless regression tests; no X11 or native library required. */
     public static BufferedImage renderToImage(View view, int width, int height) {
         if (width <= 0 || height <= 0) throw new IllegalArgumentException("Frame size must be positive");
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        renderIntoImage(view, image);
+        return image;
+    }
+    private static void renderIntoImage(View view, BufferedImage image) {
+        int width = image.getWidth(), height = image.getHeight();
         view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
         view.layout(0, 0, width, height);
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         try (Canvas canvas = new Canvas(image)) {
             canvas.drawColor(0xffffffff);
             view.draw(canvas);
         }
-        return image;
     }
     @Override public void close() {
         if (mClosed) return;
         mClosed = true;
+        mFrameBuffer = null;
         Window.Callback callback = mWindowCallback;
         mWindowCallback = null;
         try {
