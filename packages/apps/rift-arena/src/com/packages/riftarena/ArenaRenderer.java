@@ -49,7 +49,7 @@ final class ArenaRenderer implements AutoCloseable {
     }
     int modelTriangles;
     boolean profile;long sceneNanos,unitNanos,effectNanos,readbackNanos;
-    double cameraX,cameraZ;
+    double cameraX,cameraZ,zoom=1;
     String device="";
     static final double VIEW_HEIGHT=34,HUD_SCALE=800.0/VIEW_HEIGHT;
     static final class Canopy {
@@ -90,7 +90,7 @@ final class ArenaRenderer implements AutoCloseable {
         for(String surface:new String[]{"grass","dirt","stone","gravel"})loadTexture("textures/ground-"+surface+".png");
         landscape=glGenLists(1);glNewList(landscape,GL_COMPILE);world(0);glEndList();
         // Cover every legal camera position at the same world-to-pixel scale, once.
-        sceneMarginX=(int)Math.ceil(17*height/VIEW_HEIGHT);sceneMarginY=(int)Math.ceil(5*SIN*height/VIEW_HEIGHT);
+        sceneMarginX=(int)Math.ceil(17*height/VIEW_HEIGHT*1.25);sceneMarginY=(int)Math.ceil(5*SIN*height/VIEW_HEIGHT*1.25);
         sceneWidth=width+sceneMarginX*2;sceneHeight=height+sceneMarginY*2;
         sceneFbo=glGenFramebuffers();glBindFramebuffer(GL_FRAMEBUFFER,sceneFbo);
         sceneColor=glGenRenderbuffers();glBindRenderbuffer(GL_RENDERBUFFER,sceneColor);glRenderbufferStorage(GL_RENDERBUFFER,GL_RGB8,sceneWidth,sceneHeight);
@@ -104,14 +104,18 @@ final class ArenaRenderer implements AutoCloseable {
         if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)throw new IOException("无法创建树木遮挡缓存");
         glBindFramebuffer(GL_FRAMEBUFFER,fbo);
     }
-    BufferedImage render(ArenaWorld world){
+    // Snapshot API for image-comparison tests; production supplies a leased pool image.
+    BufferedImage render(ArenaWorld world){return render(world,new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB));}
+    BufferedImage render(ArenaWorld world,BufferedImage image){
+        if(image.getWidth()!=width||image.getHeight()!=height||image.getType()!=BufferedImage.TYPE_INT_RGB)throw new IllegalArgumentException("Unexpected frame buffer");
+        double wantedZoom=ArenaWorld.clamp(world.cameraZoom,.85,1.25);if(wantedZoom!=zoom){zoom=wantedZoom;sceneReady=false;}
         cameraX=world.screen==ArenaWorld.Screen.TITLE?0:ArenaWorld.clamp(world.player.x,-17,17);
         cameraZ=world.screen==ArenaWorld.Screen.TITLE?0:ArenaWorld.clamp(world.player.z,-5,5);
         // Integer pixel scrolling keeps cached depth, scene and dynamic geometry aligned.
-        double scale=height/VIEW_HEIGHT;
+        double scale=height/VIEW_HEIGHT*zoom;
         cameraX=Math.rint(cameraX*scale)/scale;cameraZ=Math.rint(cameraZ*scale*SIN)/(scale*SIN);
         glBindFramebuffer(GL_FRAMEBUFFER,fbo);glViewport(0,0,width,height);glClearColor(.025f,.055f,.085f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        glMatrixMode(GL_PROJECTION);glLoadIdentity();double aspect=width/(double)height;glOrtho(-(VIEW_HEIGHT/2)*aspect,(VIEW_HEIGHT/2)*aspect,-VIEW_HEIGHT/2,VIEW_HEIGHT/2,-100,100);
+        glMatrixMode(GL_PROJECTION);glLoadIdentity();double aspect=width/(double)height;glOrtho(-(VIEW_HEIGHT/zoom/2)*aspect,(VIEW_HEIGHT/zoom/2)*aspect,-VIEW_HEIGHT/zoom/2,VIEW_HEIGHT/zoom/2,-100,100);
         glMatrixMode(GL_MODELVIEW);glLoadIdentity();glTranslated(0,0,cameraZ*COS);glRotated(TILT,1,0,0);glTranslated(-cameraX,0,-cameraZ);
         glLightfv(GL_LIGHT0,GL_POSITION,new float[]{-20,50,25,0});
         if(profile)glFinish();long stage=profile?System.nanoTime():0;
@@ -188,7 +192,8 @@ final class ArenaRenderer implements AutoCloseable {
         for(ArenaWorld.Effect e:world.effects){
             if(culling&&!visible(e.x,e.z,e.radius+1,13))continue;
             if(e.type==3||e.type==4){glPushMatrix();if(e.type==4)glTranslated(0,meteorGround(e.x,e.z)-.16,0);slamWave(e);if(e.type==4)meteorDebris(e);glPopMatrix();continue;}
-            ring(e.x,.15,e.z,e.radius,e.type==2?0xffbf68:0x64e9ef);
+            ring(e.x,markerGround(e.x,e.z),e.z,e.radius,e.team==1?0xff4e62:e.type==2?0xffbf68:0x64e9ef);
+            if(e.type==2&&e.team!=world.player.team){markerCorners(e.x,markerGround(e.x,e.z)+.01,e.z,e.radius,0xff4e62);}
             if(e.type==2){double t=1-e.life/e.duration;ring(e.x,.2,e.z,e.radius*(1-t),0xffe5ac);cube(e.x,12*(1-t),e.z,.5,.8,.5,0xffdc90);}
         }
         for(ArenaWorld.Meteor meteor:world.meteors)if(!culling||visible(meteor.x,meteor.z,ArenaWorld.METEOR_RADIUS+2,22))drawMeteor(meteor,world.elapsed);
@@ -232,7 +237,7 @@ final class ArenaRenderer implements AutoCloseable {
         glEnable(GL_LIGHTING);
         if(profile){glFinish();effectNanos=System.nanoTime()-stage;stage=System.nanoTime();}
         glReadBuffer(GL_COLOR_ATTACHMENT0);pixels.clear();glReadPixels(0,0,width,height,GL_BGRA,GL_UNSIGNED_INT_8_8_8_8_REV,pixels);
-        BufferedImage image=new BufferedImage(width,height,BufferedImage.TYPE_INT_RGB);int[] rgb=((DataBufferInt)image.getRaster().getDataBuffer()).getData();
+        int[] rgb=((DataBufferInt)image.getRaster().getDataBuffer()).getData();
         // Native packed ARGB matches TYPE_INT_RGB storage; only the row order needs flipping.
         for(int y=0;y<height;y++){packedPixels.position((height-1-y)*width);packedPixels.get(rgb,y*width,width);}
         int err=glGetError();if(err!=GL_NO_ERROR)throw new IllegalStateException("OpenGL error: "+err);if(profile)readbackNanos=System.nanoTime()-stage;return image;
@@ -250,7 +255,7 @@ final class ArenaRenderer implements AutoCloseable {
         canopyTime=world.elapsed;
     }
     private int[] canopyPatch(Canopy tree){
-        double scale=height/VIEW_HEIGHT,cy=-cameraZ*SIN;
+        double scale=height/VIEW_HEIGHT*zoom,cy=-cameraZ*SIN;
         return new int[]{Math.max(0,(int)Math.floor(width/2.+(tree.minX-cameraX)*scale)-2),Math.max(0,(int)Math.floor(height/2.+(tree.minY-cy)*scale)-2),Math.min(width,(int)Math.ceil(width/2.+(tree.maxX-cameraX)*scale)+2),Math.min(height,(int)Math.ceil(height/2.+(tree.maxY-cy)*scale)+2)};
     }
     private boolean overlapsPatch(Canopy tree){
@@ -274,13 +279,13 @@ final class ArenaRenderer implements AutoCloseable {
         if(translucent){glDepthFunc(GL_LESS);glDepthMask(true);glDisable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);}
     }
     boolean visible(double x,double z,double radius,double tall){
-        double halfWidth=VIEW_HEIGHT/2*width/(double)height,sy=-(z-cameraZ)*SIN;
-        return x+radius>=cameraX-halfWidth&&x-radius<=cameraX+halfWidth&&sy+radius*SIN+tall*COS>=-VIEW_HEIGHT/2&&sy-radius*SIN-.5<=VIEW_HEIGHT/2;
+        double halfWidth=VIEW_HEIGHT/zoom/2*width/(double)height,sy=-(z-cameraZ)*SIN;
+        return x+radius>=cameraX-halfWidth&&x-radius<=cameraX+halfWidth&&sy+radius*SIN+tall*COS>=-VIEW_HEIGHT/zoom/2&&sy-radius*SIN-.5<=VIEW_HEIGHT/zoom/2;
     }
     private void copyScene(){
         if(!sceneReady){
             glBindFramebuffer(GL_FRAMEBUFFER,sceneFbo);glViewport(0,0,sceneWidth,sceneHeight);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-            glMatrixMode(GL_PROJECTION);glPushMatrix();glLoadIdentity();double scale=height/VIEW_HEIGHT;
+            glMatrixMode(GL_PROJECTION);glPushMatrix();glLoadIdentity();double scale=height/VIEW_HEIGHT*zoom;
             glOrtho(-sceneWidth/(2*scale),sceneWidth/(2*scale),-sceneHeight/(2*scale),sceneHeight/(2*scale),-100,100);
             glMatrixMode(GL_MODELVIEW);glPushMatrix();glLoadIdentity();glRotated(TILT,1,0,0);
             glLightfv(GL_LIGHT0,GL_POSITION,new float[]{-20,50,25,0});glCallList(landscape);
@@ -292,7 +297,7 @@ final class ArenaRenderer implements AutoCloseable {
             sceneReady=true;
         }
         glBindFramebuffer(GL_READ_FRAMEBUFFER,sceneFbo);glBindFramebuffer(GL_DRAW_FRAMEBUFFER,fbo);
-        int x=sceneMarginX+(int)Math.rint(cameraX*height/VIEW_HEIGHT),y=sceneMarginY-(int)Math.rint(cameraZ*SIN*height/VIEW_HEIGHT);
+        int x=sceneMarginX+(int)Math.rint(cameraX*height/VIEW_HEIGHT*zoom),y=sceneMarginY-(int)Math.rint(cameraZ*SIN*height/VIEW_HEIGHT*zoom);
         glBlitFramebuffer(x,y,x+width,y+height,0,0,width,height,GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,GL_NEAREST);
         if(fadedTrees>0){
             glBindFramebuffer(GL_READ_FRAMEBUFFER,bareFbo);
@@ -466,6 +471,7 @@ final class ArenaRenderer implements AutoCloseable {
             shadow(u.x+.28,ground,u.z-.22,radius*1.25,radius*.65,.19);
             shadow(u.x,ground+.002,u.z,radius*.6,radius*.38,.40);
         }
+        if(u.alive()&&u.kind==ArenaWorld.Kind.HERO){ring(u.x,ground+.012,u.z,1.28,u.team==0?0x4ddcff:0xff5b70);markerCorners(u.x,ground+.015,u.z,1.52,u.team==0?0x66efff:0xff6b78);}
         if(!mobile){building(u,time,team);return;}
         double size=u.kind==ArenaWorld.Kind.HERO?4:2.3;
         String character=u.kind==ArenaWorld.Kind.SOLDIER?"soldier":u.build==0?"warrior":u.build==1?"archer":"mage";

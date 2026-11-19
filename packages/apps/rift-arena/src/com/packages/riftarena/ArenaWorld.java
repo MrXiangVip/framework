@@ -27,6 +27,10 @@ final class ArenaWorld {
     static double attackDuration(Unit unit){return swordsman(unit)?SWORD_ATTACK_SECONDS:ATTACK_VISUAL_SECONDS;}
     static final String[] HEROES={"破晓剑士", "逐星游侠", "苍穹法师"};
     static final String[] SKILLS={"疾风突进", "震荡斩", "星陨"};
+    private static final String[][] SKILL_NAMES={{"突进","震荡斩","星陨"},{"后撤射击","扇形散射","星陨"},{"奥术闪现","奥术新星","星陨"}};
+    static String skillName(int hero,int skill){return SKILL_NAMES[hero][skill];}
+    boolean chargingMeteor(){if(!player.alive())return false;if(player.meteorTime>METEOR_CAST-METEOR_RELEASE)return true;if(hero==2)for(Effect e:effects)if(e.team==player.team&&e.type==2)return true;return false;}
+
     static final double[] COOLDOWNS={6,9,24};
     static final class Unit {
         final Kind kind; final int team; final double homeX,homeZ;
@@ -39,7 +43,7 @@ final class ArenaWorld {
         final Set<Unit> dashHits=Collections.newSetFromMap(new IdentityHashMap<Unit,Boolean>());
         double slamTime,slamFacing,slamDamage;boolean slamLanded;
         double comboWindow,combatTime;int comboStep;
-        boolean player; int build,attackSerial;
+        boolean player,retreating; int build,attackSerial;
         Unit(Kind k,int t,double x,double z){kind=k;team=t;this.x=homeX=x;this.z=homeZ=z;}
         boolean alive(){return hp>0;}
         double distance(Unit b){return Math.hypot(x-b.x,z-b.z);}
@@ -200,9 +204,12 @@ final class ArenaWorld {
     double elapsed,waveTimer=3,noticeTime,recall,attackBuffer,aimX,aimZ,destX,destZ;
     boolean moving,attackRequested,slamJustStarted;
     double inputX,inputZ;
+    double cameraZoom=1;
+    int generation;
     String notice="跟随兵线推塔，摧毁敌方水晶";
     ArenaWorld(){reset(0);screen=Screen.TITLE;}
     void reset(int hero){
+        generation++;
         this.hero=Math.floorMod(hero,3);scatterCasts.clear();fanArrows.clear();arrows.clear();meteors.clear();dashGhosts.clear();swordStrikes.clear();soundEvents.clear();impacts.clear();units.clear();effects.clear();shots.clear();Arrays.fill(cooldowns,0);
         elapsed=0;waveTimer=3;wave=0;level=1;xp=0;gold=200;kills=deaths=weapon=armor=0;recall=0;attackBuffer=0;inputX=inputZ=0;slamJustStarted=false;moving=false;selected=null;attackRequested=false;
         spawn(Kind.CORE,0,-38,0);spawn(Kind.CORE,1,38,0);
@@ -295,11 +302,17 @@ final class ArenaWorld {
                 if(recall>0){recall-=dt;if(recall<=0){u.x=u.homeX;u.z=u.homeZ;moving=false;selected=null;tell("已回到泉水，正在恢复生命");}}
             }else{
                 Unit t=target(u);
-                if(t!=null)strike(u,t);
                 if(u.kind==Kind.HERO){
-                    if(u.hp<u.maxHp*.24)move(u,u.homeX,u.homeZ,dt);
-                    else if(t==null){Unit goal=nearest(u,17);if(goal!=null)move(u,goal.x,goal.z,dt);else move(u,u.team==0?30:-30,0,dt);}
-                }else if(u.kind==Kind.SOLDIER&&t==null){Unit goal=nearest(u,12);if(goal==null)move(u,u.team==0?38:-38,0,dt);else move(u,goal.x,goal.z,dt);}
+                    if(u.hp<u.maxHp*.24)u.retreating=true;
+                    if(u.hp>=u.maxHp*.72)u.retreating=false;
+                    if(u.retreating)move(u,u.homeX,u.homeZ,dt);
+                    else if(!avoidDanger(u,dt)){
+                        if(t!=null)strike(u,t);
+                        else{Unit goal=nearest(u,17);double gx=goal==null?(u.team==0?30:-30):goal.x,gz=goal==null?0:goal.z;
+                            if(safeAdvance(u,gx,gz,dt))move(u,gx,gz,dt);
+                        }
+                    }
+                }else{if(t!=null)strike(u,t);else if(u.kind==Kind.SOLDIER){Unit goal=nearest(u,12);if(goal==null)move(u,u.team==0?38:-38,0,dt);else move(u,goal.x,goal.z,dt);}}
             }
             if(screen!=Screen.PLAYING)break;
         }
@@ -354,6 +367,21 @@ final class ArenaWorld {
             if(screen!=Screen.PLAYING)break;
         }
         units.removeIf(u->u.kind==Kind.SOLDIER&&!u.alive()&&elapsed-u.deathAt>=2);
+    }
+    private boolean avoidDanger(Unit u,double dt){
+        for(Effect e:effects)if(e.team!=u.team&&e.type==2&&e.life>.08&&Math.hypot(u.x-e.x,u.z-e.z)<e.radius+.8){evade(u,e.x,e.z,dt);return true;}
+        for(Meteor m:meteors)if(m.team!=u.team&&Math.hypot(u.x-m.x,u.z-m.z)<METEOR_RADIUS+.8){evade(u,m.x,m.z,dt);return true;}
+        return false;
+    }
+    private void evade(Unit u,double x,double z,double dt){double dx=u.x-x,dz=u.z-z;if(Math.hypot(dx,dz)<.01){dx=0;dz=u.z>=0?1:-1;}double length=Math.hypot(dx,dz);move(u,u.x+dx/length*10,u.z+dz/length*10,dt);}
+    private boolean safeAdvance(Unit u,double x,double z,double dt){
+        double dx=x-u.x,dz=z-u.z,length=Math.hypot(dx,dz);if(length<.001)return true;
+        double nx=u.x+dx/length*u.speed*dt,nz=u.z+dz/length*u.speed*dt;
+        for(Unit tower:units)if(tower.kind==Kind.TOWER&&tower.team!=u.team&&tower.alive()&&Math.hypot(nx-tower.x,nz-tower.z)<tower.range+1){
+            boolean tank=false;for(Unit ally:units)if(ally.kind==Kind.SOLDIER&&ally.team==u.team&&ally.alive()&&ally.distance(tower)<tower.range){tank=true;break;}
+            if(!tank)return false;
+        }
+        return true;
     }
     Unit nearest(Unit u,double radius){Unit result=null;double best=radius;for(Unit t:units)if(t.team!=u.team&&t.alive()&&!shielded(t)){double d=u.distance(t);if(d<best){best=d;result=t;}}return result;}
     Unit target(Unit u){
@@ -463,7 +491,7 @@ final class ArenaWorld {
             double sx=player.x,sz=player.z;player.x=clamp(sx+dx/d*7,-LIMIT_X,LIMIT_X);player.z=clamp(sz+dz/d*7,-LIMIT_Z,LIMIT_Z);
             double vx=player.x-sx,vz=player.z-sz,length=vx*vx+vz*vz;
             for(Unit u:units)if(u.team==1){double t=length==0?0:clamp(((u.x-sx)*vx+(u.z-sz)*vz)/length,0,1);if(Math.hypot(u.x-sx-vx*t,u.z-sz-vz*t)<3)damage(u,110+level*12,0);}
-            effects.add(new Effect(player.x,player.z,3,0,0,.4));moving=false;selected=null;
+            effects.add(new Effect(sx,sz,3,0,0,.25));effects.add(new Effect(player.x,player.z,3,0,0,.4));sound("dash-whoosh");moving=false;selected=null;
         }else if(index==1){
             if(swordsman(player)){
                 player.attackTime=0;player.attackSerial++;shots.removeIf(shot->shot.source==player&&shot.melee);
@@ -476,7 +504,7 @@ final class ArenaWorld {
                 player.scatterDraw=true;scatterCasts.add(new ScatterCast(player,135+level*15));
                 player.cooldown=Math.max(player.cooldown,.72);player.hitStop=player.hurtTime=0;
                 moving=false;selected=null;attackRequested=false;
-            }else{area(0,player.x,player.z,6,135+level*15);effects.add(new Effect(player.x,player.z,6,0,1,.5));}
+            }else{new Shot(player,player.x+dx,player.z+dz);area(0,player.x,player.z,6,135+level*15);effects.add(new Effect(player.x,player.z,6,0,1,.5));sound("meteor-impact");}
         }
         else if(swordsman(player)){
             player.attackTime=0;player.attackSerial++;shots.removeIf(shot->shot.source==player&&shot.melee);
@@ -485,7 +513,7 @@ final class ArenaWorld {
             double range=Math.min(14,d);
             meteors.add(new Meteor(player,clamp(player.x+dx/d*range,-LIMIT_X,LIMIT_X),clamp(player.z+dz/d*range,-LIMIT_Z,LIMIT_Z),180+level*22));
             player.hitStop=player.hurtTime=0;moving=false;selected=null;attackRequested=false;sound("meteor-charge");
-        }else{double range=Math.min(14,d);effects.add(new Effect(player.x+dx/d*range,player.z+dz/d*range,5,0,2,1.1));}
+        }else{if(hero==2)new Shot(player,aimX,aimZ);double range=Math.min(14,d);effects.add(new Effect(player.x+dx/d*range,player.z+dz/d*range,5,0,2,1.1));sound("meteor-charge");}
         return true;
     }
     void recall(){if(screen==Screen.PLAYING&&player.alive()){cancelArrowWindup(player);player.comboWindow=0;player.dashTime=0;player.slamTime=0;player.meteorTime=0;attackBuffer=0;recall=4;moving=false;selected=null;tell("回城引导中，移动或受伤将打断");}}

@@ -49,6 +49,12 @@ public final class ArenaUiTest {
             v.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_HOVER,720,450,0,0,0));
             ArenaWorld aimWorld=(ArenaWorld)field(v,"world");waitFor(v,()->Math.abs(aimWorld.aimX-(aimFrame.cameraX+120/ArenaRenderer.HUD_SCALE))<.001);
             check(Math.abs(aimWorld.aimZ-(aimFrame.cameraZ+50/(ArenaRenderer.HUD_SCALE*ArenaRenderer.SIN)))<.001,"Zoomed mouse coordinates match ground projection");
+            // Thousands of pointer updates occupy one coalesced slot, not thousands of commands.
+            for(int i=0;i<2000;i++)v.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_HOVER,700+i%100,450,0,0,0));
+            @SuppressWarnings("unchecked") ConcurrentLinkedQueue<Runnable> aimCommands=(ConcurrentLinkedQueue<Runnable>)field(v,"commands");check(aimCommands.size()<10,"Mouse aim does not flood command queue");
+            v.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_SCROLL,700,450,0,0,-1));waitFor(v,()->frame(v).zoom>1.05);draw(v,"zoomed-ui",1200,800);
+            final ArenaView.Frame zoomed=frame(v);v.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_HOVER,720,450,0,0,0));waitFor(v,()->Math.abs(aimWorld.aimX-(zoomed.cameraX+120/zoomed.scale))<.001);check(Math.abs(aimWorld.aimZ-(zoomed.cameraZ+50/(zoomed.scale*ArenaRenderer.SIN)))<.001,"Mouse projection follows zoom");
+            v.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_SCROLL,700,450,0,0,1));waitFor(v,()->Math.abs(frame(v).zoom-1)<.001);
             key(v,32);waitFor(v,()->frame(v).notice.contains("射程内无敌人"));draw(v,"basic-attack",1200,800);
             final double x=frame(v).x;v.dispatchKeyEvent(new KeyEvent(KeyEvent.DOWN,'d',0));waitFor(v,()->frame(v).x>x+.5);v.dispatchKeyEvent(new KeyEvent(KeyEvent.UP,'d',0));
             // Verify release and reversal using published frames rather than OS key-repeat timing.
@@ -119,6 +125,16 @@ public final class ArenaUiTest {
             waitFor(v,()->frame(v).dots.stream().filter(d->d.team==1).allMatch(d->d.hp<d.maxHp));
             check(frame(v).cooldowns[1]>0,"E button click starts scatter cooldown");
 
+            commands.add(()->{w.reset(0);w.player.x=w.player.z=0;w.waveTimer=1000;});waitFor(v,()->frame(v).hero==0&&frame(v).x==0&&frame(v).cooldowns[2]==0);
+            CountDownLatch entered=new CountDownLatch(1),release=new CountDownLatch(1);
+            commands.add(()->{entered.countDown();try{check(release.await(5,TimeUnit.SECONDS),"Release queued input test");}catch(InterruptedException e){Thread.currentThread().interrupt();}});
+            check(entered.await(5,TimeUnit.SECONDS),"Worker reaches input ordering gate");
+            try{
+                v.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_HOVER,720,400,0,0,0));key(v,'r');
+                v.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_HOVER,480,400,0,0,0));
+            }finally{release.countDown();}
+            waitFor(v,()->frame(v).cooldowns[2]>0);
+            check(!w.meteors.isEmpty()&&w.meteors.get(0).x>0&&w.aimX<0,"Queued cast retains its aim while newer pointer aim remains current");
         }finally{v.close();Thread worker=(Thread)field(v,"worker");worker.join(5000);check(!worker.isAlive(),"Close stops render worker and frees native resources");}
         System.out.println("PASS: real GL, selection, keyboard, right click, skills, pause, resized buttons, death/respawn, victory, restart and cleanup");
     }

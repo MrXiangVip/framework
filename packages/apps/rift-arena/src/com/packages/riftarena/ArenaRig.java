@@ -216,29 +216,36 @@ final class ArenaRig {
             }
         }
     }
-    double[][] globals(double[][] pose){
-        double[][] globals=new double[nodes.size()][];
-        for(int i=0;i<nodes.size();i++){double[] local=compose(pose[i]);int parent=nodes.get(i).parent;globals[i]=parent<0?local:multiply(globals[parent],local);}
-        return globals;
+    double[][] globals(double[][] pose){double[][] out=new double[nodes.size()][16];globals(pose,out,new double[16]);return out;}
+    void globals(double[][] pose,double[][] out,double[] local){
+        for(int i=0;i<nodes.size();i++){compose(pose[i],local);int parent=nodes.get(i).parent;if(parent<0)System.arraycopy(local,0,out[i],0,16);else multiply(out[parent],local,out[i]);}
     }
-    void skin(Mesh mesh,double[][] globals,float[] out){
-        double[][] palette=new double[mesh.palette.length][];
-        for(int b=0;b<palette.length;b++)palette[b]=multiply(globals[mesh.palette[b].node],mesh.palette[b].offset);
+    static final class Skinning {
+        final double[][] matrices,normals;
+        Skinning(Mesh mesh){matrices=new double[mesh.palette.length+1][16];normals=new double[mesh.palette.length+1][9];}
+    }
+    void skin(Mesh mesh,double[][] globals,float[] out){skin(mesh,globals,out,new Skinning(mesh));}
+    void skin(Mesh mesh,double[][] globals,float[] out,Skinning work){
+        int unweighted=mesh.palette.length;
+        for(int b=0;b<unweighted;b++)multiply(globals[mesh.palette[b].node],mesh.palette[b].offset,work.matrices[b]);
+        System.arraycopy(globals[mesh.node],0,work.matrices[unweighted],0,16);
+        // Inverse-transpose once per bone, rather than once per vertex influence.
+        for(int i=0;i<work.matrices.length;i++){
+            double[] m=work.matrices[i],n=work.normals[i];
+            double a=m[5]*m[10]-m[6]*m[9],b=m[6]*m[8]-m[4]*m[10],c=m[4]*m[9]-m[5]*m[8],det=m[0]*a+m[1]*b+m[2]*c;
+            if(Math.abs(det)<1e-12){Arrays.fill(n,0);continue;}
+            n[0]=a/det;n[1]=b/det;n[2]=c/det;
+            n[3]=(m[2]*m[9]-m[1]*m[10])/det;n[4]=(m[0]*m[10]-m[2]*m[8])/det;n[5]=(m[1]*m[8]-m[0]*m[9])/det;
+            n[6]=(m[1]*m[6]-m[2]*m[5])/det;n[7]=(m[2]*m[4]-m[0]*m[6])/det;n[8]=(m[0]*m[5]-m[1]*m[4])/det;
+        }
         for(int vertex=0;vertex<mesh.bones.length;vertex++){
             int o=vertex*8;double px=0,py=0,pz=0,nx=0,ny=0,nz=0;float[] v=mesh.vertices;
             int influences=Math.max(1,mesh.bones[vertex].length);
             for(int j=0;j<influences;j++){
-                double[] m=mesh.bones[vertex].length==0?globals[mesh.node]:palette[mesh.bones[vertex][j]];
+                int bone=mesh.bones[vertex].length==0?unweighted:mesh.bones[vertex][j];double[] m=work.matrices[bone],n=work.normals[bone];
                 double w=mesh.bones[vertex].length==0?1:mesh.weights[vertex][j];
-                px+=(m[0]*v[o]+m[1]*v[o+1]+m[2]*v[o+2]+m[3])*w;
-                py+=(m[4]*v[o]+m[5]*v[o+1]+m[6]*v[o+2]+m[7])*w;
-                pz+=(m[8]*v[o]+m[9]*v[o+1]+m[10]*v[o+2]+m[11])*w;
-                // Inverse transpose for non-uniform scale; translation never affects normals.
-                double a=m[5]*m[10]-m[6]*m[9],b=m[6]*m[8]-m[4]*m[10],c=m[4]*m[9]-m[5]*m[8];
-                double det=m[0]*a+m[1]*b+m[2]*c;if(Math.abs(det)<1e-12)continue;
-                nx+=(a*v[o+3]+b*v[o+4]+c*v[o+5])*w/det;
-                ny+=((m[2]*m[9]-m[1]*m[10])*v[o+3]+(m[0]*m[10]-m[2]*m[8])*v[o+4]+(m[1]*m[8]-m[0]*m[9])*v[o+5])*w/det;
-                nz+=((m[1]*m[6]-m[2]*m[5])*v[o+3]+(m[2]*m[4]-m[0]*m[6])*v[o+4]+(m[0]*m[5]-m[1]*m[4])*v[o+5])*w/det;
+                px+=(m[0]*v[o]+m[1]*v[o+1]+m[2]*v[o+2]+m[3])*w;py+=(m[4]*v[o]+m[5]*v[o+1]+m[6]*v[o+2]+m[7])*w;pz+=(m[8]*v[o]+m[9]*v[o+1]+m[10]*v[o+2]+m[11])*w;
+                nx+=(n[0]*v[o+3]+n[1]*v[o+4]+n[2]*v[o+5])*w;ny+=(n[3]*v[o+3]+n[4]*v[o+4]+n[5]*v[o+5])*w;nz+=(n[6]*v[o+3]+n[7]*v[o+4]+n[8]*v[o+5])*w;
             }
             double length=Math.sqrt(nx*nx+ny*ny+nz*nz);if(length<1e-12)length=1;
             out[o]=(float)px;out[o+1]=(float)py;out[o+2]=(float)pz;out[o+3]=(float)(nx/length);out[o+4]=(float)(ny/length);out[o+5]=(float)(nz/length);out[o+6]=v[o+6];out[o+7]=v[o+7];
@@ -247,7 +254,7 @@ final class ArenaRig {
     static void blend(double[][] previous,double[][] next,double alpha){
         for(int i=0;i<next.length;i++){
             slerp(previous[i],3,next[i],3,alpha,next[i],3);
-            for(int j:new int[]{0,1,2,7,8,9})next[i][j]=previous[i][j]+(next[i][j]-previous[i][j])*alpha;
+            for(int j=0;j<10;j++)if(j<3||j>6)next[i][j]=previous[i][j]+(next[i][j]-previous[i][j])*alpha;
         }
     }
     private static Track vectors(AIVectorKey.Buffer keys){
@@ -261,15 +268,19 @@ final class ArenaRig {
     static void slerp(double[] a,int ao,double[] b,int bo,double t,double[] out,int offset){
         double dot=0;for(int i=0;i<4;i++)dot+=a[ao+i]*b[bo+i];double sign=dot<0?-1:1;dot=Math.min(1,Math.abs(dot));
         double x=1-t,y=t;if(dot<.9995){double theta=Math.acos(dot),sin=Math.sin(theta);x=Math.sin((1-t)*theta)/sin;y=Math.sin(t*theta)/sin;}
-        double[] q=new double[4];double length=0;for(int i=0;i<4;i++){q[i]=a[ao+i]*x+b[bo+i]*y*sign;length+=q[i]*q[i];}
-        length=Math.sqrt(length);for(int i=0;i<4;i++)out[offset+i]=q[i]/length;
+        double q0=a[ao]*x+b[bo]*y*sign,q1=a[ao+1]*x+b[bo+1]*y*sign,q2=a[ao+2]*x+b[bo+2]*y*sign,q3=a[ao+3]*x+b[bo+3]*y*sign;
+        double length=Math.sqrt(q0*q0+q1*q1+q2*q2+q3*q3);out[offset]=q0/length;out[offset+1]=q1/length;out[offset+2]=q2/length;out[offset+3]=q3/length;
     }
-    static double[] compose(double[] p){
+    static double[] compose(double[] p){double[] out=new double[16];compose(p,out);return out;}
+    static void compose(double[] p,double[] out){
         double x=p[3],y=p[4],z=p[5],w=p[6],sx=p[7],sy=p[8],sz=p[9];
-        return new double[]{(1-2*y*y-2*z*z)*sx,(2*x*y-2*z*w)*sy,(2*x*z+2*y*w)*sz,p[0],(2*x*y+2*z*w)*sx,(1-2*x*x-2*z*z)*sy,(2*y*z-2*x*w)*sz,p[1],(2*x*z-2*y*w)*sx,(2*y*z+2*x*w)*sy,(1-2*x*x-2*y*y)*sz,p[2],0,0,0,1};
+        out[0]=(1-2*y*y-2*z*z)*sx;out[1]=(2*x*y-2*z*w)*sy;out[2]=(2*x*z+2*y*w)*sz;out[3]=p[0];
+        out[4]=(2*x*y+2*z*w)*sx;out[5]=(1-2*x*x-2*z*z)*sy;out[6]=(2*y*z-2*x*w)*sz;out[7]=p[1];
+        out[8]=(2*x*z-2*y*w)*sx;out[9]=(2*y*z+2*x*w)*sy;out[10]=(1-2*x*x-2*y*y)*sz;out[11]=p[2];out[12]=out[13]=out[14]=0;out[15]=1;
     }
     static double[] matrix(AIMatrix4x4 m){return new double[]{m.a1(),m.a2(),m.a3(),m.a4(),m.b1(),m.b2(),m.b3(),m.b4(),m.c1(),m.c2(),m.c3(),m.c4(),m.d1(),m.d2(),m.d3(),m.d4()};}
-    static double[] multiply(double[] a,double[] b){double[] out=new double[16];for(int row=0;row<4;row++)for(int col=0;col<4;col++)for(int k=0;k<4;k++)out[row*4+col]+=a[row*4+k]*b[k*4+col];return out;}
+    static double[] multiply(double[] a,double[] b){double[] out=new double[16];multiply(a,b,out);return out;}
+    static void multiply(double[] a,double[] b,double[] out){for(int row=0;row<4;row++)for(int col=0;col<4;col++){double value=0;for(int k=0;k<4;k++)value+=a[row*4+k]*b[k*4+col];out[row*4+col]=value;}}
     private static final class Scene implements AutoCloseable {
         final AIScene scene;final ByteBuffer bytes;
         Scene(AIScene scene,ByteBuffer bytes){this.scene=scene;this.bytes=bytes;}

@@ -10,12 +10,15 @@ final class ArenaAnimator {
     final double[][] pose,previous,brake;
     final List<float[]> vertices=new ArrayList<>();
     final List<FloatBuffer> buffers=new ArrayList<>();
+    final double[][] globals;
+    final double[] local=new double[16];
+    final List<ArenaRig.Skinning> skinning=new ArrayList<>();
     String action="";
     double renderFacing, facingTime=Double.NaN;
     double started,blendStarted,lastTime=Double.NaN,lastTravel,lastAttack=-1,lastHit=-1,lastSlam=-1,lastDash=-1,lastMeteor=-1;
     ArenaAnimator(ArenaRig rig){
-        this.rig=rig;pose=rig.bindPose();previous=rig.bindPose();brake=rig.bindPose();
-        for(ArenaRig.Mesh mesh:rig.meshes){vertices.add(new float[mesh.vertices.length]);buffers.add(BufferUtils.createFloatBuffer(mesh.vertices.length));}
+        this.rig=rig;globals=new double[rig.nodes.size()][16];pose=rig.bindPose();previous=rig.bindPose();brake=rig.bindPose();
+        for(ArenaRig.Mesh mesh:rig.meshes){skinning.add(new ArenaRig.Skinning(mesh));vertices.add(new float[mesh.vertices.length]);buffers.add(BufferUtils.createFloatBuffer(mesh.vertices.length));}
     }
     void update(ArenaWorld.Unit unit,double now){
         boolean moved=now-unit.lastMovedAt>=0&&now-unit.lastMovedAt<(unit.player?.000001:.08);
@@ -52,9 +55,9 @@ final class ArenaAnimator {
         }
         double blend=action.equals("charge")?.02:action.equals("run")||action.equals("combat-walk")||action.equals("attack")?.03:action.equals("hurt")?.025:action.equals("slam")?.04:action.equals("combat-idle")||action.equals("idle")?.10:.065;
         if(now-blendStarted<blend)ArenaRig.blend(previous,pose,ArenaWorld.clamp((now-blendStarted)/blend,0,1));
-        double[][] globals=rig.globals(pose);
+        rig.globals(pose,globals,local);
         for(int i=0;i<rig.meshes.size();i++){
-            float[] out=vertices.get(i);rig.skin(rig.meshes.get(i),globals,out);
+            float[] out=vertices.get(i);rig.skin(rig.meshes.get(i),globals,out,skinning.get(i));
             FloatBuffer buffer=buffers.get(i);buffer.clear();buffer.put(out).flip();
         }
         lastTime=now;lastTravel=unit.travel;lastAttack=unit.attackSerial;lastHit=unit.hitSerial;lastSlam=unit.slamSerial;lastDash=unit.dashSerial;lastMeteor=unit.meteorSerial;

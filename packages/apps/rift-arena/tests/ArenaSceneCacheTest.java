@@ -37,6 +37,15 @@ public final class ArenaSceneCacheTest {
                 g.setColor(Color.WHITE);g.drawString("Uncached / camera "+n,10,n*300+18);g.drawString("Cached + culled",910,n*300+18);
             }
             g.dispose();ImageIO.write(sheet,"png",new File("out/rift-arena-tests/scene-cache-parity.png"));
+            for(double zoom:new double[]{.85,1.25}){
+                ArenaWorld zoomed=new ArenaWorld();zoomed.reset(2);zoomed.cameraZoom=zoom;zoomed.player.x=16;zoomed.player.z=4;zoomed.elapsed=1;
+                r.culling=false;r.cachedScene=false;BufferedImage reference=r.render(zoomed);r.cachedScene=true;BufferedImage cached=r.render(zoomed);
+                int[] a=((DataBufferInt)reference.getRaster().getDataBuffer()).getData(),b=((DataBufferInt)cached.getRaster().getDataBuffer()).getData();int differences=0;
+                for(int i=0;i<a.length;i++){int worst=0;for(int shift=0;shift<=16;shift+=8)worst=Math.max(worst,Math.abs((a[i]>>shift&255)-(b[i]>>shift&255)));if(worst>12)differences++;}
+                check(differences/(double)a.length<.005,"Zoom cache color/depth parity "+zoom);
+                r.culling=true;BufferedImage culled=r.render(zoomed);int[] c=((DataBufferInt)culled.getRaster().getDataBuffer()).getData();for(int i=0;i<b.length;i++)check(b[i]==c[i],"Zoom culling preserves pixels");
+                ImageIO.write(cached,"png",new File("out/rift-arena-tests/zoom-"+zoom+".png"));
+            }
             ArenaWorld cover=new ArenaWorld();cover.reset(0);cover.units.clear();cover.units.add(cover.player);cover.elapsed=10;
             ArenaRenderer.Canopy chosen=null;for(ArenaRenderer.Canopy tree:r.canopies)if(Math.abs(tree.x)<17&&tree.z<0&&tree.z>-16){chosen=tree;break;}
             check(chosen!=null,"Forest occluder available");cover.player.x=chosen.x;cover.player.z=chosen.z-chosen.height*.62*ArenaRenderer.COS/ArenaRenderer.SIN+2*ArenaRenderer.COS/ArenaRenderer.SIN;

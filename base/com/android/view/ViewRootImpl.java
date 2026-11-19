@@ -17,6 +17,7 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     private final Choreographer mChoreographer;
     private XWindow mWindow;
     private BufferedImage mFrameBuffer;
+    private final FrameTimings mFrameTimings=Boolean.getBoolean("framework.render.profile")?new FrameTimings():null;
     private int mWidth, mHeight;
     private boolean mWindowSizeDirty = true;
     private boolean mTraversalScheduled, mClosed;
@@ -136,9 +137,12 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
                 || mFrameBuffer.getHeight() != mHeight) {
             mFrameBuffer = new BufferedImage(mWidth, mHeight, BufferedImage.TYPE_INT_RGB);
         }
+        long begin=mFrameTimings==null?0:System.nanoTime();
         renderIntoImage(mView, mFrameBuffer);
+        long composed=mFrameTimings==null?0:System.nanoTime();
         // nativePresent copies pixels synchronously; the image is reusable on return.
         mWindow.present(mFrameBuffer);
+        if(mFrameTimings!=null)mFrameTimings.record(begin,composed,System.nanoTime());
     }
     /** Also used by headless regression tests; no X11 or native library required. */
     public static BufferedImage renderToImage(View view, int width, int height) {

@@ -33,6 +33,15 @@ public final class RiftArenaAppTest {
                 }
                 check(((String)field(game,"error")).isEmpty(),"Isolated APK native loading");
                 ImageIO.write(ViewRootImpl.renderToImage(decor,1200,800),"png",new File("out/rift-arena-tests/framework-window.png"));
+                if(Boolean.getBoolean("framework.riftarena.profile")){
+                    View gameView=(View)game;gameView.dispatchKeyEvent(new KeyEvent(KeyEvent.DOWN,KeyEvent.ENTER,0));gameView.dispatchKeyEvent(new KeyEvent(KeyEvent.UP,KeyEvent.ENTER,0));
+                    long until=System.nanoTime()+8000000000L;
+                    while(System.nanoTime()<until){if(queue.size()>0){Message m=(Message)next.invoke(queue);((Handler)field(m,"target")).dispatchMessage(m);}else Thread.sleep(2);}
+                    check(((String)field(game,"error")).isEmpty(),"Profile session rendered without errors");
+                    Object metrics=field(game,"metrics");int[] counts=(int[])field(metrics,"counts");check(counts[0]>0&&counts[1]>0&&counts[2]>0&&counts[3]>0,"Game timings cover simulation, GL, UI and frame age");
+                    ImageIO.write(ViewRootImpl.renderToImage(decor,1200,800),"png",new File("out/rift-arena-tests/profile-window.png"));
+                }
+
             }finally{
                 activity.getWindowManager().removeView(decor);activity.performDestroy();
                 Thread worker=(Thread)field(game,"worker");worker.join(5000);check(!worker.isAlive(),"Window close stops render worker");

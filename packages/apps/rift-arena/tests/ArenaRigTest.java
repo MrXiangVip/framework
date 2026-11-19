@@ -7,10 +7,33 @@ public final class ArenaRigTest {
         List<String> out=new ArrayList<>();for(ArenaAssets.Part part:model.parts)for(int i=0;i<part.vertices.length;i+=8)out.add(key(part.vertices[i],part.vertices[i+1],part.vertices[i+2]));Collections.sort(out);return out;
     }
     static String key(double x,double y,double z){return Math.round(x*100)+","+Math.round(y*100)+","+Math.round(z*100);}
+    static void legacySkin(ArenaRig.Mesh mesh,double[][] globals,float[] out){
+        double[][] palette=new double[mesh.palette.length][];
+        for(int b=0;b<palette.length;b++)palette[b]=ArenaRig.multiply(globals[mesh.palette[b].node],mesh.palette[b].offset);
+        for(int vertex=0;vertex<mesh.bones.length;vertex++){
+            int o=vertex*8;double px=0,py=0,pz=0,nx=0,ny=0,nz=0;float[] v=mesh.vertices;
+            int influences=Math.max(1,mesh.bones[vertex].length);
+            for(int j=0;j<influences;j++){
+                double[] m=mesh.bones[vertex].length==0?globals[mesh.node]:palette[mesh.bones[vertex][j]];
+                double w=mesh.bones[vertex].length==0?1:mesh.weights[vertex][j];
+                px+=(m[0]*v[o]+m[1]*v[o+1]+m[2]*v[o+2]+m[3])*w;
+                py+=(m[4]*v[o]+m[5]*v[o+1]+m[6]*v[o+2]+m[7])*w;
+                pz+=(m[8]*v[o]+m[9]*v[o+1]+m[10]*v[o+2]+m[11])*w;
+                // Inverse transpose for non-uniform scale; translation never affects normals.
+                double a=m[5]*m[10]-m[6]*m[9],b=m[6]*m[8]-m[4]*m[10],c=m[4]*m[9]-m[5]*m[8];
+                double det=m[0]*a+m[1]*b+m[2]*c;if(Math.abs(det)<1e-12)continue;
+                nx+=(a*v[o+3]+b*v[o+4]+c*v[o+5])*w/det;
+                ny+=((m[2]*m[9]-m[1]*m[10])*v[o+3]+(m[0]*m[10]-m[2]*m[8])*v[o+4]+(m[1]*m[8]-m[0]*m[9])*v[o+5])*w/det;
+                nz+=((m[1]*m[6]-m[2]*m[5])*v[o+3]+(m[2]*m[4]-m[0]*m[6])*v[o+4]+(m[0]*m[5]-m[1]*m[4])*v[o+5])*w/det;
+            }
+            double length=Math.sqrt(nx*nx+ny*ny+nz*nz);if(length<1e-12)length=1;
+            out[o]=(float)px;out[o+1]=(float)py;out[o+2]=(float)pz;out[o+3]=(float)(nx/length);out[o+4]=(float)(ny/length);out[o+5]=(float)(nz/length);out[o+6]=v[o+6];out[o+7]=v[o+7];
+        }
+    }
     static float[] skin(ArenaRig rig,String action,double time){
         double[][] pose=rig.bindPose();if(action!=null)rig.sample(action,time,true,pose);
         List<Float> all=new ArrayList<>();double[][] globals=rig.globals(pose);
-        for(ArenaRig.Mesh mesh:rig.meshes){float[] v=new float[mesh.vertices.length];rig.skin(mesh,globals,v);for(float f:v){check(Float.isFinite(f),"Finite skinned geometry");all.add(f);}for(int i=0;i<v.length;i+=8){double length=Math.sqrt(v[i+3]*v[i+3]+v[i+4]*v[i+4]+v[i+5]*v[i+5]);check(Math.abs(length-1)<.001,"Unit skinned normal");check(v[i+6]==mesh.vertices[i+6]&&v[i+7]==mesh.vertices[i+7],"UVs preserved");}}
+        for(ArenaRig.Mesh mesh:rig.meshes){float[] v=new float[mesh.vertices.length];rig.skin(mesh,globals,v);float[] reference=new float[v.length];legacySkin(mesh,globals,reference);for(int i=0;i<v.length;i++)check(Math.abs(v[i]-reference[i])<.00001,"Optimized skinning matches scalar reference");for(float f:v){check(Float.isFinite(f),"Finite skinned geometry");all.add(f);}for(int i=0;i<v.length;i+=8){double length=Math.sqrt(v[i+3]*v[i+3]+v[i+4]*v[i+4]+v[i+5]*v[i+5]);check(Math.abs(length-1)<.001,"Unit skinned normal");check(v[i+6]==mesh.vertices[i+6]&&v[i+7]==mesh.vertices[i+7],"UVs preserved");}}
         float[] result=new float[all.size()];for(int i=0;i<result.length;i++)result[i]=all.get(i);return result;
     }
     public static void main(String[] args)throws Exception{

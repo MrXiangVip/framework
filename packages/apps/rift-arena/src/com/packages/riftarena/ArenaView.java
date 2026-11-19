@@ -21,6 +21,11 @@ public final class ArenaView extends View implements AutoCloseable {
     private final AtomicBoolean pending=new AtomicBoolean();
     private volatile boolean closed;
     private volatile Frame frame;
+    private final ArenaFramePool frames=new ArenaFramePool(900,600);
+    private final ArenaMetrics metrics=new ArenaMetrics();
+    private static final class Aim {final double x,z;final int generation;Aim(double x,double z,int generation){this.x=x;this.z=z;this.generation=generation;}}
+    private final java.util.concurrent.atomic.AtomicReference<Aim> latestAim=new java.util.concurrent.atomic.AtomicReference<>();
+    private final java.util.concurrent.atomic.AtomicLong inputAt=new java.util.concurrent.atomic.AtomicLong();
     private volatile String error="";
     private volatile Thread worker;
     private BufferedImage uiBuffer;
@@ -37,13 +42,14 @@ public final class ArenaView extends View implements AutoCloseable {
         DamageText(ArenaWorld.Impact hit){x=hit.x;z=hit.z;amount=hit.amount;life=hit.life;team=hit.team;}
     }
     static final class Frame {
+        final long producedAt=System.nanoTime();
         final BufferedImage image;final ArenaWorld.Screen screen;
-        final double cameraX,cameraZ,hp,maxHp,attack,time,respawn,recall,x,z,slamTime,dashTime,meteorTime;final boolean slamLanded,inFountain,retreatShot,scatterDraw;
-        final double[] cooldowns;final int gold,level,xp,kills,deaths,hero,wave,weapon,armor;
+        final double scale,zoom,cameraX,cameraZ,hp,maxHp,attack,time,respawn,recall,x,z,slamTime,dashTime,meteorTime;final boolean slamLanded,inFountain,retreatShot,scatterDraw;
+        final double[] cooldowns;final int generation,gold,level,xp,kills,deaths,hero,wave,weapon,armor;
         final java.util.List<DamageText> damageTexts=new ArrayList<>();
         final String notice;final java.util.List<Dot> dots=new ArrayList<>();
         Frame(BufferedImage image,ArenaWorld w,ArenaRenderer r){
-            this.image=image;scatterDraw=w.player.scatterDraw;retreatShot=w.player.retreatShot;meteorTime=w.player.meteorTime;inFountain=Math.hypot(w.player.x-w.player.homeX,w.player.z-w.player.homeZ)<=8;dashTime=w.player.dashTime;slamTime=w.player.slamTime;slamLanded=w.player.slamLanded;screen=w.screen;cameraX=r.cameraX;cameraZ=r.cameraZ;hp=w.player.hp;maxHp=w.player.maxHp;attack=w.player.attack;time=w.elapsed;respawn=w.player.respawn;recall=w.recall;x=w.player.x;z=w.player.z;
+            this.image=image;generation=w.generation;zoom=r.zoom;scale=ArenaRenderer.HUD_SCALE*zoom;scatterDraw=w.player.scatterDraw;retreatShot=w.player.retreatShot;meteorTime=w.player.meteorTime;inFountain=Math.hypot(w.player.x-w.player.homeX,w.player.z-w.player.homeZ)<=8;dashTime=w.player.dashTime;slamTime=w.player.slamTime;slamLanded=w.player.slamLanded;screen=w.screen;cameraX=r.cameraX;cameraZ=r.cameraZ;hp=w.player.hp;maxHp=w.player.maxHp;attack=w.player.attack;time=w.elapsed;respawn=w.player.respawn;recall=w.recall;x=w.player.x;z=w.player.z;
             cooldowns=w.cooldowns.clone();gold=w.gold;level=w.level;xp=w.xp;kills=w.kills;deaths=w.deaths;hero=w.hero;wave=w.wave;weapon=w.weapon;armor=w.armor;notice=w.noticeTime>0?w.notice:"";
             for(ArenaWorld.Unit u:w.units)if(u.alive())dots.add(new Dot(u,w,r));
             for(ArenaWorld.Impact hit:w.impacts)damageTexts.add(new DamageText(hit));
@@ -55,21 +61,35 @@ public final class ArenaView extends View implements AutoCloseable {
         worker=new Thread(()->{
             ArenaRenderer renderer=new ArenaRenderer();
             try{
-                renderer.open(ArenaView.class.getClassLoader(),900,600);long last=System.nanoTime();boolean wasCharging=false,wasMeteorCharging=false;
+                renderer.open(ArenaView.class.getClassLoader(),900,600);long last=System.nanoTime(),nextRender=last;ArenaClock clock=new ArenaClock();boolean wasCharging=false,wasMeteorCharging=false;
                 while(!closed){long begin=System.nanoTime();double dt=(begin-last)/1e9;last=begin;
+                    applyAim();
+                    long input=inputAt.getAndSet(0);if(input!=0)metrics.record(4,begin-input);
                     Runnable r;while((r=commands.poll())!=null)r.run();
-                    world.update(dt,(key('d')||keys.contains(KeyEvent.RIGHT)?1:0)-(key('a')||keys.contains(KeyEvent.LEFT)?1:0),(key('s')||keys.contains(KeyEvent.ARROW_DOWN)?1:0)-(key('w')||keys.contains(KeyEvent.ARROW_UP)?1:0),keys.contains(32));
+                    applyAim();
+                    long simulationBegin=System.nanoTime();
+                    clock.advance(dt,world.screen==ArenaWorld.Screen.PLAYING,()->world.update(ArenaClock.STEP,(key('d')||keys.contains(KeyEvent.RIGHT)?1:0)-(key('a')||keys.contains(KeyEvent.LEFT)?1:0),(key('s')||keys.contains(KeyEvent.ARROW_DOWN)?1:0)-(key('w')||keys.contains(KeyEvent.ARROW_UP)?1:0),keys.contains(32)));
+                    metrics.record(0,System.nanoTime()-simulationBegin);
                     music.update(world.screen);
                     boolean charging=world.screen==ArenaWorld.Screen.PLAYING&&world.player.slamTime>0&&!world.player.slamLanded;
-                    boolean meteorCharging=world.screen==ArenaWorld.Screen.PLAYING&&world.player.alive()&&world.player.meteorTime>ArenaWorld.METEOR_CAST-ArenaWorld.METEOR_RELEASE;
+                    boolean meteorCharging=world.screen==ArenaWorld.Screen.PLAYING&&world.chargingMeteor();
                     while(!world.soundEvents.isEmpty()){
                         String sound=world.soundEvents.removeFirst();if((!sound.equals("slam-charge")||charging)&&(!sound.equals("meteor-charge")||meteorCharging))music.playEffect(sound);
                     }
                     if(wasCharging&&!charging)music.stopEffect("slam-charge");wasCharging=charging;
                     if(wasMeteorCharging&&!meteorCharging)music.stopEffect("meteor-charge");wasMeteorCharging=meteorCharging;
-                    frame=new Frame(renderer.render(world),world,renderer);
-                    if(pending.compareAndSet(false,true))ui.sendMessage(ui.obtainMessage(0,null));
-                    long wait=(world.screen==ArenaWorld.Screen.PLAYING?16666667L:100000000L)-(System.nanoTime()-begin);
+                    if(begin>=nextRender||frame==null||frame.screen!=world.screen){
+                        BufferedImage target=frames.beginWrite();
+                        if(target!=null){long renderBegin=System.nanoTime();renderer.render(world,target);metrics.record(1,System.nanoTime()-renderBegin);
+                            Frame next=new Frame(target,world,renderer);
+                            synchronized(frames){frames.publish(target);frame=next;}
+                            if(pending.compareAndSet(false,true))ui.sendMessage(ui.obtainMessage(0,null));
+                        }
+                        long interval=world.screen==ArenaWorld.Screen.PLAYING?16666667L:100000000L;
+                        nextRender=Math.max(nextRender+interval,System.nanoTime());
+                    }
+                    metrics.report();
+                    long wait=Math.min(world.screen==ArenaWorld.Screen.PLAYING?8333333L:100000000L,Math.max(0,nextRender-System.nanoTime()));
                     if(wait>0)LockSupport.parkNanos(wait);
                     if(Thread.currentThread().isInterrupted())break;
                 }
@@ -77,20 +97,21 @@ public final class ArenaView extends View implements AutoCloseable {
             finally{music.close();renderer.close();}
         },"rift-arena-render");worker.setDaemon(true);worker.start();
     }
-    private void wakeRenderer(){Thread active=worker;if(active!=null)LockSupport.unpark(active);}
+    private void wakeRenderer(){inputAt.compareAndSet(0,System.nanoTime());Thread active=worker;if(active!=null)LockSupport.unpark(active);}
     private boolean key(char c){return keys.contains((int)c);}
     public void pause(){keys.clear();music.update(ArenaWorld.Screen.PAUSED);commands.add(world::pause);wakeRenderer();}
     @Override protected void onFocusChanged(boolean focused){if(!focused)pause();}
     @Override public void close(){music.close();closed=true;keys.clear();commands.clear();if(worker!=null)worker.interrupt();}
     @Override protected void onMeasure(int w,int h){setMeasuredDimension(resolveSize(1200,w),resolveSize(800,h));}
     @Override protected void onDraw(Canvas canvas){
-        if(getWidth()<1||getHeight()<1)return;start();
+        if(getWidth()<1||getHeight()<1)return;long composeBegin=System.nanoTime();start();
         if(uiBuffer==null||uiBuffer.getWidth()!=getWidth()||uiBuffer.getHeight()!=getHeight())
             uiBuffer=new BufferedImage(getWidth(),getHeight(),BufferedImage.TYPE_INT_RGB);
         BufferedImage image=uiBuffer;Graphics2D g=image.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);g.setColor(new Color(0x081522));g.fillRect(0,0,getWidth(),getHeight());
-        double scale=Math.min(getWidth()/1200.0,getHeight()/800.0);g.translate((getWidth()-1200*scale)/2,(getHeight()-800*scale)/2);g.scale(scale,scale);hits.clear();Frame f=frame;
-        if(f!=null)g.drawImage(f.image,0,0,1200,800,null);
+        double scale=Math.min(getWidth()/1200.0,getHeight()/800.0);g.translate((getWidth()-1200*scale)/2,(getHeight()-800*scale)/2);g.scale(scale,scale);hits.clear();Frame f;
+        synchronized(frames){f=frame;if(f!=null)frames.retain(f.image);}
+        if(f!=null)try{g.drawImage(f.image,0,0,1200,800,null);metrics.record(3,System.nanoTime()-f.producedAt);}finally{frames.release(f.image);}
         if(!error.isEmpty()){
             veil(g,.9f);text(g,"竞技场暂时无法打开",90,280,38,0xf2dfb2);wrap(g,error,90,340,55,19);text(g,"请检查 Linux 显示服务与 OpenGL 驱动，然后关闭窗口重试。",90,480,20,0xafc4cf);
         }else if(f==null){text(g,"RIFT ARENA",90,330,64,0xe8d3a0);text(g,"正在唤醒竞技场…",94,385,24,0xb8cdd0);}
@@ -109,7 +130,7 @@ public final class ArenaView extends View implements AutoCloseable {
             }
         }
         if(f!=null&&error.isEmpty())button(g,!music.isAvailable()?"声音不可用":music.isMuted()?"声音：关 [M]":"声音：开 [M]",947,93,158,42,()->{music.toggleMuted();invalidate();},false);
-        g.dispose();canvas.drawImage(image,0,0,getWidth(),getHeight());
+        g.dispose();canvas.drawImage(image,0,0,getWidth(),getHeight());metrics.record(2,System.nanoTime()-composeBegin);
     }
     private void title(Graphics2D g){
         veil(g,.68f);text(g,"R I F T   A R E N A",65,90,20,0x8ecacc);text(g,"星隙竞技场",60,167,61,0xf0dfb1);
@@ -126,6 +147,8 @@ public final class ArenaView extends View implements AutoCloseable {
         text(g,"Q / E / R 技能   ·   B 回城   ·   1 / 2 购买装备   ·   Esc 暂停",65,738,18,0x91b0b5);
         text(g,"目标：先拆防御塔，再摧毁敌方水晶。泉水可恢复生命与购买装备。",445,620,17,0xb0c3be);
     }
+    private void applyAim(){Aim aim=latestAim.get();if(aim!=null&&aim.generation==world.generation){world.aimX=aim.x;world.aimZ=aim.z;}}
+    private void queueCast(int skill){final Aim aim=latestAim.get();commands.add(()->{double x=world.aimX,z=world.aimZ;if(aim!=null&&aim.generation==world.generation){world.aimX=aim.x;world.aimZ=aim.z;}world.cast(skill);world.aimX=x;world.aimZ=z;});}
     private void begin(){final int selected=choice;keys.clear();commands.add(()->world.reset(selected));requestFocus();}
     private void hud(Graphics2D g,Frame f){
         panel(g,22,18,244,44,0x102835);text(g,"星隙竞技场",38,46,20,0xe7d6a8);
@@ -148,7 +171,7 @@ public final class ArenaView extends View implements AutoCloseable {
         button(g,f.recall>0?"B 引导中":"B 回城",835,701,92,55,()->commands.add(world::recall),false);
         text(g,f.recall>0?"移动 / 受伤打断":"4 秒引导",837,771,12,0x9dbbbd);
         shopButton(g,f,0,941,100);shopButton(g,f,1,1051,109);
-        text(g,"WASD 移动   ·   右键追击   ·   按住空格普攻   ·   Q/E/R 技能朝鼠标释放   ·   Esc 暂停",245,795,14,0x9cb8bd);
+        text(g,"WASD 移动   ·   右键追击   ·   按住空格普攻   ·   Q/E/R 技能   ·   滚轮缩放   ·   Esc 暂停",245,795,14,0x9cb8bd);
         if(f.hp<=0){panel(g,410,300,380,86,0x122b36);text(g,"英雄阵亡",520,334,27,0xf2c4bd);text(g,"距离复活  "+(int)Math.ceil(f.respawn)+" 秒",510,370,22,0xd7ddd1);}
         if(f.recall>0){panel(g,440,610,320,45,0x122b36);bar(g,457,638,286,6,1-f.recall/4,0x83d5ea);text(g,"正在回城… "+String.format(Locale.ROOT,"%.1f",f.recall),505,631,18,0xe4dfbd);}
     }
@@ -169,7 +192,10 @@ public final class ArenaView extends View implements AutoCloseable {
         panel(g,x,690,88,68,ready?0x294b4d:0x172e38);
         g.setColor(new Color(active?0xffe1a0:ready?tint:0x52656a));g.drawRoundRect(x,690,88,68,10,10);
         Graphics2D icon=(Graphics2D)g.create();icon.translate(x+44,720);icon.setColor(new Color(tint));icon.setStroke(new BasicStroke(2.5f,BasicStroke.CAP_ROUND,BasicStroke.JOIN_ROUND));
-        if(skill==0){
+        if(f.hero==2&&skill<2){
+            if(skill==0){icon.drawOval(-15,-15,30,30);icon.drawLine(-23,0,23,0);icon.drawLine(0,-23,0,23);icon.drawOval(-5,-5,10,10);}
+            else{for(int i=0;i<8;i++){double a=i*Math.PI/4;icon.drawLine((int)(Math.cos(a)*8),(int)(Math.sin(a)*8),(int)(Math.cos(a)*23),(int)(Math.sin(a)*23));}icon.drawOval(-10,-10,20,20);}
+        }else if(skill==0){
             if(f.hero==1)icon.rotate(Math.PI);
             for(int i=0;i<2;i++){int dx=i*13-9;icon.drawLine(dx-10,-11,dx+1,0);icon.drawLine(dx+1,0,dx-10,11);}
             icon.drawLine(-25,-6,-16,-6);icon.drawLine(-25,6,-16,6);
@@ -190,10 +216,10 @@ public final class ArenaView extends View implements AutoCloseable {
             g.fillArc(x+20,696,48,48,90,-(int)Math.ceil(fraction*360));
         }
         text(g,new String[]{"Q","E","R"}[skill],x+7,708,13,0xf0e0b8);
-        text(g,new String[]{f.hero==1?"后撤射击":"突进",f.hero==1?"扇形散射":"震荡斩","星陨"}[skill],x+27-(skill==1?(f.hero==1?12:7):skill==0&&f.hero==1?12:0),753,14,0xd4dfd7);
+        text(g,ArenaWorld.skillName(f.hero,skill),x+27-(f.hero==2&&skill<2?12:skill==1?(f.hero==1?12:7):skill==0&&f.hero==1?12:0),753,14,0xd4dfd7);
         text(g,state,x+19,774,13,active?0xffdc91:ready?0xa8e4d4:0xb6c7cb);
         final int selected=skill;
-        hits.add(new Hit(x,690,88,68,()->commands.add(()->world.cast(selected))));
+        hits.add(new Hit(x,690,88,68,()->queueCast(selected)));
     }
     static String purchaseState(Frame f,int item){
         int cost=100+(item==0?f.weapon:f.armor)*60;
@@ -210,13 +236,13 @@ public final class ArenaView extends View implements AutoCloseable {
         panel(g,22,588,180,190,0x102835);text(g,"战场态势",40,614,16,0xbcd1ca);
         g.setColor(new Color(0x385b58));g.fillRoundRect(36,631,152,127,5,5);g.setColor(new Color(0x8a8262));g.fillRect(38,691,148,7);g.setColor(new Color(0x3d8596));g.fillRect(106,633,8,122);
         for(Dot d:f.dots){int x=112+(int)(d.x*1.65),y=695+(int)(d.z*2.7);g.setColor(new Color(d.player?0xffe6a6:d.team==0?0x64e0df:0xfa8790));int n=d.kind==ArenaWorld.Kind.HERO?7:d.kind==ArenaWorld.Kind.SOLDIER?3:9;if(d.kind==ArenaWorld.Kind.TOWER||d.kind==ArenaWorld.Kind.CORE)g.fillRect(x-n/2,y-n/2,n,n);else g.fillOval(x-n/2,y-n/2,n,n);}
-        g.setColor(new Color(0xd2ddc1));int vx=112+(int)(f.cameraX*1.65),vy=695+(int)(f.cameraZ*2.7);g.drawRect(vx-49,vy-56,98,112);
+        g.setColor(new Color(0xd2ddc1));int vx=112+(int)(f.cameraX*1.65),vy=695+(int)(f.cameraZ*2.7);int halfW=(int)(49/f.zoom),halfH=(int)(56/f.zoom);g.drawRect(vx-halfW,vy-halfH,halfW*2,halfH*2);
     }
     private void damageNumbers(Graphics2D g,Frame f){
         for(DamageText hit:f.damageTexts){
             double age=.65-hit.life;
-            int x=(int)(600+(hit.x-f.cameraX)*ArenaRenderer.HUD_SCALE)-12;
-            int y=(int)(400+(hit.z-f.cameraZ)*ArenaRenderer.SIN*ArenaRenderer.HUD_SCALE-58-age*58);
+            int x=(int)(600+(hit.x-f.cameraX)*f.scale)-12;
+            int y=(int)(400+(hit.z-f.cameraZ)*ArenaRenderer.SIN*f.scale-58-age*58);
             if(x<0||x>1200||y<80||y>670)continue;
             Composite old=g.getComposite();g.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,(float)Math.min(1,hit.life/.2)));
             String label="-"+(int)Math.ceil(hit.amount);
@@ -225,7 +251,7 @@ public final class ArenaView extends View implements AutoCloseable {
     }
     private void healthBars(Graphics2D g,Frame f){
         for(Dot d:f.dots){double tall=d.kind==ArenaWorld.Kind.TOWER?6:d.kind==ArenaWorld.Kind.CORE?7:d.kind==ArenaWorld.Kind.HERO?4.5:2.9;
-            int x=(int)(600+(d.x-f.cameraX)*ArenaRenderer.HUD_SCALE),y=(int)(400+(d.z-f.cameraZ)*ArenaRenderer.SIN*ArenaRenderer.HUD_SCALE-tall*ArenaRenderer.COS*ArenaRenderer.HUD_SCALE);
+            int x=(int)(600+(d.x-f.cameraX)*f.scale),y=(int)(400+(d.z-f.cameraZ)*ArenaRenderer.SIN*f.scale-tall*ArenaRenderer.COS*f.scale);
             boolean soldier=d.kind==ArenaWorld.Kind.SOLDIER,hero=d.kind==ArenaWorld.Kind.HERO;
             int w=soldier?32:hero?78:94,h=soldier?4:hero?7:9;
             if(x<0||x>1200||y<85||y>660)continue;
@@ -259,7 +285,7 @@ public final class ArenaView extends View implements AutoCloseable {
         else if(k==KeyEvent.ESCAPE){keys.clear();keys.add(k);commands.add(()->{if(world.screen==ArenaWorld.Screen.PAUSED)world.resume();else world.pause();});}
         else if(k==KeyEvent.ENTER){if(f.screen==ArenaWorld.Screen.TITLE)begin();else commands.add(()->{if(world.screen==ArenaWorld.Screen.PAUSED)world.resume();else if(world.screen==ArenaWorld.Screen.WON||world.screen==ArenaWorld.Screen.LOST)world.reset(world.hero);});}
         else if(f.screen==ArenaWorld.Screen.TITLE){if(k>='1'&&k<='3'){choice=k-'1';invalidate();}}
-        else if(k==32)commands.add(world::requestAttack);else if(k=='q')commands.add(()->world.cast(0));else if(k=='e')commands.add(()->world.cast(1));else if(k=='r')commands.add(()->world.cast(2));else if(k=='b')commands.add(world::recall);else if(k=='1')commands.add(()->world.buy(0));else if(k=='2')commands.add(()->world.buy(1));
+        else if(k==32)commands.add(world::requestAttack);else if(k=='q')queueCast(0);else if(k=='e')queueCast(1);else if(k=='r')queueCast(2);else if(k=='b')commands.add(world::recall);else if(k=='1')commands.add(()->world.buy(0));else if(k=='2')commands.add(()->world.buy(1));
         wakeRenderer();return true;
     }
     @Override protected boolean onTouchEvent(MotionEvent e){
@@ -268,11 +294,12 @@ public final class ArenaView extends View implements AutoCloseable {
         if(x<0||x>=1200||y<0||y>=800)return false;
         Frame f=frame;
         boolean field=y>135&&y<680&&!(x<223&&y>580);
-        if(f!=null&&f.screen==ArenaWorld.Screen.PLAYING&&field){double wx=f.cameraX+(x-600)/ArenaRenderer.HUD_SCALE,wz=f.cameraZ+(y-400)/(ArenaRenderer.HUD_SCALE*ArenaRenderer.SIN);commands.add(()->{world.aimX=ArenaWorld.clamp(wx,-43,43);world.aimZ=ArenaWorld.clamp(wz,-18,18);});}
-        if(e.getAction()==MotionEvent.ACTION_DOWN){requestFocus();downX=x;downY=y;if(e.getButton()==3&&f!=null&&f.screen==ArenaWorld.Screen.PLAYING&&field){double wx=f.cameraX+(x-600)/ArenaRenderer.HUD_SCALE,wz=f.cameraZ+(y-400)/(ArenaRenderer.HUD_SCALE*ArenaRenderer.SIN);
+        if(e.getAction()==MotionEvent.ACTION_SCROLL&&f!=null&&f.screen==ArenaWorld.Screen.PLAYING&&field){final int delta=e.getScrollDelta();commands.add(()->world.cameraZoom=ArenaWorld.clamp(world.cameraZoom-delta*.1,.85,1.25));wakeRenderer();return true;}
+        if(f!=null&&f.screen==ArenaWorld.Screen.PLAYING&&field){double wx=f.cameraX+(x-600)/f.scale,wz=f.cameraZ+(y-400)/(f.scale*ArenaRenderer.SIN);latestAim.set(new Aim(ArenaWorld.clamp(wx,-43,43),ArenaWorld.clamp(wz,-18,18),f.generation));}
+        if(e.getAction()==MotionEvent.ACTION_DOWN){requestFocus();downX=x;downY=y;if(e.getButton()==3&&f!=null&&f.screen==ArenaWorld.Screen.PLAYING&&field){double wx=f.cameraX+(x-600)/f.scale,wz=f.cameraZ+(y-400)/(f.scale*ArenaRenderer.SIN);
                 double best=Double.MAX_VALUE;
-                for(Dot d:f.dots)if(d.team==1){double px=600+(d.x-f.cameraX)*ArenaRenderer.HUD_SCALE,py=400+(d.z-f.cameraZ)*ArenaRenderer.HUD_SCALE*ArenaRenderer.SIN;double tall=d.kind==ArenaWorld.Kind.TOWER||d.kind==ArenaWorld.Kind.CORE?85:55;
-                    double distance=Math.hypot(x-px,y-(py-tall/2));if(Math.abs(x-px)<30&&y>py-tall&&y<py+12&&distance<best){best=distance;wx=d.x;wz=d.z;}}
+                for(Dot d:f.dots)if(d.team==1){double px=600+(d.x-f.cameraX)*f.scale,py=400+(d.z-f.cameraZ)*f.scale*ArenaRenderer.SIN;double tall=(d.kind==ArenaWorld.Kind.TOWER||d.kind==ArenaWorld.Kind.CORE?85:55)*f.zoom;
+                    double distance=Math.hypot(x-px,y-(py-tall/2));if(Math.abs(x-px)<30*f.zoom&&y>py-tall&&y<py+12&&distance<best){best=distance;wx=d.x;wz=d.z;}}
                 final double targetX=wx,targetZ=wz;commands.add(()->world.command(targetX,targetZ));wakeRenderer();}return true;}
         if(e.getAction()==MotionEvent.ACTION_UP&&e.getButton()==1){for(Hit hit:new ArrayList<>(hits))if(hit.box.contains(x,y)&&hit.box.contains(downX,downY)){hit.action.run();wakeRenderer();break;}return true;}
         return e.getAction()==MotionEvent.ACTION_MOVE||e.getAction()==MotionEvent.ACTION_HOVER;

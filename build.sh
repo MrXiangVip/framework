@@ -28,7 +28,7 @@ gcc -fPIC "${JNI_INC[@]}" -shared -o com/android/libandroid.so com/android/Zygot
 export LD_LIBRARY_PATH="$BASE_DIR/com/android:${LD_LIBRARY_PATH:-}"
 
 echo "Compile libwindow.so"
-gcc -fPIC "${JNI_INC[@]}" -shared -o com/android/libwindow.so com/android/XWindow.c -lX11
+gcc -O2 -fPIC "${JNI_INC[@]}" -shared -o com/android/libwindow.so com/android/XWindow.c -lX11
 
 echo "Compile app_process"
 g++ -D__int64="long long" "${JNI_INC[@]}" -o app_process app_main.cpp -L"$JVM_LIB" -ljvm

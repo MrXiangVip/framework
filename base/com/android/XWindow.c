@@ -278,6 +278,32 @@ static unsigned long component(unsigned int value, unsigned long mask) {
     return (((unsigned long)value * mask / 255) << shift);
 }
 
+/* Common TrueColor images can be filled a scanline at a time without XPutPixel calls.
+ * Keep the general path for other masks, packed formats and opposite byte orders. */
+static void copy_frame_pixels(XImage *image, const jint *data, int width, int height) {
+    const uint32_t endian = 1;
+    const int native_order = *(const unsigned char *)&endian ? LSBFirst : MSBFirst;
+    if (image->format == ZPixmap && image->xoffset == 0 && image->bits_per_pixel == 32
+            && image->byte_order == native_order && image->bytes_per_line % 4 == 0
+            && image->red_mask == 0xff0000 && image->green_mask == 0xff00 && image->blue_mask == 0xff) {
+        for (int y = 0; y < height; y++) {
+            uint32_t *row = (uint32_t *)(void *)(image->data + (size_t)y * image->bytes_per_line);
+            const jint *source = data + (size_t)y * width;
+            for (int x = 0; x < width; x++) row[x] = (uint32_t)source[x] & 0xffffffu;
+        }
+        return;
+    }
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            unsigned int rgb = (unsigned int)data[y * width + x];
+            unsigned long pixel = component((rgb >> 16) & 255, image->red_mask)
+                | component((rgb >> 8) & 255, image->green_mask)
+                | component(rgb & 255, image->blue_mask);
+            XPutPixel(image, x, y, pixel);
+        }
+    }
+}
+
 /* Keep the previous buffer if allocating its replacement fails. */
 static XImage *ensure_frame_image(JNIEnv *env, XSurface *s, int width, int height) {
     if (s->frame_image && s->frame_image->width == width && s->frame_image->height == height)
@@ -310,15 +336,7 @@ JNIEXPORT void JNICALL Java_com_android_wm_XWindow_nativePresent
     if (!image) return;
     jint *data = (*env)->GetIntArrayElements(env, pixels, NULL);
     if (!data) return;
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            unsigned int rgb = (unsigned int)data[y * width + x];
-            unsigned long pixel = component((rgb >> 16) & 255, image->red_mask)
-                | component((rgb >> 8) & 255, image->green_mask)
-                | component(rgb & 255, image->blue_mask);
-            XPutPixel(image, x, y, pixel);
-        }
-    }
+    copy_frame_pixels(image, data, width, height);
     (*env)->ReleaseIntArrayElements(env, pixels, data, JNI_ABORT);
     XPutImage(s->display, s->window, s->gc, image, 0, 0, 0, 0, (unsigned)width, (unsigned)height);
     XFlush(s->display);
