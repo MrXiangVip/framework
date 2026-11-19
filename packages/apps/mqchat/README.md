@@ -4,13 +4,15 @@
 
 ## 使用
 
-1. 启动 MQChat，点击右上角「连接」。默认使用 `broker.emqx.io:8883`，开启 TLS 与服务器证书校验。
-2. 底部点击「我的」查看圆形头像、昵称与 13 位展示码。点击「编辑资料」修改昵称、查看完整 UUID；头像栏输入图片完整路径，点击「保存资料」。PNG / JPEG 会自动裁剪压缩为 64×64 图片。
+1. 启动 MQChat 后自动连接 MQTT；可通过右上角或「我 → 连接管理」手动断开 / 连接。默认使用 `broker.emqx.io:8883`，开启 TLS 与服务器证书校验。
+2. 底部点击「我」查看方圆角头像、昵称与 13 位展示码。点击资料卡片修改昵称、查看完整 UUID；头像栏输入图片完整路径，点击「保存资料」。PNG / JPEG 会自动裁剪压缩为 64×64 图片。
 3. 双方至少连接一次以发布展示码目录。在「通讯录」点击右上方「添加好友」，输入对方展示码或完整 UUID，再点击「发送好友申请」。申请会保留在服务器，对方上线后可收到。
 4. 对方打开申请，选择同意或拒绝。同意后双方保存好友，自动订阅好友状态与共同私聊 Topic。点击好友进入对话。
 5. Enter 发送；Shift + Enter 换行。离线消息先存入 SQLite，重连后每 10 秒重试；收到对方回执后显示「已送达」。MQTT PUBACK 只显示「已发送」，不当作对方已经收到。
 
-通讯录支持按昵称、展示码或 UUID 搜索，点击联系人进入私聊或处理好友申请。顶部「连接 / 断开」控制 MQTT 连接，底部「通讯录 / 我的」切换页面。当前 UUID 账号没有密码登录，参考图中的第二个资料菜单用作「编辑资料」。
+通讯录支持按昵称、展示码或 UUID 搜索，点击联系人进入私聊或处理好友申请。顶部「连接 / 断开」控制 MQTT 连接，底部「消息 / 通讯录 / 我」切换页面。「消息」按最新消息时间排序，显示会话摘要与时间；聊天采用灰色背景、白色接收气泡和绿色发送气泡，返回时保留草稿。当前 UUID 账号没有密码登录。
+
+聊天输入栏的笑脸按钮打开八列表情面板，支持默认表情、爱心与庆祝、手势、搜索、最近使用及删除。表情仍以标准 Unicode 文本加密发送；最近使用保存在账号目录的 `emoji-recent.txt`。当前框架使用单色 Emoji 字体，部分新表情用近似旧字形显示，发送和保存的原始 Unicode 不变。
 
 昵称、头像、UUID 和密钥重启后保持不变。联系人包括「待对方同意」「新好友申请」「已成为好友」「已拒绝」状态。
 
@@ -18,7 +20,7 @@
 
 默认数据库位置：`~/.mqchat/mqchat.sqlite`。可用 JVM 属性 `framework.mqchat.dataDir` 为不同账号指定独立目录。
 
-在「我的 → 备份迁移」填写 `.sqlite` 文件路径，点击「导出备份」。新设备打开相同页面，填写备份路径，点击「导入备份」，再点击「确认恢复」。
+在「我 → 备份迁移」填写 `.sqlite` 文件路径，点击「导出备份」。新设备打开相同页面，填写备份路径，点击「导入备份」，再点击「确认恢复」。
 
 备份包含自己的 UUID、身份密钥、昵称头像、好友和申请、聊天记录、待发送消息。恢复会断开网络并替换当前账号资料；校验完成后在同一 SQLite 事务中恢复，失败时保留原数据。恢复后点击连接即可重新订阅好友并继续发送待送达消息。换设备时停止旧设备登录，同一身份使用固定 MQTT Client ID，不能同时运行两个副本。
 
@@ -51,7 +53,8 @@ WSL 中请填写 Linux 路径，例如 `/home/用户名/avatar.png`、`/mnt/c/Us
 - `PeerMqtt.java`：多 Topic / 单层通配符订阅、QoS 1、遗嘱、重连、TLS。
 - `PeerStore.java`：真实 SQLite 表、好友公钥固定、消息去重、持久发送队列与备份恢复。
 - `PeerSession.java`：申请 / 同意 / 拒绝、资料发现、在线状态、心跳、私聊送达状态机。
-- `PeerView.java`：好友与申请列表、个人资料、头像、私聊、备份迁移。
+- `PeerView.java`：参考 `D:\AndroidStudioProjects\MQChat` 的消息 / 通讯录 / 我、好友申请、个人资料、聊天气泡和备份迁移。
+- `EmojiPicker.java`：同一参考项目的表情分类与搜索词，适配当前框架的自绘面板。
 - `ChatText.java` 与 `res/fonts`：内置 CJK / Emoji 字体，保持中文输入和显示。
 
 旧的公共频道界面保留为 `legacy_channel.xml` 和 `ChatView.java`，新应用入口使用 `PeerView`。
@@ -87,4 +90,14 @@ javac -encoding UTF-8 -source 8 -target 8 -cp 'out/framework/classes;libs/*' -d 
 java '-Djava.awt.headless=true' -cp 'out/mqchat-peer-ui-tests;out/framework/classes;libs/*' com.android.app.MqchatPeerViewTest
 ```
 
-Linux / WSL 将 classpath 的分隔符 `;` 改为 `:`。界面测试从真实 APK 加载全部 SQLite 依赖，验证 12 项操作并生成好友、资料、备份、私聊的 600 / 360 像素宽预览。
+Linux / WSL 将 classpath 的分隔符 `;` 改为 `:`。界面测试从真实 APK 加载全部 SQLite 依赖，使用临时数据库和离线模式验证导航、会话排序、草稿、表情、消息入库与发送队列，并生成 600 / 360 像素宽预览。
+
+```bash
+bash packages/apps/build.sh mqchat
+mkdir -p out/mqchat-peer-ui-tests
+javac -encoding UTF-8 -source 8 -target 8 -cp 'out/framework/classes:libs/*' -d out/mqchat-peer-ui-tests tests/com/android/app/MqchatPeerViewTest.java
+java -Djava.awt.headless=true -cp 'out/mqchat-peer-ui-tests:out/framework/classes:libs/*' com.android.app.MqchatPeerViewTest out/mqchat-ui-previews
+python3 tests/mqchat_packaging_test.py
+```
+
+适配保留桌面框架的 JDBC SQLite、图片和备份路径输入；不依赖 Android SDK 的 Activity、SQLiteDatabase 或系统文件选择器。MQTT、加密协议、数据库格式和 Android 版 v2 备份保持兼容。可设置 `-Dframework.mqchat.autoConnect=false` 关闭启动自动连接，便于离线使用和测试。

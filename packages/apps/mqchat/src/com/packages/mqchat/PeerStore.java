@@ -61,6 +61,13 @@ public final class PeerStore implements AutoCloseable {
     private void transactionSql(Work work)throws SQLException{try{transaction(work);}catch(SQLException e){throw e;}catch(Exception e){throw new SQLException(e);}}
     public synchronized boolean addMessage(String id,String peer,String body,boolean own,long time,String status)throws SQLException{try(PreparedStatement statement=db.prepareStatement("INSERT OR IGNORE INTO messages VALUES(?,?,?,?,?,?)")){statement.setString(1,id);statement.setString(2,peer);statement.setString(3,body);statement.setInt(4,own?1:0);statement.setLong(5,time);statement.setString(6,status);return statement.executeUpdate()!=0;}}
     public synchronized void delivered(String id,String peer)throws SQLException{transactionSql(()->{update("UPDATE messages SET status='已送达' WHERE id=? AND peer=? AND own=1",id,peer);update("DELETE FROM outbox WHERE id IN (SELECT id FROM messages WHERE id=? AND peer=? AND own=1 AND status='已送达')",id,peer);});}
+    public synchronized Message latestMessage(String peer)throws SQLException{
+        try(PreparedStatement statement=db.prepareStatement("SELECT * FROM messages WHERE peer=? ORDER BY time DESC,id DESC LIMIT 1")){
+            statement.setString(1,peer);try(ResultSet rows=statement.executeQuery()){
+                return rows.next()?new Message(rows.getString("id"),rows.getString("peer"),rows.getString("body"),rows.getInt("own")!=0,rows.getLong("time"),rows.getString("status")):null;
+            }
+        }
+    }
     public synchronized List<Message> messages(String peer)throws SQLException{List<Message> result=new ArrayList<>();try(PreparedStatement statement=db.prepareStatement("SELECT * FROM (SELECT * FROM messages WHERE peer=? ORDER BY time DESC,id DESC LIMIT 300) ORDER BY time,id")){statement.setString(1,peer);try(ResultSet rows=statement.executeQuery()){while(rows.next())result.add(new Message(rows.getString("id"),rows.getString("peer"),rows.getString("body"),rows.getInt("own")!=0,rows.getLong("time"),rows.getString("status")));}}return result;}
     public synchronized void exportBackup(Path destination)throws Exception{
         Path target=destination.toAbsolutePath().normalize();if(target.equals(path))throw new IllegalArgumentException("备份路径不能是当前数据库");Files.createDirectories(target.getParent());Path temp=Files.createTempFile(target.getParent(),"mqchat-backup-",".sqlite");Files.delete(temp);
