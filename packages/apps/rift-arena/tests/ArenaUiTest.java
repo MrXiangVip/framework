@@ -92,9 +92,9 @@ public final class ArenaUiTest {
             double dashX=frame(v).x;key(v,'q');waitFor(v,()->frame(v).dashTime>0);draw(v,"dash-ui",1200,800);
             waitFor(v,()->frame(v).dashTime==0&&frame(v).x>dashX+5);check(frame(v).cooldowns[0]>0,"Q key dispatch and cooldown");
             commands.add(()->{
-                w.reset(0);w.waveTimer=100;w.player.x=17;w.player.z=0;
-                w.rival.x=35;w.rival.z=10;
-                for(ArenaWorld.Unit u:w.units)if(u.kind==ArenaWorld.Kind.TOWER&&u.team==1){u.attack=0;w.selected=u;}
+                w.reset(0);w.waveTimer=100;w.player.x=ArenaWorld.TOWER_X-5;w.player.z=0;
+                w.rival.x=ArenaWorld.HOME_X;w.rival.z=10;
+                for(ArenaWorld.Unit u:w.units)if(u.kind==ArenaWorld.Kind.TOWER&&u.team==1&&u.lane==0){u.attack=0;w.selected=u;}
             });
             waitFor(v,()->frame(v).hero==0&&frame(v).dots.stream().anyMatch(d->d.selected&&d.threat));
             draw(v,"target-tower-warning",1200,800);
@@ -106,7 +106,7 @@ public final class ArenaUiTest {
             draw(v,null,1200,800);
             check(frame(v).dots.stream().filter(d->d.player).findFirst().get().trail==frozenTrail,"Pause freezes health feedback");
             commands.add(()->{
-                ArenaWorld.Unit soldier=w.spawn(ArenaWorld.Kind.SOLDIER,0,21,0);soldier.speed=0;
+                ArenaWorld.Unit soldier=w.spawn(ArenaWorld.Kind.SOLDIER,0,ArenaWorld.TOWER_X-1,0);soldier.speed=0;
                 for(ArenaWorld.Unit u:w.units)if(u.kind==ArenaWorld.Kind.TOWER&&u.team==1)check(!ArenaRenderer.towerThreat(w,u),"Tower prioritizes minion over player");
                 w.resume();w.damage(w.selected,10000,0);
             });

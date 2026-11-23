@@ -3,23 +3,25 @@ package com.packages.riftarena;
 public final class ArenaWorldTest {
     static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
     static ArenaWorld fresh(){ArenaWorld w=new ArenaWorld();w.reset(0);return w;}
-    static ArenaWorld.Unit find(ArenaWorld w,ArenaWorld.Kind k,int team){for(ArenaWorld.Unit u:w.units)if(u.kind==k&&u.team==team)return u;throw new AssertionError("Missing unit");}
+    static ArenaWorld.Unit find(ArenaWorld w,ArenaWorld.Kind k,int team){for(ArenaWorld.Unit u:w.units)if(u.kind==k&&u.team==team&&(k!=ArenaWorld.Kind.TOWER||u.lane==0))return u;throw new AssertionError("Missing unit");}
     static void advance(ArenaWorld w,double seconds){for(int i=0;i<(int)(seconds*100);i++)w.update(.01,0,0,false);}
     public static void main(String[] args){
         ArenaWorld w=fresh();double x=w.player.x;w.update(.1,1,1,false);check(Math.abs(Math.hypot(w.player.x-x,w.player.z)-.8)<.001,"Normalized diagonal movement");
-        w.player.x=42.9;w.update(.2,1,0,false);check(w.player.x<=43,"Map bounds");
+        w.player.x=ArenaWorld.LIMIT_X-.1;w.update(.2,1,0,false);check(w.player.x==ArenaWorld.LIMIT_X,"Expanded east map boundary");
+        w.player.z=ArenaWorld.LIMIT_Z-.1;w.update(.2,0,1,false);check(w.player.z==ArenaWorld.LIMIT_Z,"Expanded north map boundary");
+        w.command(-1000,-1000);check(w.destX==-ArenaWorld.LIMIT_X&&w.destZ==-ArenaWorld.LIMIT_Z,"Ground orders clamp both expanded axes");
         w=fresh();w.pause();double time=w.elapsed;w.update(.1,1,0,true);check(w.elapsed==time,"Pause freezes simulation");w.resume();w.update(.1,0,0,false);check(w.elapsed>time,"Resume");
-        w=fresh();advance(w,3.1);check(w.wave==1&&w.units.stream().filter(u->u.kind==ArenaWorld.Kind.SOLDIER).count()==8,"Both sides spawn four soldiers");
+        w=fresh();advance(w,3.1);check(w.wave==1&&w.units.stream().filter(u->u.kind==ArenaWorld.Kind.SOLDIER).count()==24,"Both sides spawn four soldiers on each of three lanes");
         ArenaWorld.Unit tower=find(w,ArenaWorld.Kind.TOWER,1),core=find(w,ArenaWorld.Kind.CORE,1);double hp=core.hp;w.damage(core,100000,0);check(core.hp==hp,"Core protected while tower alive");
-        w.player.x=19;w.player.z=0;ArenaWorld.Unit soldier=w.spawn(ArenaWorld.Kind.SOLDIER,0,13,0);check(w.target(tower)==soldier,"Tower prioritizes minions over nearer hero");
+        w.player.x=tower.x-3;w.player.z=tower.z;ArenaWorld.Unit soldier=w.spawn(ArenaWorld.Kind.SOLDIER,0,tower.x-9,0);check(w.target(tower)==soldier,"Tower prioritizes minions over nearer hero");
         w=fresh();w.player.x=0;ArenaWorld.Unit enemy=w.spawn(ArenaWorld.Kind.SOLDIER,1,3,0),ally=w.spawn(ArenaWorld.Kind.SOLDIER,0,3,0);hp=ally.hp;enemy.attack=ally.attack=enemy.speed=ally.speed=0;
         w.aimX=7;w.aimZ=0;check(w.cast(0)&&enemy.hp==enemy.maxHp,"Dash does not hit before moving");advance(w,.25);check(enemy.hp<enemy.maxHp&&ally.hp==hp,"Dash damages path enemies only");check(!w.cast(0),"Skill cooldown enforced");
         w.player.x=0;w.player.z=0;enemy.hp=enemy.maxHp;check(w.cast(1)&&enemy.hp==enemy.maxHp,"Slam waits for impact");advance(w,.6);check(enemy.hp<enemy.maxHp,"Slam area damage on impact");
         w.aimX=3;w.aimZ=0;enemy.hp=enemy.maxHp;enemy.speed=0;enemy.attack=0;check(w.cast(2)&&enemy.hp==enemy.maxHp,"Meteor has warning delay");advance(w,1.2);check(enemy.hp==Math.max(0,enemy.maxHp-180-w.level*22),"Delayed meteor resolves");
         w=fresh();double attack=w.player.attack;check(w.buy(0)&&w.player.attack==attack+18&&w.gold==100,"Attack purchase");double max=w.player.maxHp;check(w.buy(1)&&w.player.maxHp==max+180&&w.gold==0,"Health purchase");check(!w.buy(0),"No spending missing gold");w.gold=999;w.player.x=0;check(!w.buy(0),"Shop limited to fountain");
-        w=fresh();w.player.x=0;w.recall();w.update(.1,1,0,false);check(w.recall==0,"Movement cancels recall");w.recall();w.damage(w.player,1,1);check(w.recall==0,"Damage cancels recall");w.rival.speed=0;w.waveTimer=100;w.recall();advance(w,4.1);check(Math.abs(w.player.x+33)<.01,"Recall returns to fountain");
+        w=fresh();w.player.x=0;w.recall();w.update(.1,1,0,false);check(w.recall==0,"Movement cancels recall");w.recall();w.damage(w.player,1,1);check(w.recall==0,"Damage cancels recall");w.rival.speed=0;w.waveTimer=100;w.recall();advance(w,4.1);check(Math.abs(w.player.x-w.player.homeX)<.01,"Recall returns to fountain");
         w=fresh();w.player.x=0;int gold=w.gold;for(int i=0;i<6;i++){enemy=w.spawn(ArenaWorld.Kind.SOLDIER,1,1,0);w.damage(enemy,10000,0);}check(w.gold>gold&&w.level==2,"Gold XP and level rewards");
-        w.damage(w.player,10000,1);check(!w.player.alive()&&w.deaths==1,"Hero death counted");advance(w,8);check(w.player.alive()&&w.player.hp==w.player.maxHp&&w.player.x==-33,"Hero respawns at home");
+        w.damage(w.player,10000,1);check(!w.player.alive()&&w.deaths==1,"Hero death counted");advance(w,8);check(w.player.alive()&&w.player.hp==w.player.maxHp&&w.player.x==w.player.homeX,"Hero respawns at home");
         w=fresh();tower=find(w,ArenaWorld.Kind.TOWER,1);core=find(w,ArenaWorld.Kind.CORE,1);w.damage(tower,10000,0);check(!w.shielded(core),"Tower destruction removes shield");w.damage(core,10000,0);check(w.screen==ArenaWorld.Screen.WON,"Victory");w.reset(2);check(w.screen==ArenaWorld.Screen.PLAYING&&w.gold==200&&w.hero==2&&w.cooldowns[2]==0&&w.effects.isEmpty(),"Clean restart with selected hero");
         w.damage(find(w,ArenaWorld.Kind.TOWER,0),10000,1);w.damage(find(w,ArenaWorld.Kind.CORE,0),10000,1);check(w.screen==ArenaWorld.Screen.LOST,"Defeat");
         // Tap requests survive release before the next frame; empty attacks cannot damage distant enemies.
@@ -74,10 +76,10 @@ public final class ArenaWorldTest {
         w=fresh();w.reset(1);int ticks=0;
         while(w.screen==ArenaWorld.Screen.PLAYING&&ticks++<24000){
             if(w.player.alive()){
-                if(Math.hypot(w.player.x+33,w.player.z)<8){w.buy(0);w.buy(1);}
+                if(Math.hypot(w.player.x-w.player.homeX,w.player.z-w.player.homeZ)<8){w.buy(0);w.buy(1);}
                 boolean retreat=w.player.hp<w.player.maxHp*.35;
-                ArenaWorld.Unit target=w.nearest(w.player,100);
-                if(retreat)w.command(-33,0);else if(target!=null)w.command(target.x,target.z);
+                ArenaWorld.Unit target=w.nearest(w.player,ArenaWorld.LIMIT_X*2);
+                if(retreat)w.command(w.player.homeX,w.player.homeZ);else if(target!=null)w.command(target.x,target.z);
                 if(target!=null&&!retreat){w.aimX=target.x;w.aimZ=target.z;if(w.player.distance(target)<5)w.cast(1);if(w.player.distance(target)<14)w.cast(2);}
             }
             w.update(.1,0,0,true);

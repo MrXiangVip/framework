@@ -54,10 +54,17 @@ final class ArenaRenderer implements AutoCloseable {
     static final double VIEW_HEIGHT=34,HUD_SCALE=800.0/VIEW_HEIGHT;
     static final class Canopy {
         final double x,z,height,angle;final String model;double alpha=1,minX,maxX,minY,maxY;
-        Canopy(int i){x=-42+(i*17%85);z=(i%2==0?-1:1)*(12+(i*7%5)*1.35);height=5.5+(i%4)*.65;angle=i*43;model=i%3==0?"birch":"tree";}
+        Canopy(int i){x=-82+(i*37%165);z=(i%2==0?-1:1)*(12+(i*7%13)*1.7);height=5.5+(i%4)*.65;angle=i*43;model=i%3==0?"birch":"tree";}
     }
     final List<Canopy> canopies=new ArrayList<>();double canopyTime=Double.NaN;int fadedTrees;
     static final double TILT=55, SIN=Math.sin(Math.toRadians(TILT)),COS=Math.cos(Math.toRadians(TILT));
+    static boolean onLane(double x,double z,double margin){
+        for(int lane=-1;lane<=1;lane++)if(Math.abs(z-ArenaWorld.laneZ(lane,x))<margin)return true;
+        return false;
+    }
+    static boolean nearBridge(double z){return Math.abs(z)<6||Math.abs(Math.abs(z)-ArenaWorld.LANE_Z)<6;}
+    static double cameraLimitX(double zoom,double aspect){return Math.max(0,ArenaWorld.LIMIT_X-VIEW_HEIGHT/zoom/2*aspect);}
+    static double cameraLimitZ(double zoom){return Math.max(0,ArenaWorld.LIMIT_Z-VIEW_HEIGHT/zoom/2/SIN);}
     void open(ClassLoader loader,int w,int h)throws IOException{
         errors=GLFWErrorCallback.createPrint(System.err);errors.set();
         glfwInitHint(GLFW_PLATFORM,GLFW_PLATFORM_X11);
@@ -77,7 +84,7 @@ final class ArenaRenderer implements AutoCloseable {
         pixels=BufferUtils.createByteBuffer(w*h*4);packedPixels=pixels.asIntBuffer();glPixelStorei(GL_PACK_ALIGNMENT,1);
         glEnable(GL_DEPTH_TEST);glEnable(GL_NORMALIZE);glEnable(GL_COLOR_MATERIAL);glColorMaterial(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE);
         glEnable(GL_LIGHTING);glEnable(GL_LIGHT0);glLightModelfv(GL_LIGHT_MODEL_AMBIENT,new float[]{.48f,.55f,.64f,1});glLightfv(GL_LIGHT0,GL_DIFFUSE,new float[]{.8f,.79f,.68f,1});
-        for(int i=0;i<36;i++){Canopy tree=new Canopy(i);if(Math.abs(tree.x)>=7)canopies.add(tree);}
+        for(int i=0;i<108;i++){Canopy tree=new Canopy(i);if(Math.abs(tree.x)>=7&&!onLane(tree.x,tree.z,5))canopies.add(tree);}
         assets=new ArenaAssets(loader);
         for(String name:ArenaAssets.MODELS){
             if(isCharacter(name)){
@@ -90,7 +97,8 @@ final class ArenaRenderer implements AutoCloseable {
         for(String surface:new String[]{"grass","dirt","stone","gravel"})loadTexture("textures/ground-"+surface+".png");
         landscape=glGenLists(1);glNewList(landscape,GL_COMPILE);world(0);glEndList();
         // Cover every legal camera position at the same world-to-pixel scale, once.
-        sceneMarginX=(int)Math.ceil(17*height/VIEW_HEIGHT*1.25);sceneMarginY=(int)Math.ceil(5*SIN*height/VIEW_HEIGHT*1.25);
+        sceneMarginX=(int)Math.ceil(cameraLimitX(1.25,w/(double)h)*height/VIEW_HEIGHT*1.25)+2;
+        sceneMarginY=(int)Math.ceil(cameraLimitZ(1.25)*SIN*height/VIEW_HEIGHT*1.25)+2;
         sceneWidth=width+sceneMarginX*2;sceneHeight=height+sceneMarginY*2;
         sceneFbo=glGenFramebuffers();glBindFramebuffer(GL_FRAMEBUFFER,sceneFbo);
         sceneColor=glGenRenderbuffers();glBindRenderbuffer(GL_RENDERBUFFER,sceneColor);glRenderbufferStorage(GL_RENDERBUFFER,GL_RGB8,sceneWidth,sceneHeight);
@@ -109,8 +117,8 @@ final class ArenaRenderer implements AutoCloseable {
     BufferedImage render(ArenaWorld world,BufferedImage image){
         if(image.getWidth()!=width||image.getHeight()!=height||image.getType()!=BufferedImage.TYPE_INT_RGB)throw new IllegalArgumentException("Unexpected frame buffer");
         double wantedZoom=ArenaWorld.clamp(world.cameraZoom,.85,1.25);if(wantedZoom!=zoom){zoom=wantedZoom;sceneReady=false;}
-        cameraX=world.screen==ArenaWorld.Screen.TITLE?0:ArenaWorld.clamp(world.player.x,-17,17);
-        cameraZ=world.screen==ArenaWorld.Screen.TITLE?0:ArenaWorld.clamp(world.player.z,-5,5);
+        cameraX=world.screen==ArenaWorld.Screen.TITLE?0:ArenaWorld.clamp(world.player.x,-cameraLimitX(zoom,width/(double)height),cameraLimitX(zoom,width/(double)height));
+        cameraZ=world.screen==ArenaWorld.Screen.TITLE?0:ArenaWorld.clamp(world.player.z,-cameraLimitZ(zoom),cameraLimitZ(zoom));
         // Integer pixel scrolling keeps cached depth, scene and dynamic geometry aligned.
         double scale=height/VIEW_HEIGHT*zoom;
         cameraX=Math.rint(cameraX*scale)/scale;cameraZ=Math.rint(cameraZ*scale*SIN)/(scale*SIN);
@@ -311,25 +319,27 @@ final class ArenaRenderer implements AutoCloseable {
         glLightfv(GL_LIGHT0,GL_POSITION,new float[]{-20,50,25,0});
     }
     private void world(double time){
-        cube(0,-2.1,0,91,3,43,0x394b38);
+        double edgeX=ArenaWorld.TERRAIN_X,edgeZ=ArenaWorld.TERRAIN_Z;
+        cube(0,-2.1,0,edgeX*2+1,3,edgeZ*2+1,0x394b38);
         // A continuous textured surface, with irregular dirt shoulders instead of road markings.
-        surface("grass",-45,-4.6,-21,21,0,5,0xc5d2a3);
-        surface("grass",4.6,45,-21,21,0,5,0xc5d2a3);
-        for(int x=-45;x<45;x++){
-            if(x>=-5&&x<5)continue;
-            roadRibbon("dirt",x,x+1,-shoulder(x),-shoulder(x+1),shoulder(x),shoulder(x+1),.012,4,0xc6bd94,false);
-            roadRibbon("stone",x,x+1,-roadEdge(x),-roadEdge(x+1),roadEdge(x),roadEdge(x+1),.025,5,0xd8d5be,false);
+        surface("grass",-edgeX,-4.6,-edgeZ,edgeZ,0,5,0xc5d2a3);
+        surface("grass",4.6,edgeX,-edgeZ,edgeZ,0,5,0xc5d2a3);
+        for(int lane=-1;lane<=1;lane++)for(int x=-(int)edgeX;x<edgeX;x++){
+            if(x>=-5&&x<5||lane!=0&&(x<-ArenaWorld.WAVE_X||x>=ArenaWorld.WAVE_X))continue;
+            double z0=ArenaWorld.laneZ(lane,x),z1=ArenaWorld.laneZ(lane,x+1);
+            roadRibbon("dirt",x,x+1,z0-shoulder(x),z1-shoulder(x+1),z0+shoulder(x),z1+shoulder(x+1),.012,4,0xc6bd94,false);
+            roadRibbon("stone",x,x+1,z0-roadEdge(x),z1-roadEdge(x+1),z0+roadEdge(x),z1+roadEdge(x+1),.025,5,0xd8d5be,false);
             for(int side=-1;side<=1;side+=2){
-                roadRibbon("stone",x,x+1,side*roadEdge(x),side*roadEdge(x+1),side*(roadEdge(x)+.85),side*(roadEdge(x+1)+.85),.028,5,0xd8d5be,true);
-                roadRibbon("dirt",x,x+1,side*shoulder(x),side*shoulder(x+1),side*(shoulder(x)+.95),side*(shoulder(x+1)+.95),.018,4,0xc6bd94,true);
+                roadRibbon("stone",x,x+1,z0+side*roadEdge(x),z1+side*roadEdge(x+1),z0+side*(roadEdge(x)+.85),z1+side*(roadEdge(x+1)+.85),.028,5,0xd8d5be,true);
+                roadRibbon("dirt",x,x+1,z0+side*shoulder(x),z1+side*shoulder(x+1),z0+side*(shoulder(x)+.95),z1+side*(shoulder(x+1)+.95),.018,4,0xc6bd94,true);
             }
         }
         // Lowered river bed, sloped textured banks, and a shallow-to-deep water gradient.
-        surface("gravel",-4.6,4.6,-21,21,-.85,4,0x82978a);
+        surface("gravel",-4.6,4.6,-edgeZ,edgeZ,-.85,4,0x82978a);
         for(int side=-1;side<=1;side+=2){
             bank(side);
-            for(int i=0;i<6;i++){
-                double z=-18+i*7.1;if(Math.abs(z)<6)continue;
+            for(int i=0;i<11;i++){
+                double z=-35+i*7.1;if(nearBridge(z))continue;
                 shadow(side*5.25,.035,z,.8,1.2);
                 drawModel("cliff",side*5.1,-.65,z,1.6+(i%2)*.3,side<0?90:270,0xd3d7bc);
                 drawModel("grass",side*6.4,0,z+1.6,.7,i*47,0xffffff);
@@ -338,8 +348,8 @@ final class ArenaRenderer implements AutoCloseable {
         riverSurface();
         for(int side=-1;side<=1;side+=2){
             // Small stones and reeds break the bank silhouette without entering the lane.
-            for(int i=0;i<19;i++){
-                double z=-19+i*2.05;if(Math.abs(z)<5.5)continue;
+            for(int i=0;i<37;i++){
+                double z=-37+i*2.05;if(nearBridge(z))continue;
                 double edge=bankEdge(z,side);
                 if(i%3==0){
                     drawModel("roundrock",side*(edge-.65),-.40,z,.35+(i%4)*.09,i*67,0xaaa994);
@@ -347,33 +357,36 @@ final class ArenaRenderer implements AutoCloseable {
                 }
             }
             // Low stone abutments support the bridge ends; the playable deck stays clear.
-            for(int end=-1;end<=1;end+=2){
-                cube(side*5.0,-.34,end*3.8,1.4,.72,.9,0x827f69);
-                drawModel("rock",side*5.4,-.1,end*4.45,.58,end*side*57,0xc2bca1);
+            for(int lane=-1;lane<=1;lane++){
+                double laneZ=lane*ArenaWorld.LANE_Z;
+                for(int end=-1;end<=1;end+=2){
+                    cube(side*5.0,-.34,laneZ+end*3.8,1.4,.72,.9,0x827f69);
+                    drawModel("rock",side*5.4,-.1,laneZ+end*4.45,.58,end*side*57,0xc2bca1);
+                }
+                surface("gravel",side<0?-6.3:4.7,side<0?-4.7:6.3,laneZ-3.6,laneZ+3.6,.031,3,0xc4bea4);
             }
-            surface("gravel",side<0?-6.3:4.7,side<0?-4.7:6.3,-3.6,3.6,.031,3,0xc4bea4);
         }
-        drawModel("bridge",0,-.65,0,1,0,0xffffff);
+        for(int lane=-1;lane<=1;lane++)drawModel("bridge",0,-.65,lane*ArenaWorld.LANE_Z,1,0,0xffffff);
         for(int side=-1;side<=1;side+=2){
             int team=side<0?0x45cbd2:0xe16c72;
-            cylinder(side*35,.10,0,6,.20,0x7b806b,24);
-            cylinder(side*35,.23,0,5.65,.12,0x566b65,24);
-            ring(side*35,.30,0,5.35,0xb1a77b);ring(side*35,.31,0,4.95,team);
-            drawModel("well",side*38,.3,-3,2.6,side*90,0xffffff);
+            cylinder(side*(ArenaWorld.HOME_X+2),.10,0,6,.20,0x7b806b,24);
+            cylinder(side*(ArenaWorld.HOME_X+2),.23,0,5.65,.12,0x566b65,24);
+            ring(side*(ArenaWorld.HOME_X+2),.30,0,5.35,0xb1a77b);ring(side*(ArenaWorld.HOME_X+2),.31,0,4.95,team);
+            drawModel("well",side*ArenaWorld.CORE_X,.3,-3,2.6,side*90,0xffffff);
             for(int i=0;i<8;i++){double a=i*Math.PI/4;
-                drawModel("runestone",side*35+Math.cos(a)*5.6,.2,Math.sin(a)*5.6,.7,i*45,0xcbd1b2);
+                drawModel("runestone",side*(ArenaWorld.HOME_X+2)+Math.cos(a)*5.6,.2,Math.sin(a)*5.6,.7,i*45,0xcbd1b2);
             }
-            for(int i=-1;i<=1;i+=2){cube(side*40,1.4,i*7,1,2.8,1,0x4c6365);crystal(side*40,3.3,i*7,.6,1,team,time*18);}
+            for(int i=-1;i<=1;i+=2){cube(side*(ArenaWorld.CORE_X+4),1.4,i*7,1,2.8,1,0x4c6365);crystal(side*(ArenaWorld.CORE_X+4),3.3,i*7,.6,1,team,time*18);}
         }
         // Model decorations are compiled once. The playable lane and both fountains stay clear.
-        for(int i=0;i<36;i++){
-            double x=-42+(i*17%85),z=(i%2==0?-1:1)*(12+(i*7%5)*1.35);if(Math.abs(x)<7)continue;
+        for(Canopy tree:canopies){
+            double x=tree.x,z=tree.z;
             shadow(x+1.2,.032,z-1.1,3.5,2.2,.18);
             shadow(x,.038,z,.85,.65,.44);
             // Crowns are drawn separately so only obstructing trees fade.
         }
-        for(int i=0;i<28;i++){
-            double x=-41+i*3.1,z=(i%2==0?-1:1)*(7.5+(i%3)*.65);
+        for(int i=0;i<54;i++){
+            double x=-82+i*3.1,z=(i%2==0?-1:1)*(7.5+(i%3)*.65);
             if(Math.abs(x)<7)continue;
             double rockSize=1+(i%4)*.3;
             shadow(x+.3,.035,z-.2,rockSize*.9,rockSize*.65,.23);
@@ -384,16 +397,16 @@ final class ArenaRenderer implements AutoCloseable {
             drawModel(i%3==0?"flowers":i%3==1?"grass":"mushrooms",x+.8,0,z+Math.signum(z)*1.3,i%3==0?.75:i%3==1?.6:.5,i*29,0xffffff);
         }
         // Sparse roadside clumps and gravel sit outside the clear combat lane.
-        for(int i=0;i<48;i++){
-            double x=-42+i*1.79;if(Math.abs(x)<7||Math.abs(x)>39)continue;
+        for(int i=0;i<96;i++){
+            double x=-85+i*1.79;if(Math.abs(x)<7||Math.abs(x)>ArenaWorld.CORE_X)continue;
             int side=i%2==0?-1:1;double z=side*(shoulder(x)+.65+(i%3)*.24);
             if(i%3==0){shadow(x,.04,z,.3,.2,.27);drawModel("roundrock",x,-.04,z,.23+(i%4)*.06,i*71,0xc9c6ae);}
             else drawModel(i%7==0?"flowers":"grass",x,0,z,i%7==0?.42:.33+(i%4)*.06,i*137,0xe1e6cf);
         }
-        shadow(-30,.035,-15,3.1,2.1,.27);shadow(32,.035,15,3.1,2.1,.27);
+        shadow(-60,.035,-28,3.1,2.1,.27);shadow(62,.035,28,3.1,2.1,.27);
         shadow(-12,.04,9.5,1.2,.8,.36);shadow(12,.04,-9.5,1.2,.8,.36);
-        drawModel("cabin",-31,0,-15,5.2,30,0xffffff);
-        drawModel("cabin",31,0,15,5.2,210,0xffffff);
+        drawModel("cabin",-61,0,-28,5.2,30,0xffffff);
+        drawModel("cabin",61,0,28,5.2,210,0xffffff);
         drawModel("swordstone",-12,0,9.5,2.5,-30,0xffffff);
         drawModel("swordstone",12,0,-9.5,2.5,150,0xffffff);
     }
@@ -449,7 +462,7 @@ final class ArenaRenderer implements AutoCloseable {
         for(int side=-1;side<=1;side+=2)for(int i=0;i<12;i++){
             double phase=(time*.23+i/12.0)%1,a=i*2.399+time*.12;
             glColor4f(side<0?.25f:1,.65f,side<0?1:.4f,(float)(Math.sin(phase*Math.PI)*.38));
-            double x=side*35+Math.cos(a)*4.7,z=Math.sin(a)*4.7,y=.4+phase*1.7;
+            double x=side*(ArenaWorld.HOME_X+2)+Math.cos(a)*4.7,z=Math.sin(a)*4.7,y=.4+phase*1.7;
             glBegin(GL_LINES);glVertex3d(x,y,z);glVertex3d(x,y+.18,z);glEnd();
         }
         glDepthMask(true);glDisable(GL_BLEND);glEnable(GL_LIGHTING);
@@ -675,15 +688,15 @@ final class ArenaRenderer implements AutoCloseable {
     private void bank(int side){
         glEnable(GL_TEXTURE_2D);glBindTexture(GL_TEXTURE_2D,textures.get("textures/ground-gravel.png"));
         color(0xaaa78b);glNormal3d(-side*.36,1,0);glBegin(GL_QUADS);
-        for(int i=0;i<84;i++){
-            double z0=-21+i*.5,z1=z0+.5;
+        for(int i=0;i<ArenaWorld.TERRAIN_Z*4;i++){
+            double z0=-ArenaWorld.TERRAIN_Z+i*.5,z1=z0+.5;
             if(side>0){groundVertex(side*bankEdge(z0,side),.004,z0,3);groundVertex(side*bankToe(z0,side),-.75,z0,3);groundVertex(side*bankToe(z1,side),-.75,z1,3);groundVertex(side*bankEdge(z1,side),.004,z1,3);}
             else{groundVertex(side*bankEdge(z1,side),.004,z1,3);groundVertex(side*bankToe(z1,side),-.75,z1,3);groundVertex(side*bankToe(z0,side),-.75,z0,3);groundVertex(side*bankEdge(z0,side),.004,z0,3);}
         }
         glEnd();glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glDepthMask(false);
         glBegin(GL_QUADS);
-        for(int i=0;i<84;i++){
-            double z0=-21+i*.5,z1=z0+.5;if(side<0){double swap=z0;z0=z1;z1=swap;}
+        for(int i=0;i<ArenaWorld.TERRAIN_Z*4;i++){
+            double z0=-ArenaWorld.TERRAIN_Z+i*.5,z1=z0+.5;if(side<0){double swap=z0;z0=z1;z1=swap;}
             glColor4f(.67f,.66f,.54f,.8f);groundVertex(side*bankEdge(z0,side),.009,z0,3);groundVertex(side*bankEdge(z1,side),.009,z1,3);
             glColor4f(.67f,.66f,.54f,0);groundVertex(side*(bankEdge(z1,side)+.55),.009,z1,3);groundVertex(side*(bankEdge(z0,side)+.55),.009,z0,3);
         }
@@ -691,8 +704,8 @@ final class ArenaRenderer implements AutoCloseable {
     }
     private void riverSurface(){
         glDisable(GL_LIGHTING);glBegin(GL_QUADS);
-        for(int row=0;row<84;row++)for(int col=0;col<16;col++){
-            double z=-21+row*.5,u=col/16.,v=(col+1)/16.;
+        for(int row=0;row<ArenaWorld.TERRAIN_Z*4;row++)for(int col=0;col<16;col++){
+            double z=-ArenaWorld.TERRAIN_Z+row*.5,u=col/16.,v=(col+1)/16.;
             waterVertex(z,u);waterVertex(z+.5,u);waterVertex(z+.5,v);waterVertex(z,v);
         }
         glEnd();glEnable(GL_LIGHTING);
@@ -704,8 +717,8 @@ final class ArenaRenderer implements AutoCloseable {
     /** Only the small translucent overlay moves; terrain and depth remain cached. */
     private void waterMotion(double time){
         glDisable(GL_LIGHTING);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glDepthMask(false);glLineWidth(1);
-        for(int i=0;i<72;i++){
-            double z=-21+((i*.593+time*.65)%42),x=Math.sin(i*8.31)*3.45,length=.22+(i%5)*.12;
+        for(int i=0;i<132;i++){
+            double z=-ArenaWorld.TERRAIN_Z+((i*.593+time*.65)%(ArenaWorld.TERRAIN_Z*2)),x=Math.sin(i*8.31)*3.45,length=.22+(i%5)*.12;
             if(!visible(x,z,1,1))continue;
             glBegin(GL_LINE_STRIP);
             for(int j=0;j<=6;j++){

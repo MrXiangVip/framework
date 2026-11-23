@@ -6,7 +6,12 @@ import java.util.*;
 final class ArenaWorld {
     enum Screen { TITLE, PLAYING, PAUSED, WON, LOST }
     enum Kind { HERO, SOLDIER, TOWER, CORE }
-    static final double LIMIT_X=43, LIMIT_Z=18;
+    static final double LIMIT_X=86, LIMIT_Z=36;
+    static final double TERRAIN_X=LIMIT_X+3,TERRAIN_Z=LIMIT_Z+3;
+    static final double CORE_X=76,TOWER_X=44,HOME_X=66,WAVE_X=68;
+    static final double LANE_Z=24,LANE_FORK_X=56;
+    /** Side lanes leave the fountain, cross their own bridge and merge at the enemy base. */
+    static double laneZ(int lane,double x){return lane*LANE_Z*clamp((WAVE_X-Math.abs(x))/(WAVE_X-LANE_FORK_X),0,1);}
     static final double ATTACK_VISUAL_SECONDS=.46;
     static final double HURT_SECONDS=.26;
     static final double DASH_MOVE=.18,DASH_SECONDS=.24,DASH_RADIUS=1.6;
@@ -36,7 +41,7 @@ final class ArenaWorld {
         final Kind kind; final int team; final double homeX,homeZ;
         double x,z,hp,maxHp,attack,range,speed,cooldown,respawn,facing,travel,hitFlash,attackFacing,attackTime;
         double lastMovedAt=-100,deathAt=-1,hitStop,hitPauseTotal,hurtTime,hitDX,hitDZ;
-        int hitSerial,slamSerial,dashSerial,meteorSerial;
+        int hitSerial,slamSerial,dashSerial,meteorSerial,lane,lanePoint;
         double meteorTime,meteorFacing;
         boolean retreatShot,scatterDraw;double retreatDamage;
         double dashTime,dashFacing,dashStartX,dashStartZ,dashEndX,dashEndZ,dashDamage;
@@ -212,11 +217,13 @@ final class ArenaWorld {
         generation++;
         this.hero=Math.floorMod(hero,3);scatterCasts.clear();fanArrows.clear();arrows.clear();meteors.clear();dashGhosts.clear();swordStrikes.clear();soundEvents.clear();impacts.clear();units.clear();effects.clear();shots.clear();Arrays.fill(cooldowns,0);
         elapsed=0;waveTimer=3;wave=0;level=1;xp=0;gold=200;kills=deaths=weapon=armor=0;recall=0;attackBuffer=0;inputX=inputZ=0;slamJustStarted=false;moving=false;selected=null;attackRequested=false;
-        spawn(Kind.CORE,0,-38,0);spawn(Kind.CORE,1,38,0);
-        spawn(Kind.TOWER,0,-22,0);spawn(Kind.TOWER,1,22,0);
-        player=spawn(Kind.HERO,0,-33,0);player.player=true;configure(player,this.hero);
-        rival=spawn(Kind.HERO,1,33,0);configure(rival,(this.hero+1)%3);
-        aimX=player.x+10;aimZ=0;screen=Screen.PLAYING;tell("跟随兵线拆塔，再摧毁敌方水晶！");
+        spawn(Kind.CORE,0,-CORE_X,0);spawn(Kind.CORE,1,CORE_X,0);
+        for(int lane=-1;lane<=1;lane++)for(int team=0;team<2;team++){
+            Unit tower=spawn(Kind.TOWER,team,team==0?-TOWER_X:TOWER_X,lane*LANE_Z);tower.lane=lane;
+        }
+        player=spawn(Kind.HERO,0,-HOME_X,0);player.player=true;configure(player,this.hero);
+        rival=spawn(Kind.HERO,1,HOME_X,0);configure(rival,(this.hero+1)%3);
+        aimX=player.x+10;aimZ=0;screen=Screen.PLAYING;tell("上中下三路推进，突破一路防御塔后摧毁水晶！");
     }
     void configure(Unit u,int build){u.build=build;u.maxHp=build==0?900:build==1?650:700;u.hp=u.maxHp;u.range=build==0?3.4:build==1?8:6.5;u.attack=build==0?62:build==1?48:53;u.speed=build==0?8:7.5;}
     Unit spawn(Kind kind,int team,double x,double z){
@@ -230,7 +237,13 @@ final class ArenaWorld {
     void tell(String text){notice=text;noticeTime=4;}
     void pause(){attackRequested=false;attackBuffer=0;if(screen==Screen.PLAYING)screen=Screen.PAUSED;}
     void resume(){if(screen==Screen.PAUSED)screen=Screen.PLAYING;}
-    boolean shielded(Unit u){if(u.kind!=Kind.CORE)return false;for(Unit t:units)if(t.kind==Kind.TOWER&&t.team==u.team&&t.alive())return true;return false;}
+    // One tower per lane: breaking any lane opens a route to the core.
+    boolean shielded(Unit u){
+        if(u.kind!=Kind.CORE)return false;
+        boolean defended=false;
+        for(Unit t:units)if(t.kind==Kind.TOWER&&t.team==u.team){if(!t.alive())return false;defended=true;}
+        return defended;
+    }
     void command(double x,double z){
         if(screen!=Screen.PLAYING||!player.alive())return;
         attackBuffer=0;attackRequested=false;recall=0;destX=clamp(x,-LIMIT_X,LIMIT_X);destZ=clamp(z,-LIMIT_Z,LIMIT_Z);moving=true;selected=null;
@@ -275,7 +288,11 @@ final class ArenaWorld {
             it.remove();
         }}
         if(screen!=Screen.PLAYING)return;
-        waveTimer-=dt;if(waveTimer<=0){waveTimer+=14;wave++;for(int team=0;team<2;team++)for(int i=0;i<4;i++)spawn(Kind.SOLDIER,team,team==0?-34:34,(i-1.5)*1.5);}
+        waveTimer-=dt;if(waveTimer<=0){waveTimer+=14;wave++;
+            for(int team=0;team<2;team++)for(int lane=-1;lane<=1;lane++)for(int i=0;i<4;i++){
+                Unit soldier=spawn(Kind.SOLDIER,team,team==0?-WAVE_X:WAVE_X,lane*2+(i-1.5)*.65);soldier.lane=lane;
+            }
+        }
         for(Unit u:units){
             double stopped=u.alive()?Math.min(dt,u.hitStop):0;u.hitStop=Math.max(0,u.hitStop-dt);u.hitPauseTotal+=stopped;
             double actionDt=dt-stopped;
@@ -308,11 +325,11 @@ final class ArenaWorld {
                     if(u.retreating)move(u,u.homeX,u.homeZ,dt);
                     else if(!avoidDanger(u,dt)){
                         if(t!=null)strike(u,t);
-                        else{Unit goal=nearest(u,17);double gx=goal==null?(u.team==0?30:-30):goal.x,gz=goal==null?0:goal.z;
+                        else{Unit goal=nearest(u,17);double gx=goal==null?(u.team==0?HOME_X:-HOME_X):goal.x,gz=goal==null?0:goal.z;
                             if(safeAdvance(u,gx,gz,dt))move(u,gx,gz,dt);
                         }
                     }
-                }else{if(t!=null)strike(u,t);else if(u.kind==Kind.SOLDIER){Unit goal=nearest(u,12);if(goal==null)move(u,u.team==0?38:-38,0,dt);else move(u,goal.x,goal.z,dt);}}
+                }else{if(t!=null)strike(u,t);else if(u.kind==Kind.SOLDIER){Unit goal=nearest(u,12);if(goal==null)advanceLane(u,dt);else move(u,goal.x,goal.z,dt);}}
             }
             if(screen!=Screen.PLAYING)break;
         }
@@ -367,6 +384,15 @@ final class ArenaWorld {
             if(screen!=Screen.PLAYING)break;
         }
         units.removeIf(u->u.kind==Kind.SOLDIER&&!u.alive()&&elapsed-u.deathAt>=2);
+    }
+    private void advanceLane(Unit u,double dt){
+        double direction=u.team==0?1:-1;
+        double[] pathX={-LANE_FORK_X,LANE_FORK_X,CORE_X};
+        double x=pathX[u.lanePoint]*direction,z=u.lanePoint<2?u.lane*LANE_Z:0;
+        if(u.lanePoint<2&&(Math.hypot(u.x-x,u.z-z)<.05||direction*(u.x-x)>.5)){
+            u.lanePoint++;x=pathX[u.lanePoint]*direction;z=u.lanePoint<2?u.lane*LANE_Z:0;
+        }
+        move(u,x,z,dt);
     }
     private boolean avoidDanger(Unit u,double dt){
         for(Effect e:effects)if(e.team!=u.team&&e.type==2&&e.life>.08&&Math.hypot(u.x-e.x,u.z-e.z)<e.radius+.8){evade(u,e.x,e.z,dt);return true;}

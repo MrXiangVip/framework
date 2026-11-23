@@ -25,7 +25,7 @@ public final class ArenaRetreatTest {
         check(w.player.z>0&&!w.player.retreatShot&&w.arrows.get(0).released,"Held movement waits through draw and resumes after release");
         w=fresh();w.cast(0);tick(w,46);w.damage(w.player,10000,1);tick(w,70);
         check(ArenaSwordTest.dummy(w).hp==88,"Released Q arrow survives caster death");
-        w=fresh();w.player.x=-42;w.aimX=-30;w.cast(0);tick(w,26);check(w.player.x==-43,"Boundary clamps backward endpoint");
+        w=fresh();w.player.x=-ArenaWorld.LIMIT_X+1;w.aimX=w.player.x+12;w.cast(0);tick(w,26);check(w.player.x==-ArenaWorld.LIMIT_X,"Boundary clamps backward endpoint");
         w=fresh();w.units.remove(1);w.cast(0);tick(w,130);check(w.arrows.isEmpty()&&w.impacts.isEmpty(),"Empty Q arrow expires without damage");
         w=fresh();w.cast(0);tick(w,26);w.reset(1);check(w.arrows.isEmpty()&&!w.player.retreatShot&&w.player.dashTime==0,"Restart clears action");
         System.out.println("PASS: archer retreat, saved aim, delayed skill arrow, cancellation, held movement, cooldown, pause, death, bounds and restart");

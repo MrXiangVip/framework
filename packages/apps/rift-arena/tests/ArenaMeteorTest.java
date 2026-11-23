@@ -39,8 +39,8 @@ public final class ArenaMeteorTest {
   w=fresh();t=ArenaSwordTest.dummy(w);t.x=8.01;ArenaWorld.Unit ally=w.spawn(ArenaWorld.Kind.SOLDIER,0,3,0);ally.range=ally.speed=ally.attack=0;
   ArenaWorld.Unit core=w.spawn(ArenaWorld.Kind.CORE,1,3,0);core.attack=0;w.spawn(ArenaWorld.Kind.TOWER,1,35,0).attack=0;w.cast(2);tick(w,95);
   check(t.hp==2000&&ally.hp==ally.maxHp&&core.hp==core.maxHp,"Radius, allies and protected core respected");
-  w=fresh();w.player.x=42;w.aimX=100;w.aimZ=100;w.cast(2);ArenaWorld.Meteor m=w.meteors.get(0);
-  check(m.x<=43&&m.z<=18&&Math.hypot(m.x-42,m.z)<=14.001,"Landing clamped to range and arena");
+  w=fresh();w.player.x=ArenaWorld.LIMIT_X-1;w.player.z=ArenaWorld.LIMIT_Z-1;w.aimX=200;w.aimZ=200;w.cast(2);ArenaWorld.Meteor m=w.meteors.get(0);
+  check(m.x<=ArenaWorld.LIMIT_X&&m.z<=ArenaWorld.LIMIT_Z&&Math.hypot(m.x-w.player.x,m.z-w.player.z)<=14.001,"Landing clamped to range and arena");
   w.reset(0);check(w.meteors.isEmpty()&&w.player.meteorTime==0,"Restart clears cast and flight");
   w=fresh();w.configure(w.player,1);w.cast(2);check(w.meteors.isEmpty()&&w.effects.get(0).type==2,"Other heroes retain existing R");
   System.out.println("PASS: meteor windup/release/impact, fixed aim, single area damage, radius/team/shield filtering, cancellation, death, pause, movement/attack chaining and restart");

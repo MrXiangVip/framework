@@ -135,7 +135,7 @@ public final class ArenaView extends View implements AutoCloseable {
     }
     private void title(Graphics2D g){
         veil(g,.68f);text(g,"R I F T   A R E N A",65,90,20,0x8ecacc);text(g,"星隙竞技场",60,167,61,0xf0dfb1);
-        text(g,"守住你的水晶，带领兵线夺下胜利。",65,215,23,0xb6cbcf);text(g,"3D 单路人机对战   /   选择你的英雄",67,258,18,0x89aaa9);
+        text(g,"守住你的水晶，带领兵线夺下胜利。",65,215,23,0xb6cbcf);text(g,"3D 三路人机对战   /   选择你的英雄",67,258,18,0x89aaa9);
         String[] roles={"近战战士 / 更高生命","远程射手 / 更远射程","中程法师 / 均衡输出"};String[] stats={"生命 900   攻击 62   射程 3.4","生命 650   攻击 48   射程 8.0","生命 700   攻击 53   射程 6.5"};
         for(int i=0;i<3;i++){final int hero=i;int x=65+i*360;boolean active=choice==i;
             panel(g,x,300,340,243,active?0x24484e:0x122b36);g.setColor(new Color(active?0xe3c88f:0x45616b));g.drawRoundRect(x,300,340,243,14,14);
@@ -146,7 +146,7 @@ public final class ArenaView extends View implements AutoCloseable {
         button(g,"进入竞技场   →",65,586,330,62,()->begin(),true);
         text(g,"WASD 移动  ·  右键移动 / 选敌  ·  空格普攻",65,702,19,0xc6d6d2);
         text(g,"Q / E / R 技能   ·   B 回城   ·   1 / 2 购买装备   ·   Esc 暂停",65,738,18,0x91b0b5);
-        text(g,"目标：先拆防御塔，再摧毁敌方水晶。泉水可恢复生命与购买装备。",445,620,17,0xb0c3be);
+        text(g,"目标：突破上中下任意一路，再摧毁水晶。泉水恢复生命并支持购买装备。",445,620,17,0xb0c3be);
     }
     private void applyAim(){Aim aim=latestAim.get();if(aim!=null&&aim.generation==world.generation){world.aimX=aim.x;world.aimZ=aim.z;}}
     private void queueCast(int skill){final Aim aim=latestAim.get();commands.add(()->{double x=world.aimX,z=world.aimZ;if(aim!=null&&aim.generation==world.generation){world.aimX=aim.x;world.aimZ=aim.z;}world.cast(skill);world.aimX=x;world.aimZ=z;});}
@@ -235,9 +235,19 @@ public final class ArenaView extends View implements AutoCloseable {
     }
     private void miniMap(Graphics2D g,Frame f){
         panel(g,22,588,180,190,0x102835);text(g,"战场态势",40,614,16,0xbcd1ca);
-        g.setColor(new Color(0x385b58));g.fillRoundRect(36,631,152,127,5,5);g.setColor(new Color(0x8a8262));g.fillRect(38,691,148,7);g.setColor(new Color(0x3d8596));g.fillRect(106,633,8,122);
-        for(Dot d:f.dots){int x=112+(int)(d.x*1.65),y=695+(int)(d.z*2.7);g.setColor(new Color(d.player?0xffe6a6:d.team==0?0x64e0df:0xfa8790));int n=d.kind==ArenaWorld.Kind.HERO?7:d.kind==ArenaWorld.Kind.SOLDIER?3:9;if(d.kind==ArenaWorld.Kind.TOWER||d.kind==ArenaWorld.Kind.CORE)g.fillRect(x-n/2,y-n/2,n,n);else g.fillOval(x-n/2,y-n/2,n,n);}
-        g.setColor(new Color(0xd2ddc1));int vx=112+(int)(f.cameraX*1.65),vy=695+(int)(f.cameraZ*2.7);int halfW=(int)(49/f.zoom),halfH=(int)(56/f.zoom);g.drawRect(vx-halfW,vy-halfH,halfW*2,halfH*2);
+        g.setColor(new Color(0x385b58));g.fillRoundRect(36,631,152,127,5,5);g.setColor(new Color(0x3d8596));g.fillRect(108,633,8,122);
+        double mapScaleX=74/ArenaWorld.LIMIT_X,mapScaleZ=61/ArenaWorld.LIMIT_Z;
+        g.setColor(new Color(0x8a8262));g.setStroke(new BasicStroke(3));
+        for(int lane=-1;lane<=1;lane++){
+            int[] xs=new int[4],ys=new int[4];double[] route={-ArenaWorld.WAVE_X,-ArenaWorld.LANE_FORK_X,ArenaWorld.LANE_FORK_X,ArenaWorld.WAVE_X};
+            for(int i=0;i<4;i++){xs[i]=112+(int)(route[i]*mapScaleX);ys[i]=695+(int)(ArenaWorld.laneZ(lane,route[i])*mapScaleZ);}
+            g.drawPolyline(xs,ys,4);
+        }
+        g.setStroke(new BasicStroke(1));
+        for(Dot d:f.dots){int x=112+(int)(d.x*mapScaleX),y=695+(int)(d.z*mapScaleZ);g.setColor(new Color(d.player?0xffe6a6:d.team==0?0x64e0df:0xfa8790));int n=d.kind==ArenaWorld.Kind.HERO?7:d.kind==ArenaWorld.Kind.SOLDIER?3:9;if(d.kind==ArenaWorld.Kind.TOWER||d.kind==ArenaWorld.Kind.CORE)g.fillRect(x-n/2,y-n/2,n,n);else g.fillOval(x-n/2,y-n/2,n,n);}
+        g.setColor(new Color(0xd2ddc1));int vx=112+(int)(f.cameraX*mapScaleX),vy=695+(int)(f.cameraZ*mapScaleZ);
+        int halfW=(int)(ArenaRenderer.VIEW_HEIGHT/f.zoom/2*1.5*mapScaleX),halfH=(int)(ArenaRenderer.VIEW_HEIGHT/f.zoom/2/ArenaRenderer.SIN*mapScaleZ);
+        g.drawRect(vx-halfW,vy-halfH,halfW*2,halfH*2);
     }
     private void damageNumbers(Graphics2D g,Frame f){
         for(DamageText hit:f.damageTexts){
@@ -296,7 +306,7 @@ public final class ArenaView extends View implements AutoCloseable {
         Frame f=frame;
         boolean field=y>135&&y<680&&!(x<223&&y>580);
         if(e.getAction()==MotionEvent.ACTION_SCROLL&&f!=null&&f.screen==ArenaWorld.Screen.PLAYING&&field){final int delta=e.getScrollDelta();commands.add(()->world.cameraZoom=ArenaWorld.clamp(world.cameraZoom-delta*.1,.85,1.25));wakeRenderer();return true;}
-        if(f!=null&&f.screen==ArenaWorld.Screen.PLAYING&&field){double wx=f.cameraX+(x-600)/f.scale,wz=f.cameraZ+(y-400)/(f.scale*ArenaRenderer.SIN);latestAim.set(new Aim(ArenaWorld.clamp(wx,-43,43),ArenaWorld.clamp(wz,-18,18),f.generation));}
+        if(f!=null&&f.screen==ArenaWorld.Screen.PLAYING&&field){double wx=f.cameraX+(x-600)/f.scale,wz=f.cameraZ+(y-400)/(f.scale*ArenaRenderer.SIN);latestAim.set(new Aim(ArenaWorld.clamp(wx,-ArenaWorld.LIMIT_X,ArenaWorld.LIMIT_X),ArenaWorld.clamp(wz,-ArenaWorld.LIMIT_Z,ArenaWorld.LIMIT_Z),f.generation));}
         if(e.getAction()==MotionEvent.ACTION_DOWN){requestFocus();downX=x;downY=y;if(e.getButton()==3&&f!=null&&f.screen==ArenaWorld.Screen.PLAYING&&field){double wx=f.cameraX+(x-600)/f.scale,wz=f.cameraZ+(y-400)/(f.scale*ArenaRenderer.SIN);
                 double best=Double.MAX_VALUE;
                 for(Dot d:f.dots)if(d.team==1){double px=600+(d.x-f.cameraX)*f.scale,py=400+(d.z-f.cameraZ)*f.scale*ArenaRenderer.SIN;double tall=(d.kind==ArenaWorld.Kind.TOWER||d.kind==ArenaWorld.Kind.CORE?85:55)*f.zoom;

@@ -10,7 +10,7 @@ public final class ArenaSceneCacheTest {
     public static void main(String[] args)throws Exception{
         ArenaRenderer r=new ArenaRenderer();r.open(ArenaSceneCacheTest.class.getClassLoader(),900,600);
         try{
-            double[][] positions={{-33,-18},{0,0},{33,18},{-10,-14},{12,14},{.033,.041},{-16.95,-4.96}};
+            double[][] positions={{-ArenaWorld.LIMIT_X,-ArenaWorld.LIMIT_Z},{0,0},{ArenaWorld.LIMIT_X,ArenaWorld.LIMIT_Z},{-10,-14},{12,14},{.033,.041},{-16.95,-4.96}};
             BufferedImage sheet=new BufferedImage(1800,positions.length*300,BufferedImage.TYPE_INT_RGB);Graphics2D g=sheet.createGraphics();
             for(int n=0;n<positions.length;n++){
                 ArenaWorld w=new ArenaWorld();w.reset(0);w.waveTimer=1000;
@@ -38,7 +38,7 @@ public final class ArenaSceneCacheTest {
             }
             g.dispose();ImageIO.write(sheet,"png",new File("out/rift-arena-tests/scene-cache-parity.png"));
             for(double zoom:new double[]{.85,1.25}){
-                ArenaWorld zoomed=new ArenaWorld();zoomed.reset(2);zoomed.cameraZoom=zoom;zoomed.player.x=16;zoomed.player.z=4;zoomed.elapsed=1;
+                ArenaWorld zoomed=new ArenaWorld();zoomed.reset(2);zoomed.cameraZoom=zoom;zoomed.player.x=ArenaWorld.LIMIT_X;zoomed.player.z=ArenaWorld.LIMIT_Z;zoomed.elapsed=1;
                 r.culling=false;r.cachedScene=false;BufferedImage reference=r.render(zoomed);r.cachedScene=true;BufferedImage cached=r.render(zoomed);
                 int[] a=((DataBufferInt)reference.getRaster().getDataBuffer()).getData(),b=((DataBufferInt)cached.getRaster().getDataBuffer()).getData();int differences=0;
                 for(int i=0;i<a.length;i++){int worst=0;for(int shift=0;shift<=16;shift+=8)worst=Math.max(worst,Math.abs((a[i]>>shift&255)-(b[i]>>shift&255)));if(worst>12)differences++;}

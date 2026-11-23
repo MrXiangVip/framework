@@ -20,7 +20,7 @@ public final class ArenaDashTest {
         check(w.player.x==x&&w.player.dashTime==0&&target.hp==hp,"Death cancels remaining motion and hits");
         w=fresh();w.cast(0);ArenaSwordTest.advance(w,3);x=w.player.x;w.aimX=x;w.aimZ=5;w.cast(1);ArenaSwordTest.advance(w,10);
         check(w.player.x==x&&w.player.dashTime==0&&w.player.slamTime>0,"E interrupts dash at actual current position");
-        w=fresh();w.player.x=42.5;w.aimX=50;w.cast(0);ArenaSwordTest.advance(w,30);check(w.player.x==43,"Dash clamps map boundary");
+        w=fresh();w.player.x=ArenaWorld.LIMIT_X-.5;w.aimX=ArenaWorld.LIMIT_X+10;w.cast(0);ArenaSwordTest.advance(w,30);check(w.player.x==ArenaWorld.LIMIT_X,"Dash clamps expanded map boundary");
         w=fresh();w.cast(0);ArenaSwordTest.advance(w,14);w.requestAttack();w.update(.01,0,0,false);ArenaSwordTest.advance(w,12);
         check(w.player.attackTime>0,"Late attack tap chains after braking");
         w=fresh();w.cast(0);for(int i=0;i<28;i++)w.update(.01,0,1,false);
