@@ -33,6 +33,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback {
 
 
     public View findViewById(String id) { return getWindow().getDecorView().findViewById(id); }
+    public View findViewById(int id) { return getWindow().getDecorView().findViewById(id); }
 
     public Window getWindow() {
         return mWindow;
@@ -132,6 +133,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback {
     }
 	
     /** Resource path relative to the application APK, e.g. res/layout/activity_main.xml. */
+    public void setContentView(int layoutId) {
+        setContentView(getResources().getLayoutPath(layoutId));
+    }
+
     public void setContentView(String layoutPath) {
         getWindow().setContentView(layoutPath);
     }

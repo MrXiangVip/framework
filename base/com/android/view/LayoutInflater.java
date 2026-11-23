@@ -13,6 +13,10 @@ public abstract class LayoutInflater {
     protected LayoutInflater(Context context) { mContext = context; }
     public Context getContext() { return mContext; }
     public static LayoutInflater from(Context context) { return new PhoneLayoutInflater(context); }
+    public View inflate(int id, ViewGroup root) { return inflate(id, root, root != null); }
+    public View inflate(int id, ViewGroup root, boolean attach) {
+        return inflate(mContext.getResources().getLayoutPath(id), root, attach);
+    }
     public View inflate(String path, ViewGroup root) { return inflate(path, root, root != null); }
     public View inflate(String path, ViewGroup root, boolean attach) {
         Objects.requireNonNull(path, "layoutPath");

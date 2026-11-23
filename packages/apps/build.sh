@@ -50,8 +50,10 @@ for name in "${APP_NAMES[@]}"; do
     # A fresh directory prevents deleted or renamed classes from entering the next APK.
     BUILD_TMP="$(mktemp -d "$REPO_ROOT/out/apps/$name.XXXXXX")"
     mkdir -p "$BUILD_TMP/classes" "$(dirname -- "$apk")"
+    python3 "$REPO_ROOT/base/tools/generate_resources.py" --app "$app_dir" --output "$BUILD_TMP"
+    mapfile -d '' -t generated_sources < <(find "$BUILD_TMP/generated" -name '*.java' -print0)
     javac -encoding UTF-8 -source 8 -target 8 -cp "$FRAMEWORK_CLASSES:$REPO_ROOT/libs/*:$app_dir/libs/*" \
-        -sourcepath "$app_dir/src" -d "$BUILD_TMP/classes" "${sources[@]}"
+        -sourcepath "$app_dir/src:$BUILD_TMP/generated" -d "$BUILD_TMP/classes" "${sources[@]}" "${generated_sources[@]}"
     if [[ -d "$app_dir/libs" ]]; then
         for dependency in "$app_dir/libs/"*.jar; do
             [[ -f "$dependency" ]] || continue

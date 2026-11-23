@@ -13,6 +13,8 @@ public class View {
     protected int mPadding;
     protected Integer mBackground;
     private String mId;
+    public static final int NO_ID = -1;
+    private int mResourceId = NO_ID;
     private OnClickListener mClickListener;
     private boolean mPressed;
     private boolean mFocusable, mFocused;
@@ -25,7 +27,7 @@ public class View {
     public View(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         mContext = context;
         if (attrs != null) {
-            mId = normalizeId(attrs.get("id"));
+            setId(attrs.get("id"));
             mPadding = attrs.dimension("padding", 0);
             if (attrs.get("background") != null) mBackground = attrs.color("background", 0);
         }
@@ -36,7 +38,21 @@ public class View {
         return id.startsWith("@+id/") ? id.substring(5) : id.startsWith("@id/") ? id.substring(4) : id;
     }
     public String getId() { return mId; }
-    public void setId(String id) { mId = normalizeId(id); }
+    public void setId(String id) {
+        mId = normalizeId(id);
+        com.android.res.Resources resources = mContext == null ? null : mContext.getResources();
+        mResourceId = resources == null || mId == null ? NO_ID : resources.getId(mId);
+    }
+    /** Integer counterpart of the legacy string getId(). */
+    public int getResourceId() { return mResourceId; }
+    public void setId(int id) {
+        mResourceId = id;
+        com.android.res.Resources resources = mContext == null ? null : mContext.getResources();
+        mId = resources == null ? null : resources.getIdName(id);
+    }
+    public View findViewById(int id) {
+        return id != NO_ID && mResourceId == id ? this : null;
+    }
     public View findViewById(String id) {
         return mId != null && mId.equals(normalizeId(id)) ? this : null;
     }

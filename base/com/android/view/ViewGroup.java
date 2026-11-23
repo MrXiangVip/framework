@@ -97,6 +97,11 @@ public abstract  class ViewGroup extends View implements ViewParent {
         }
     }
 
+    @Override public View findViewById(int id) {
+        View found = super.findViewById(id);
+        for (int i = 0; found == null && i < mChildrenCount; i++) found = mChildren[i].findViewById(id);
+        return found;
+    }
     @Override public View findViewById(String id) {
         View found = super.findViewById(id);
         for (int i = 0; found == null && i < mChildrenCount; i++) found = mChildren[i].findViewById(id);

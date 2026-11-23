@@ -14,7 +14,7 @@ import javax.imageio.ImageIO;
 
 /**
  * Android-style image layout on this framework's BufferedImage software renderer.
- * Resources are APK paths, not Android integer IDs; matrices are affine AWT transforms.
+ * Bitmap resources accept APK paths or generated R.drawable IDs; matrices are affine AWT transforms.
  * Drawable state/levels, animated drawables, content providers and HTTP loading are not supported.
  */
 public class ImageView extends View {
@@ -74,6 +74,12 @@ public class ImageView extends View {
     public String getImageResource() { return resource; }
     public URI getImageURI() { return uri; }
     public void setImageBitmap(BufferedImage bitmap) { replaceImage(bitmap, null, null); }
+    /** Loads a generated R.drawable ID. Zero clears the image. */
+    public void setImageResource(int id) {
+        if (id == 0) { setImageBitmap(null); return; }
+        com.android.res.Resources resources = getContext().getResources();
+        replaceImage(resources.getDrawable(id), resources.getDrawablePath(id), null);
+    }
     /** Loads a classloader path or @drawable/name / @mipmap/name. Null clears the image. */
     public void setImageResource(String source) {
         if (source == null || source.isEmpty() || "@null".equals(source)) { setImageBitmap(null); return; }
@@ -81,6 +87,10 @@ public class ImageView extends View {
         replaceImage(bitmap, source, null);
     }
     private BufferedImage loadResource(String source) {
+        if (source.startsWith("@drawable/") && getContext().getResources() != null) {
+            int id = getContext().getResources().getDrawableId(source.substring("@drawable/".length()));
+            if (id != 0) return getContext().getResources().getDrawable(id);
+        }
         String path = source;
         boolean reference = source.startsWith("@drawable/") || source.startsWith("@mipmap/");
         if (reference) path = "res/" + source.substring(1);

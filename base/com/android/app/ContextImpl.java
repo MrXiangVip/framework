@@ -38,9 +38,9 @@ public class ContextImpl extends Context {
                          String packageInfo,  String attributionTag,
                          String splitName,  String activityToken,  String user,
                         int flags,  ClassLoader classLoader,  String overrideOpPackageName) {
-        mResources = new Resources();
         mMainThread = mainThread;
         mClassLoader = classLoader;
+        mResources = new Resources(getClassLoader());
 
 
     }

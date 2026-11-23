@@ -28,7 +28,7 @@ public class Launcher extends Activity {
             List<GridLayout> grids = new ArrayList<>();
             int count = Math.max(1, (apps.size() + PAGE_SIZE - 1) / PAGE_SIZE);
             for (int page = 0; page < count; page++) {
-                GridLayout grid = (GridLayout) LayoutInflater.from(this).inflate("res/layout/activity_main.xml", null, false);
+                GridLayout grid = (GridLayout) LayoutInflater.from(this).inflate(R.layout.activity_main, null, false);
                 for (int i = page * PAGE_SIZE; i < Math.min(apps.size(), (page + 1) * PAGE_SIZE); i++) {
                     final LauncherActivityInfo info = apps.get(i);
                     AppIconView icon = new AppIconView(this, info);

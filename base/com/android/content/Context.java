@@ -8,6 +8,9 @@ public abstract class Context {
 
     public abstract Resources getResources();
 
+    public String getString(int id) { return getResources().getString(id); }
+    public String getString(int id, Object... args) { return getResources().getString(id, args); }
+
     public abstract Intent registerReceiver( BroadcastReceiver receiver,
                                             IntentFilter filter);
     public abstract ComponentName startService(Intent service);

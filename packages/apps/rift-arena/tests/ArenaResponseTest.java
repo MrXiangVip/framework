@@ -4,6 +4,15 @@ package com.packages.riftarena;
 public final class ArenaResponseTest {
     static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
     public static void main(String[] args){
+        for(int hero=0;hero<3;hero++){
+            ArenaWorld turn=ArenaSwordTest.fresh();turn.configure(turn.player,hero);turn.hero=hero;ArenaSwordTest.dummy(turn).x=1;
+            turn.update(.01,-1,0,false);turn.requestAttack();turn.update(.01,-1,0,false);
+            for(int tick=0;tick<8;tick++)turn.update(.01,-1,0,false);
+            double locked=turn.player.attackFacing;
+            check(turn.player.attackTime>0&&turn.player.facing!=locked,"Reproduce movement heading differing from attack heading");
+            for(int tick=0;tick<80;tick++)turn.update(.01,0,0,false);
+            check(turn.player.attackTime==0&&ArenaWorld.visualFacing(turn.player)==locked,"Releasing movement during attack cannot turn the stationary hero back to an old movement direction: "+hero);
+        }
         ArenaWorld w=ArenaSwordTest.fresh();ArenaWorld.Unit target=ArenaSwordTest.dummy(w);target.range=0;
         w.requestAttack();w.update(.01,0,0,false);ArenaSwordTest.advance(w,22);
         double hp=target.hp,x=w.player.x;check(w.player.attackTime>0,"Attack is recovering");

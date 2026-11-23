@@ -19,7 +19,11 @@ public class TextView extends View {
         super(context, attrs, style, res);
         if (attrs != null) {
             centerText = "center".equals(attrs.get("gravity"));
-            if (attrs.get("text") != null) mText = attrs.get("text");
+            if (attrs.get("text") != null) {
+                String text = attrs.get("text");
+                mText = text.startsWith("@string/")
+                        ? context.getString(context.getResources().getStringId(text.substring(8))) : text;
+            }
             mTextSize = Math.max(1, attrs.dimension("textSize", mTextSize));
             mTextColor = attrs.color("textColor", mTextColor);
         }
@@ -28,6 +32,7 @@ public class TextView extends View {
     public void setTextSize(int size) { mTextSize = Math.max(1, size); requestLayout(); invalidate(); }
     public void setTextColor(int color) { mTextColor = color; invalidate(); }
     public String getText() { return mText; }
+    public void setText(int stringId) { setText(getContext().getString(stringId)); }
     public void setText(String text) { mText = text == null ? "" : text; requestLayout(); invalidate(); }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         int width = (int) Math.ceil(FontManager.measureText(mText, mTextSize));
