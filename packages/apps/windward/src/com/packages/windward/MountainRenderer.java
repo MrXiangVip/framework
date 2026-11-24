@@ -1,0 +1,295 @@
+package com.packages.windward;
+
+import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.glfw.GLFWErrorCallback;
+import org.lwjgl.opengl.GL;
+import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL12.*;
+import static org.lwjgl.opengl.GL30.*;
+
+/** Hidden GL context; only the framework creates a visible application window. */
+final class MountainRenderer implements AutoCloseable {
+    static final int WIDTH=900,HEIGHT=600;
+    private long window;
+    private GLFWErrorCallback errors;
+    private int fbo,color,depth;
+    private final java.util.List<StaticDraw> scene=new java.util.ArrayList<>();
+    private final MountainFrustum frustum=new MountainFrustum();
+    boolean culling=true;int sceneDraws;
+    private static final class StaticDraw {
+        final int id;final double x,y,z,radius;
+        StaticDraw(int id,double x,double y,double z,double radius){this.id=id;this.x=x;this.y=y;this.z=z;this.radius=radius;}
+    }
+    int sceneSize(){return scene.size();}
+    private void cache(double x,double y,double z,double radius,Runnable draw){
+        int id=glGenLists(1);if(id==0)throw new IllegalStateException("Cannot cache static scene");
+        scene.add(new StaticDraw(id,x,y,z,radius));glNewList(id,GL_COMPILE);draw.run();glEndList();
+    }
+    private void cacheModel(String name,double x,double y,double z,double height,double angle,double radius){
+        cache(x,y+height/2,z,art.radius(name,height,radius),()->art.model(name,x,y,z,height,angle,radius));
+    }
+    private void drawScene(MountainWorld w,MountainCamera camera){
+        frustum.update(w,camera);sceneDraws=0;
+        for(StaticDraw draw:scene)if(!culling||frustum.visible(draw.x,draw.y,draw.z,draw.radius)){glCallList(draw.id);sceneDraws++;}
+        glDisable(GL_TEXTURE_2D);glDisable(GL_ALPHA_TEST);glColor3f(1,1,1);
+    }
+    private ByteBuffer pixels;
+    String device="";
+    // Explicit profiling only: glFinish boundaries make GPU work attributable to stages.
+    boolean profile;
+    double sceneMs,characterMs,propsMs,readMs,copyMs,skinMs;
+    private long stage(){if(profile)glFinish();return System.nanoTime();}
+    private static double elapsed(long begin){return (System.nanoTime()-begin)/1e6;}
+    private MountainArt art;
+    void open(MountainWorld world)throws IOException{
+        errors=GLFWErrorCallback.createPrint(System.err);errors.set();
+        glfwInitHint(GLFW_PLATFORM,GLFW_PLATFORM_X11);
+        if(!glfwInit())throw new IOException("OpenGL 初始化失败，请检查 DISPLAY");
+        glfwDefaultWindowHints();glfwWindowHint(GLFW_VISIBLE,GLFW_FALSE);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,2);glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,1);
+        window=glfwCreateWindow(64,64,"windward offscreen",0,0);
+        if(window==0)throw new IOException("无法创建 OpenGL 上下文");
+        glfwMakeContextCurrent(window);GL.createCapabilities();device=glGetString(GL_RENDERER);
+        if(!GL.getCapabilities().OpenGL30&&!GL.getCapabilities().GL_ARB_framebuffer_object)throw new IOException("需要 framebuffer object 支持");
+        fbo=glGenFramebuffers();glBindFramebuffer(GL_FRAMEBUFFER,fbo);
+        color=glGenTextures();glBindTexture(GL_TEXTURE_2D,color);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,WIDTH,HEIGHT,0,GL_RGB,GL_UNSIGNED_BYTE,(ByteBuffer)null);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,color,0);
+        depth=glGenRenderbuffers();glBindRenderbuffer(GL_RENDERBUFFER,depth);
+        glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH_COMPONENT24,WIDTH,HEIGHT);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,depth);
+        if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)throw new IOException("离屏缓冲创建失败");
+        pixels=BufferUtils.createByteBuffer(WIDTH*HEIGHT*4);
+        glEnable(GL_DEPTH_TEST);glEnable(GL_NORMALIZE);glEnable(GL_COLOR_MATERIAL);
+        glColorMaterial(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE);glEnable(GL_LIGHTING);glEnable(GL_LIGHT0);
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT,new float[]{.45f,.48f,.47f,1});
+        glLightfv(GL_LIGHT0,GL_DIFFUSE,new float[]{.55f,.53f,.48f,1});
+        glEnable(GL_FOG);glFogi(GL_FOG_MODE,GL_LINEAR);glFogfv(GL_FOG_COLOR,new float[]{.65f,.83f,.87f,1});
+        glFogf(GL_FOG_START,40);glFogf(GL_FOG_END,125);
+        art=new MountainArt();art.open();
+        landscape(world);
+    }
+    BufferedImage render(MountainWorld w,MountainCamera camera){
+        camera.update(w);
+        glBindFramebuffer(GL_FRAMEBUFFER,fbo);glViewport(0,0,WIDTH,HEIGHT);
+        glClearColor(.65f,.83f,.92f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        glMatrixMode(GL_PROJECTION);glLoadIdentity();
+        double top=.1*Math.tan(Math.toRadians(65)/2);glFrustum(-top*WIDTH/HEIGHT,top*WIDTH/HEIGHT,-top,top,.1,220);
+        glMatrixMode(GL_MODELVIEW);glLoadIdentity();
+        lookAt(camera.eyeX,camera.eyeY,camera.eyeZ,w.x,w.y+1.35,w.z);
+        glLightfv(GL_LIGHT0,GL_POSITION,new float[]{-30,65,20,0});
+        long begin=profile?stage():0;
+        drawScene(w,camera);
+        if(profile){glFinish();sceneMs=elapsed(begin);begin=stage();}
+        contactShadow(w);
+        art.profile=profile;art.character(w);
+        if(profile){glFinish();characterMs=elapsed(begin);skinMs=art.skinMs;begin=stage();}
+        traversalObjects(w);
+        combatObjects(w,art);
+        puzzleObjects(w);
+        if(profile){glFinish();propsMs=elapsed(begin);begin=stage();}
+        glReadPixels(0,0,WIDTH,HEIGHT,GL_BGRA,GL_UNSIGNED_INT_8_8_8_8_REV,pixels);
+        if(profile){readMs=elapsed(begin);begin=System.nanoTime();}
+        BufferedImage image=new BufferedImage(WIDTH,HEIGHT,BufferedImage.TYPE_INT_RGB);
+        int[] dest=((DataBufferInt)image.getRaster().getDataBuffer()).getData();
+        java.nio.IntBuffer packed=pixels.asIntBuffer();
+        for(int row=0;row<HEIGHT;row++){packed.position((HEIGHT-1-row)*WIDTH);packed.get(dest,row*WIDTH,WIDTH);}
+        if(profile)copyMs=elapsed(begin);
+        return image;
+    }
+    private static void puzzleObjects(MountainWorld w){
+        MountainPuzzle p=w.puzzle;
+        double py=MountainWorld.ground(MountainPuzzle.X,MountainPuzzle.PLATE_Z);
+        cylinder(MountainPuzzle.X,py+.03,MountainPuzzle.PLATE_Z,1.25,.12,1.25,p.powered?0x75d9bb:0xc2b471,12);
+        box(MountainPuzzle.X,p.stoneY()+.7,p.stoneZ,.7,.7,.7,p.powered?0x90c8b3:0x9eaa9c);
+        box(MountainPuzzle.X,p.stoneY()+1.42,p.stoneZ,.3,.025,.3,0xe0d08b);
+        double tx=MountainPuzzle.TERMINAL_X,tz=MountainPuzzle.TERMINAL_Z,ty=MountainWorld.ground(tx,tz);
+        cylinder(tx,ty+.9,tz,.48,.12,.48,p.powered?0x75d9bb:0x847968,8);
+        glDisable(GL_LIGHTING);glLineWidth(3);color(p.powered?0x75d9bb:0x8d886a);glBegin(GL_LINE_STRIP);
+        for(int i=0;i<=24;i++){double u=i/24.,x=MountainPuzzle.X+(tx-MountainPuzzle.X)*u,z=MountainPuzzle.PLATE_Z+(tz-MountainPuzzle.PLATE_Z)*u;glVertex3d(x,MountainWorld.ground(x,z)+.18,z);}
+        glEnd();glLineWidth(1);
+        if(w.journey.complete){
+            double towerY=MountainWorld.ground(15,-25);
+            glPushMatrix();glTranslated(15,towerY+8.2,-25);glRotated(w.time*65,0,1,0);
+            glColor3d(.65,.97,.86);glBegin(GL_LINES);
+            for(int i=0;i<4;i++){double angle=i*Math.PI/2;glVertex3d(0,0,0);glVertex3d(Math.cos(angle)*3.1,.5,Math.sin(angle)*3.1);}
+            glEnd();glPopMatrix();
+            glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glDepthMask(false);glColor4d(.5,.95,.84,.2);
+            glBegin(GL_QUADS);
+            for(int i=0;i<12;i++){double a=i*Math.PI/6,b=(i+1)*Math.PI/6;glVertex3d(15+Math.cos(a)*.7,towerY+10.5,-25+Math.sin(a)*.7);glVertex3d(15+Math.cos(b)*.7,towerY+10.5,-25+Math.sin(b)*.7);glVertex3d(15+Math.cos(b)*.7,towerY+24,-25+Math.sin(b)*.7);glVertex3d(15+Math.cos(a)*.7,towerY+24,-25+Math.sin(a)*.7);}
+            glEnd();glDepthMask(true);glDisable(GL_BLEND);
+        }
+        glEnable(GL_LIGHTING);
+    }
+    private static void puzzleRails(){
+        // Narrow rails communicate the allowed push direction, with a bright receiver.
+        for(double z=MountainPuzzle.MIN_Z;z<=MountainPuzzle.MAX_Z;z+=.5){
+            for(int side:new int[]{-1,1})box(MountainPuzzle.X+side*.9,MountainWorld.ground(MountainPuzzle.X+side*.9,z)+.04,z,.05,.04,.25,0xb4ab8a);
+        }
+    }
+    private static void combatObjects(MountainWorld w,MountainArt art){
+        MountainCombat c=w.combat;double floor=MountainWorld.ground(c.x,c.z);
+        if(c.enemyHealth>0){
+            glPushMatrix();glTranslated(c.x,floor,c.z);glRotated(Math.toDegrees(c.facing),0,1,0);
+            int stone=c.enemyHurt>0?0xffe9b4:0x879d9b;
+            double stride=c.state==MountainCombat.State.CHASE||c.state==MountainCombat.State.RETURN?Math.sin(w.time*9)*.13:0;
+            box(-.28,.3+stride,0,.22,.3,.28,stone);box(.28,.3-stride,0,.22,.3,.28,stone);
+            box(0,1.05,0,.55,.48,.35,stone);box(0,1.83,0,.37,.3,.32,stone);
+            box(-.17,1.87,.33,.065,.065,.02,0xf3d16c);box(.17,1.87,.33,.065,.065,.02,0xf3d16c);
+            double reach=c.state==MountainCombat.State.WINDUP?-.35:c.state==MountainCombat.State.RECOVERY&&c.timer<.25?.8:.15;
+            box(-.73,1.0,reach,.23,.35,.24,stone);box(.73,1.0,reach,.23,.35,.24,stone);
+            glPopMatrix();
+            if(c.state==MountainCombat.State.WINDUP){
+                glDisable(GL_LIGHTING);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glDepthMask(false);
+                glColor4d(1,.28,.12,.25+c.timer*.3);glBegin(GL_TRIANGLE_FAN);glVertex3d(c.x,floor+.04,c.z);
+                for(int i=0;i<=24;i++){double angle=c.facing-1.26+i*2.52/24,px=c.x+Math.sin(angle)*2.35,pz=c.z+Math.cos(angle)*2.35;glVertex3d(px,MountainTraversal.floor(px,pz)+.045,pz);}
+                glEnd();glDepthMask(true);glDisable(GL_BLEND);glEnable(GL_LIGHTING);
+            }
+        }else{cylinder(c.x,floor,c.z,.65,.25,.45,0x879d9b,6);box(c.x+.5,floor+.23,c.z+.3,.25,.2,.25,0x879d9b);}
+        if(w.grounded&&!w.climbing&&!w.gliding&&!w.puzzle.pushing&&c.health>0){
+            glPushMatrix();glTranslated(w.x,w.y,w.z);glRotated(Math.toDegrees(w.visualFacing),0,1,0);
+            double slash=c.attackTime<0?0:Math.sin(Math.min(1,c.attackTime/.5)*Math.PI);
+            glTranslated(art.handX,art.handY,art.handZ);glRotated(-35+slash*140,0,1,0);glRotated(65-slash*55,1,0,0);
+            box(0,-.12,0,.055,.16,.055,0x66513a);box(0,.04,0,.19,.04,.06,0xc7ab63);box(0,.6,0,.07,.52,.035,0xd6eff0);
+            glPopMatrix();
+        }
+    }
+    private static void traversalObjects(MountainWorld w){
+        double y=MountainWorld.ground(MountainJourney.CACHE_X,MountainJourney.CACHE_Z);
+        box(MountainJourney.CACHE_X,y+.35,MountainJourney.CACHE_Z,.65,.35,.45,0x82704a);
+        box(MountainJourney.CACHE_X,y+(w.journey.treasure?.98:.75),MountainJourney.CACHE_Z,.7,.10,.48,w.journey.treasure?0x738f80:0xe6c56b);
+        if(w.gliding){
+            glPushMatrix();glTranslated(w.x,w.y,w.z);glRotated(Math.toDegrees(w.visualFacing),0,1,0);
+            glDisable(GL_CULL_FACE);
+            tri(-2,2.8,.5,0,3.25,-.65,2,2.8,.5,0x58b6b4);
+            tri(-2,2.8,.5,2,2.8,.5,0,2.9,1.1,0xe5d6a1);
+            glDisable(GL_LIGHTING);glColor3f(.35f,.3f,.22f);glBegin(GL_LINES);
+            for(int side:new int[]{-1,1}){glVertex3d(side*1.8,2.8,.5);glVertex3d(side*.45,2.15,0);}
+            glEnd();glEnable(GL_LIGHTING);glPopMatrix();
+        }
+    }
+    private static void contactShadow(MountainWorld w){
+        double floor=w.floor(),air=Math.max(0,w.y-floor),radius=.42+air*.08;
+        glDisable(GL_LIGHTING);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glDepthMask(false);
+        glColor4d(.08,.14,.12,.24/(1+air));glBegin(GL_TRIANGLE_FAN);glVertex3d(w.x,floor+.025,w.z);
+        for(int i=0;i<=24;i++){double a=i*Math.PI/12,x=w.x+Math.cos(a)*radius,z=w.z+Math.sin(a)*radius;glColor4d(.08,.14,.12,0);glVertex3d(x,w.floorAt(x,z)+.025,z);}
+        glEnd();glDepthMask(true);glDisable(GL_BLEND);glEnable(GL_LIGHTING);
+    }
+    private static void lookAt(double ex,double ey,double ez,double tx,double ty,double tz){
+        double fx=tx-ex,fy=ty-ey,fz=tz-ez,n=Math.sqrt(fx*fx+fy*fy+fz*fz);fx/=n;fy/=n;fz/=n;
+        double sx=-fz,sz=fx,sn=Math.hypot(sx,sz);sx/=sn;sz/=sn;
+        double ux=-sz*fy,uy=sz*fx-sx*fz,uz=sx*fy;
+        glMultMatrixd(new double[]{sx,ux,-fx,0,0,uy,-fy,0,sz,uz,-fz,0,0,0,0,1});glTranslated(-ex,-ey,-ez);
+    }
+    private void landscape(MountainWorld w){
+        // Cache terrain in 10m tiles; keep the original 2m triangles and texture coordinates.
+        for(int z=-50;z<50;z+=10)for(int x=-50;x<50;x+=10){
+            final int tx=x,tz=z;double min=Double.POSITIVE_INFINITY,max=-min;
+            for(int vz=z;vz<=z+10;vz+=2)for(int vx=x;vx<=x+10;vx+=2){double h=MountainWorld.rawHeight(vx,vz);min=Math.min(min,h);max=Math.max(max,h);}
+            cache(x+5,(min+max)/2,z+5,Math.sqrt(50+(max-min)*(max-min)/4)+.05,()->{
+                // Two opaque texture batches per tile, rather than a bind/begin per triangle.
+                for(int material=0;material<2;material++){
+                    art.groundTexture(material==1);glBegin(GL_TRIANGLES);
+                    for(int gz=tz;gz<tz+10;gz+=2)for(int gx=tx;gx<tx+10;gx+=2){
+                        double mx=gx+1,mz=gz+1;
+                        boolean path=Math.abs(mx-MountainWorld.pathX(mz))<1.8||(mz>-11&&mz<-3&&Math.abs(mx-(-7*(-3-mz)/8))<1.3);
+                        if(path!=(material==1))continue;
+                        emitTri(gx,MountainWorld.rawHeight(gx,gz),gz,gx,MountainWorld.rawHeight(gx,gz+2),gz+2,gx+2,MountainWorld.rawHeight(gx+2,gz),gz,0xffffff);
+                        emitTri(gx+2,MountainWorld.rawHeight(gx+2,gz+2),gz+2,gx+2,MountainWorld.rawHeight(gx+2,gz),gz,gx,MountainWorld.rawHeight(gx,gz+2),gz+2,0xffffff);
+                    }
+                    glEnd();
+                }
+                glDisable(GL_TEXTURE_2D);
+            });
+        }
+        for(int i=0;i<15;i++){
+            double angle=i*Math.PI*2/15,px=Math.cos(angle)*90,pz=Math.sin(angle)*90,h=24+i%4*7;
+            int tint=i%2==0?0x8caaa0:0x779c94;
+            cache(px,-8+h/2,pz,Math.hypot(20,h/2)+.05,()->cylinder(px,-8,pz,20,h,0,tint,5));
+        }
+        // The rails and terminal pedestal never change during a journey.
+        double railZ=(MountainPuzzle.MIN_Z+MountainPuzzle.MAX_Z)/2;
+        double railY=MountainWorld.ground(MountainPuzzle.X,railZ),railRadius=0;
+        for(double z=MountainPuzzle.MIN_Z;z<=MountainPuzzle.MAX_Z;z+=.5)
+            for(int side:new int[]{-1,1}){
+                double x=MountainPuzzle.X+side*.9,y=MountainWorld.ground(x,z)+.04;
+                railRadius=Math.max(railRadius,Math.sqrt(.9*.9+(y-railY)*(y-railY)+(z-railZ)*(z-railZ))+.3);
+            }
+        cache(MountainPuzzle.X,railY,railZ,railRadius,MountainRenderer::puzzleRails);
+        double terminalY=MountainWorld.ground(MountainPuzzle.TERMINAL_X,MountainPuzzle.TERMINAL_Z);
+        cache(MountainPuzzle.TERMINAL_X,terminalY+.45,MountainPuzzle.TERMINAL_Z,.8,
+            ()->cylinder(MountainPuzzle.TERMINAL_X,terminalY,MountainPuzzle.TERMINAL_Z,.55,.9,.4,0xb4b49b,8));
+        int treeIndex=0;
+        for(MountainWorld.Obstacle t:w.trees){
+            String name=treeIndex++%3==0?"birch":"tree";
+            cacheModel(name,t.x,MountainWorld.ground(t.x,t.z),t.z,t.height+2,treeIndex*43,0);
+        }
+        int rockIndex=0;
+        for(MountainWorld.Obstacle r:w.rocks)cacheModel(rockIndex++%2==0?"rock":"roundrock",r.x,MountainWorld.ground(r.x,r.z),r.z,r.height,rockIndex*29,r.r);
+        cacheModel("tent",w.tent.x,MountainWorld.ground(w.tent.x,w.tent.z),w.tent.z,w.tent.height,25,w.tent.r);
+        cacheModel("runestone",w.rune.x,MountainWorld.ground(w.rune.x,w.rune.z),w.rune.z,w.rune.height,15,w.rune.r);
+        double base=MountainWorld.ground(-7,-14)-2,top=MountainTraversal.TOP;
+        cache(-7,(base+top)/2,-14,8,()->{
+            box(-7,(base+top)/2,-14,3,(top-base)/2,3,0x969888);
+            box(-7,top-.12,-14,3,.12,3,0x99ab78);
+            for(int row=0;row<6;row++)for(int side:new int[]{-1,1})box(-7+side*(.45+row%2*.2),top-4.7+row*.72,MountainTraversal.FRONT+.04,.24,.08,.09,0xe7d4a1);
+        });
+        for(int i=1;i<MountainJourney.ROUTE.length;i++){
+            double px=MountainJourney.ROUTE[i][0]-2.5,pz=MountainJourney.ROUTE[i][1],py=MountainWorld.ground(px,pz);
+            cache(px+.35,py+.9,pz,1.5,()->{cylinder(px,py,pz,.12,1.8,.12,0x847258,6);box(px+.35,py+1.5,pz,.65,.19,.13,0x4697a2);});
+        }
+        double ty=MountainWorld.ground(15,-25);
+        cache(15,ty+5.25,-25,6,()->{
+            cylinder(15,ty,-25,2.3,1,2.3,0xb8b7a0,8);
+            cylinder(15,ty+1,-25,1.35,7,1.1,0xe3d9b8,8);
+            cylinder(15,ty+8,-25,2.1,.5,2.1,0xb2b5a2,8);
+            cylinder(15,ty+8.5,-25,2.5,2,0,0x4697a2,8);
+        });
+        cache(-3,MountainWorld.ground(-3,14),14,3,()->{
+            for(int i=0;i<8;i++){double a=i*Math.PI/4,x=-3+Math.cos(a),z=14+Math.sin(a);cylinder(x,MountainWorld.ground(x,z),z,.26,.25,.2,0xaba797,6);}
+        });
+        for(int i=0;i<95;i++){
+            double x=-44+i*19%88,z=-42+i*31%84;
+            if(Math.abs(x-MountainWorld.pathX(z))<2||Math.hypot(x,z-12)<4)continue;
+            cacheModel(i%9==0?"mushrooms":i%4==0?"flowers":"grass",x,MountainWorld.ground(x,z),z,i%9==0?.45:i%4==0?.18:.55,i*67,i%9==0?.35:i%4==0?0:.7);
+        }
+    }
+
+    private static void color(int c){glColor3d((c>>16&255)/255.,(c>>8&255)/255.,(c&255)/255.);}
+    private static void tri(double ax,double ay,double az,double bx,double by,double bz,double cx,double cy,double cz,int c){
+        glBegin(GL_TRIANGLES);emitTri(ax,ay,az,bx,by,bz,cx,cy,cz,c);glEnd();
+    }
+    private static void emitTri(double ax,double ay,double az,double bx,double by,double bz,double cx,double cy,double cz,int c){
+        double ux=bx-ax,uy=by-ay,uz=bz-az,vx=cx-ax,vy=cy-ay,vz=cz-az;
+        color(c);glNormal3d(uy*vz-uz*vy,uz*vx-ux*vz,ux*vy-uy*vx);
+        glTexCoord2d(ax/5,az/5);glVertex3d(ax,ay,az);glTexCoord2d(bx/5,bz/5);glVertex3d(bx,by,bz);glTexCoord2d(cx/5,cz/5);glVertex3d(cx,cy,cz);
+    }
+    private static void cylinder(double x,double y,double z,double bottom,double h,double top,int c,int sides){
+        for(int i=0;i<sides;i++){
+            double a=i*Math.PI*2/sides,b=(i+1)*Math.PI*2/sides;
+            double ax=x+Math.cos(a)*bottom,az=z+Math.sin(a)*bottom,bx=x+Math.cos(b)*bottom,bz=z+Math.sin(b)*bottom;
+            double cx=x+Math.cos(a)*top,cz=z+Math.sin(a)*top,dx=x+Math.cos(b)*top,dz=z+Math.sin(b)*top;
+            tri(ax,y,az,cx,y+h,cz,bx,y,bz,c);tri(bx,y,bz,cx,y+h,cz,dx,y+h,dz,c);
+            tri(x,y+h,z,dx,y+h,dz,cx,y+h,cz,c);
+        }
+    }
+    private static void box(double x,double y,double z,double a,double b,double c,int tint){
+        double[][] p={{x-a,y-b,z-c},{x+a,y-b,z-c},{x+a,y+b,z-c},{x-a,y+b,z-c},{x-a,y-b,z+c},{x+a,y-b,z+c},{x+a,y+b,z+c},{x-a,y+b,z+c}};
+        int[][] faces={{0,3,2,1},{4,5,6,7},{0,4,7,3},{1,2,6,5},{3,7,6,2},{0,1,5,4}};
+        for(int[] f:faces){double[] u=p[f[0]],v=p[f[1]],w=p[f[2]],t=p[f[3]];tri(u[0],u[1],u[2],v[0],v[1],v[2],w[0],w[1],w[2],tint);tri(u[0],u[1],u[2],w[0],w[1],w[2],t[0],t[1],t[2],tint);}
+    }
+    @Override public void close(){
+        if(window!=0){
+            glfwMakeContextCurrent(window);
+            for(StaticDraw draw:scene)glDeleteLists(draw.id,1);scene.clear();if(art!=null)art.close();if(depth!=0)glDeleteRenderbuffers(depth);if(color!=0)glDeleteTextures(color);if(fbo!=0)glDeleteFramebuffers(fbo);
+            GL.setCapabilities(null);glfwDestroyWindow(window);window=0;
+        }
+        glfwTerminate();if(errors!=null){glfwSetErrorCallback(null);errors.free();errors=null;}
+    }
+}

@@ -40,6 +40,8 @@ xshx@xshx:~/IdeaProjects/framework$ ./build.sh
 
 Browser: [build and usage](packages/apps/browser/README.md)
 
+风起山野：[明亮卡通 3D 山野冒险，目前为第三人称跑跳与山地镜头原型](packages/apps/windward/README.md)。
+
 星隙竞技场：[基于当前 Java / OpenGL 框架的 3D 三路 MOBA 与运行方法](packages/apps/rift-arena/README.md)。从 Launcher 直接进入游戏，无需 Unity。
 由 Launcher 启动独立 Linux Unity Player；需要先安装 Unity 编辑器并导出游戏。
 

@@ -1,10 +1,12 @@
 package com.android.view;
 
+import com.android.util.Log;
 import java.util.Arrays;
 import java.util.Locale;
 
 /** Software budgets and submission timings; never physical display FPS. */
 final class FrameTimings {
+    private static final String TAG = "FrameTimings ";
     private final long[][] samples = new long[6][256];
     private int count, position;
     private long previous, lateCount, skippedTicks, totalCount;
@@ -21,7 +23,7 @@ final class FrameTimings {
         totalCount++; if(overrun>0) lateCount++;
         if(frame!=null) skippedTicks+=frame.skippedTicks;
         if(Boolean.getBoolean("framework.render.trace")) {
-            System.out.println("FrameTrace id="+(frame==null?0:frame.id)
+            Log.d(TAG, "FrameTrace id="+(frame==null?0:frame.id)
                     +" requestNs="+request+" targetNs="+target+" startNs="+start
                     +" traversalBeginNs="+begin+" drawEndNs="+composed
                     +" submitEndNs="+submitted+" deadlineNs="+deadline
@@ -38,7 +40,7 @@ final class FrameTimings {
         }
         out.append(" | totalFrames=").append(totalCount).append(" lateFrames=").append(lateCount)
                 .append(" skippedTicks=").append(skippedTicks).append(" presentation=unavailable");
-        System.out.println(out);
+        Log.d(TAG, out.toString());
     }
     private static double at(long[] values,double fraction) {
         return values[Math.max(0,(int)Math.ceil(values.length*fraction)-1)]/1e6;
