@@ -17,10 +17,11 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     private final Choreographer mChoreographer;
     private XWindow mWindow;
     private BufferedImage mFrameBuffer;
-    private final FrameTimings mFrameTimings=Boolean.getBoolean("framework.render.profile")?new FrameTimings():null;
+    private final FrameTimings mFrameTimings=(Boolean.getBoolean("framework.render.profile") || Boolean.getBoolean("framework.render.trace"))?new FrameTimings():null;
     private int mWidth, mHeight;
     private boolean mWindowSizeDirty = true;
     private boolean mTraversalScheduled, mClosed;
+    private long mFrameRequestNanos;
     public final WindowManager.LayoutParams mWindowAttributes = new WindowManager.LayoutParams();
 
     public ViewRootImpl(Context context, int display) { this(context, display, false); }
@@ -59,6 +60,7 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
                 if (mClosed || mMinimized == minimized) return;
                 mMinimized = minimized;
                 if (minimized) {
+                    cancelTraversal();
                     mView.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
                 }
                 if (mWindowCallback != null) mWindowCallback.onWindowMinimizedChanged(minimized);
@@ -123,12 +125,19 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     void scheduleTraversals() {
         if (mClosed || mMinimized || mTraversalScheduled) return;
         mTraversalScheduled = true;
+        mFrameRequestNanos = System.nanoTime();
         mChoreographer.postCallback(Choreographer.CALLBACK_TRAVERSAL, () -> {
             mTraversalScheduled = false;
             if (!mClosed && !mMinimized) performTraversals();
-        }, null);
+        }, this);
+    }
+    private void cancelTraversal() {
+        mChoreographer.removeCallbacks(Choreographer.CALLBACK_TRAVERSAL, null, this);
+        mTraversalScheduled = false;
     }
     private void performTraversals() {
+        long requestNanos = mFrameRequestNanos;
+        long begin=mFrameTimings==null?0:System.nanoTime();
         if (mWindowSizeDirty) resolveWindowSize();
         if (mWindow == null) {
             mWindow = new XWindow(mWidth, mHeight, mWindowAttributes.getTitle());
@@ -137,12 +146,11 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
                 || mFrameBuffer.getHeight() != mHeight) {
             mFrameBuffer = new BufferedImage(mWidth, mHeight, BufferedImage.TYPE_INT_RGB);
         }
-        long begin=mFrameTimings==null?0:System.nanoTime();
         renderIntoImage(mView, mFrameBuffer);
         long composed=mFrameTimings==null?0:System.nanoTime();
         // nativePresent copies pixels synchronously; the image is reusable on return.
         mWindow.present(mFrameBuffer);
-        if(mFrameTimings!=null)mFrameTimings.record(begin,composed,System.nanoTime());
+        if(mFrameTimings!=null)mFrameTimings.record(mChoreographer.getCurrentFrame(),requestNanos,begin,composed,System.nanoTime());
     }
     /** Also used by headless regression tests; no X11 or native library required. */
     public static BufferedImage renderToImage(View view, int width, int height) {
@@ -164,6 +172,7 @@ public class ViewRootImpl implements ViewParent, AutoCloseable {
     @Override public void close() {
         if (mClosed) return;
         mClosed = true;
+        cancelTraversal();
         mFrameBuffer = null;
         Window.Callback callback = mWindowCallback;
         mWindowCallback = null;

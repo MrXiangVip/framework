@@ -120,3 +120,39 @@ XML `android:text="@string/greeting"`。格式化使用 Java `String.format` 和
 bash packages/apps/build.sh calendar settings
 python3 tests/resource_pipeline_test.py
 ```
+
+软件帧时钟：UI 绘制按需合并到固定节拍，默认目标 60Hz，可通过 JVM 属性
+`-Dframework.render.hz=60` 设置（1–1000Hz）。这是软件目标，不代表宿主显示器刷新率。
+没有绘制请求时不产生连续帧；UI 阻塞后跳过过期节拍，窗口最小化或关闭时取消待执行遍历。
+
+启用计量：
+
+```bash
+JAVA_TOOL_OPTIONS='-Dframework.render.profile=true -Dframework.render.trace=true -Dframework.render.hz=60' ./build.sh
+```
+
+`profile` 在有帧提交时每隔至少五秒输出最近最多 256 帧的调度延迟、遍历
+（包括窗口尺寸解析和缓冲分配）、native 提交、请求到提交、预算超期和提交间隔的
+P50/P95/P99，以及累计帧数、超期帧数和跳过节拍数。空闲期不主动打印。
+`trace` 独立启用逐帧记录：帧 ID、该窗口首次请求时间、计划/实际开始时间、遍历开始、
+绘制结束、提交返回及软件截止时间，时间戳采用 `System.nanoTime()` 基准。
+同一 UI Looper 的同一调度帧共享 ID；跨进程分析时应同时记录日志来源进程。
+截止时间为当前计划节拍加一个周期，仅表示软件预算；X11 提交返回不表示屏幕已呈现。
+实际呈现反馈尚未接入。详细 trace 会增加输出开销，适合短时诊断。
+
+Handler 的 `sendMessageAtTime` 现在接收 `System.nanoTime() / 1_000_000L`
+基准的绝对毫秒时间，`sendMessageDelayed` 接收相对延时；消息按到期时间稳定排序。
+
+帧时钟与延时队列无窗口测试：
+
+```bash
+mkdir -p /tmp/framework-frame-tests
+javac -encoding UTF-8 -cp 'libs/*' -d /tmp/framework-frame-tests \
+  $(rg --files base/com/android -g '*.java') \
+  tests/com/android/view/FrameClockTest.java \
+  tests/com/android/os/MessageQueueTimingTest.java \
+  tests/com/android/view/WindowCloseLifecycleTest.java
+java -cp /tmp/framework-frame-tests com.android.view.FrameClockTest
+java -cp /tmp/framework-frame-tests com.android.os.MessageQueueTimingTest
+java -Djava.awt.headless=true -cp /tmp/framework-frame-tests com.android.view.WindowCloseLifecycleTest
+```

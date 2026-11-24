@@ -1,149 +1,54 @@
-/*
-* 源码路径 : frameworks/base/core/java/android/os/MessageQueue.java
-* */
 package com.android.os;
 
-import com.android.util.Log;
-
-import java.util.Collection;
+import java.util.AbstractQueue;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.Queue;
 
-public final class MessageQueue implements Queue {
-//    Message mMessages;
+/** Stable deadline ordering in the System.nanoTime() millisecond timebase. */
+public final class MessageQueue extends AbstractQueue<Message> {
+    private final LinkedList<Message> messages = new LinkedList<>();
 
-    Queue<Message>  queue;
-    private final boolean mQuitAllowed;
-    private String TAG="MessageQueue.";
+    MessageQueue(boolean quitAllowed) {}
 
-
-    MessageQueue(boolean quitAllowed) {
-        mQuitAllowed = quitAllowed;
-        queue = new LinkedList();
-
-    }
     Message next() {
-        Message message=null;
-        synchronized(queue) {
-
-            while (queue.size() == 0) {
+        synchronized (this) {
+            for (;;) {
+                Message first = messages.peek();
+                long remaining = first == null ? 0 : first.when - nowMillis();
+                if (first != null && remaining <= 0) return messages.poll();
                 try {
-                    Log.d("等待消息 wait here");
-
-                    queue.wait();
-                } catch (Exception e) {
-                    e.printStackTrace();
+                    if (first == null) wait();
+                    else wait(remaining);
+                } catch (InterruptedException ignored) {
+                    // Interrupts wake the queue; only due messages are dispatched.
                 }
             }
-            if( queue.size()>0 ){
-                 message = (Message)poll();
-            }
         }
-        return  message;
     }
-    boolean enqueueMessage(Message msg, long when) {
-        Log.d(TAG, "enqueueMessage ");
+
+    static long nowMillis() { return System.nanoTime() / 1_000_000L; }
+
+    synchronized boolean enqueueMessage(Message msg, long when) {
         msg.when = when;
-//        Message p = mMessages;
-        synchronized (queue) {
-            queue.add(msg);
-            queue.notifyAll();
-        }
+        int index = 0;
+        while (index < messages.size() && messages.get(index).when <= when) index++;
+        messages.add(index, msg);
+        notifyAll();
         return true;
     }
-    @Override
-    public int size() {
-        return  queue.size();
+
+    synchronized void removeMessages(Handler handler, int what) {
+        messages.removeIf(message -> message.target == handler && message.what == what);
+        notifyAll();
     }
 
-    @Override
-    public boolean isEmpty() {
-        if( queue.size()==0){
-            return  true;
-        }else{
-            return false;
-        }
+    @Override public synchronized int size() { return messages.size(); }
+    @Override public synchronized Message peek() { return messages.peek(); }
+    @Override public synchronized Message poll() { return messages.poll(); }
+    @Override public boolean offer(Message message) { return enqueueMessage(message, message.when); }
+    @Override public synchronized Iterator<Message> iterator() {
+        return new ArrayList<>(messages).iterator();
     }
-
-    @Override
-    public boolean contains(Object o) {
-        return false;
-    }
-
-    @Override
-    public Iterator iterator() {
-        return null;
-    }
-
-    @Override
-    public Object[] toArray() {
-        return new Object[0];
-    }
-
-    @Override
-    public Object[] toArray(Object[] objects) {
-        return new Object[0];
-    }
-
-    @Override
-    public boolean add(Object o) {
-        return false;
-    }
-
-    @Override
-    public boolean remove(Object o) {
-        return false;
-    }
-
-    @Override
-    public boolean addAll(Collection collection) {
-        return false;
-    }
-
-    @Override
-    public void clear() {
-
-    }
-
-    @Override
-    public boolean retainAll(Collection collection) {
-        return false;
-    }
-
-    @Override
-    public boolean removeAll(Collection collection) {
-        return false;
-    }
-
-    @Override
-    public boolean containsAll(Collection collection) {
-        return false;
-    }
-
-    @Override
-    public boolean offer(Object o) {
-        return false;
-    }
-
-    @Override
-    public Object remove() {
-        return null;
-    }
-
-    @Override
-    public Object poll() {
-        Message msg = queue.poll();
-        return msg;
-    }
-
-    @Override
-    public Object element() {
-        return null;
-    }
-
-    @Override
-    public Object peek() {
-        return null;
-    }
+    @Override public synchronized void clear() { messages.clear(); notifyAll(); }
 }

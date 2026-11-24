@@ -51,7 +51,10 @@ public class Handler {
         if (delayMillis < 0) {
             delayMillis = 0;
         }
-        return sendMessageAtTime(msg, delayMillis);
+        long now = MessageQueue.nowMillis();
+        long when = now + delayMillis;
+        if (delayMillis > 0 && when < now) when = Long.MAX_VALUE;
+        return sendMessageAtTime(msg, when);
     }
     public boolean sendMessageAtTime( Message msg, long uptimeMillis) {
         MessageQueue queue = mQueue;
@@ -66,6 +69,10 @@ public class Handler {
         msg.target = this;
 
         return queue.enqueueMessage(msg, uptimeMillis);
+    }
+
+    public final void removeMessages(int what) {
+        mQueue.removeMessages(this, what);
     }
 
     public void handleMessage( Message msg) {
