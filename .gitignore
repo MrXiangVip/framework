@@ -2,6 +2,7 @@ out/
 external/
 *.class
 .idea
+skills/
 
 # Local licensed source packages and extracted libraries
 /external/unity/
