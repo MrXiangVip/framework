@@ -123,6 +123,10 @@ bash packages/apps/build.sh calendar settings
 python3 tests/resource_pipeline_test.py
 ```
 
+Fragment：支持动态 `add/remove/replace`、异步 `commit()`、同步 `commitNow()`，
+以及跟随 Activity 的生命周期。用法与边界见 [Fragment 文档](doc/FRAGMENTS.md)，
+示例位于 `packages/apps/fragment-demo`，运行 `bash tests/run-fragment-tests.sh` 验证。
+
 软件帧时钟：UI 绘制按需合并到固定节拍，默认目标 60Hz，可通过 JVM 属性
 `-Dframework.render.hz=60` 设置（1–1000Hz）。这是软件目标，不代表宿主显示器刷新率。
 没有绘制请求时不产生连续帧；UI 阻塞后跳过过期节拍，窗口最小化或关闭时取消待执行遍历。

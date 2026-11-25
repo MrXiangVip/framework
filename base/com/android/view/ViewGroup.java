@@ -188,6 +188,24 @@ public abstract  class ViewGroup extends View implements ViewParent {
         return super.dispatchTouchEvent(event);
     }
 
+    /** Detach a child, cancelling pointer capture and clearing subtree focus. */
+    public void removeView(View child) {
+        for (int i = 0; i < mChildrenCount; i++) {
+            if (mChildren[i] != child) continue;
+            if (mTouchTarget == child) {
+                mTouchTarget = null;
+                child.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
+            }
+            child.clearFocus();
+            child.mParent = null;
+            System.arraycopy(mChildren, i + 1, mChildren, i, mChildrenCount - i - 1);
+            mChildren[--mChildrenCount] = null;
+            requestLayout();
+            invalidate();
+            return;
+        }
+    }
+
     public void removeAllViews() {
         if (mTouchTarget != null) mTouchTarget.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
         mTouchTarget = null;

@@ -12,6 +12,18 @@ public class Activity extends ContextThemeWrapper implements Window.Callback {
     private static Activity activity;
 
     private boolean mResumed, mResumeRequested, mWindowMinimized, mDestroyed;
+    private final Thread mUiThread = Thread.currentThread();
+    private FragmentManager mFragments;
+
+    public final FragmentManager getFragmentManager() {
+        if (Thread.currentThread() != mUiThread) throw new IllegalStateException("FragmentManager requires the Activity UI thread");
+        if (mFragments == null) {
+            mFragments = new FragmentManager(this);
+            if (mResumed && !mDestroyed) mFragments.dispatchResume();
+        }
+        return mFragments;
+    }
+
     private Window mWindow;
     private WindowManager mWindowManager;
     View mDecor = null;
@@ -75,12 +87,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback {
         if (mResumed || mWindowMinimized) return;
         mResumed = true;
         onResume();
+        if (mFragments != null && mResumed && !mDestroyed) mFragments.dispatchResume();
     }
 
     public final void performPause() {
         if (!mResumed) return;
         mResumed = false;
-        onPause();
+        try { if (mFragments != null) mFragments.dispatchPause(); }
+        finally { onPause(); }
     }
 
     @Override public final void onWindowMinimizedChanged(boolean minimized) {
@@ -105,7 +119,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback {
             performPause();
         } finally {
             try {
-                onDestroy();
+                try { if (mFragments != null) mFragments.dispatchDestroy(); }
+                finally { onDestroy(); }
             } finally {
                 if (mWindow != null) mWindow.setCallback(null);
                 mDecor = null;

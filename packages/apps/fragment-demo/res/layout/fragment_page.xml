@@ -1,0 +1,8 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:padding="24"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <TextView android:id="@+id/title" android:text="Fragment"
+        android:textSize="24" android:layout_width="match_parent" android:layout_height="64"/>
+    <Button android:id="@+id/switch_page" android:text="Switch fragment"
+        android:layout_width="240" android:layout_height="56"/>
+</LinearLayout>
