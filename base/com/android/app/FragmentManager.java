@@ -6,6 +6,8 @@ import com.android.view.LayoutInflater;
 import com.android.view.View;
 import com.android.view.ViewGroup;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Collections;
 import java.util.List;
 
@@ -15,15 +17,21 @@ public final class FragmentManager {
     private final Thread thread;
     private final Handler handler;
     private final List<Fragment> added = new ArrayList<>();
-    private final List<FragmentTransaction> pending = new ArrayList<>();
-    private boolean resumed, destroyed, executing;
+    private final Deque<FragmentTransaction> pending = new ArrayDeque<>();
+    private enum HostState { PAUSED, RESUMED, DESTROYED }
+    private HostState hostState = HostState.PAUSED;
+    private int executionDepth, lifecycleVersion;
+    private boolean scheduled, draining;
+    private static final int MAX_ASYNC_BATCH = 32;
     private int nextId;
 
     FragmentManager(Activity host) {
         this.host = host;
         thread = Thread.currentThread();
         handler = Looper.myLooper() == null ? null : new Handler(message -> {
-            executePendingTransactions(); return true;
+            scheduled = false;
+            if (alive()) drainPending(MAX_ASYNC_BATCH);
+            return true;
         });
     }
     private void checkThread() {
@@ -31,7 +39,7 @@ public final class FragmentManager {
     }
     private void checkReady() {
         checkThread();
-        if (destroyed || host.isDestroyed()) throw new IllegalStateException("Activity is destroyed");
+        if (!alive()) throw new IllegalStateException("Activity is destroyed");
     }
     public FragmentTransaction beginTransaction() { checkReady(); return new FragmentTransaction(this); }
     public List<Fragment> getFragments() { checkThread(); return Collections.unmodifiableList(new ArrayList<>(added)); }
@@ -48,21 +56,45 @@ public final class FragmentManager {
     int commit(FragmentTransaction transaction, boolean now) {
         checkReady();
         if (!now && handler == null) throw new IllegalStateException("commit() requires a prepared Looper; use commitNow()");
-        if (now && executing) throw new IllegalStateException("FragmentManager is already executing callbacks");
+        if (now && executionDepth != 0) throw new IllegalStateException("FragmentManager is already executing callbacks");
         int id = nextId++;
         if (now) execute(transaction);
         else {
-            pending.add(transaction);
-            handler.sendMessage(handler.obtainMessage(0, null));
+            pending.addLast(transaction);
+            schedulePending();
         }
         return id;
     }
+    private boolean alive() { return hostState != HostState.DESTROYED && !host.isDestroyed(); }
+    private boolean active(Fragment f) { return alive() && f.manager == this && f.added; }
+    private void schedulePending() {
+        if (!scheduled && !draining && alive() && !pending.isEmpty()) {
+            scheduled = true;
+            handler.sendMessage(handler.obtainMessage(0, null));
+        }
+    }
     public boolean executePendingTransactions() {
         checkReady();
-        if (executing) throw new IllegalStateException("FragmentManager is already executing callbacks");
-        if (handler != null) handler.removeMessages(0);
-        boolean changed = !pending.isEmpty();
-        while (!pending.isEmpty()) execute(pending.remove(0));
+        // Synchronous draining handles the queue present at entry. Callback submissions wait
+        // for another turn so a producer cannot indefinitely block the UI thread.
+        return drainPending(pending.size());
+    }
+    private boolean drainPending(int limit) {
+        if (executionDepth != 0 || draining) throw new IllegalStateException("FragmentManager is already executing callbacks");
+        if (handler != null && scheduled) handler.removeMessages(0);
+        scheduled = false;
+        boolean changed = false;
+        draining = true;
+        try {
+            int count = Math.min(limit, pending.size());
+            while (count-- > 0 && alive() && !pending.isEmpty()) {
+                changed = true;
+                execute(pending.removeFirst());
+            }
+        } finally {
+            draining = false;
+            schedulePending();
+        }
         return changed;
     }
     private void execute(FragmentTransaction transaction) {
@@ -84,83 +116,131 @@ public final class FragmentManager {
                 containers.put(f, op.containerId);
             }
         }
-        executing = true;
+        executionDepth++;
         try {
             for (FragmentTransaction.Op op : transaction.operations) {
+                if (!alive()) break;
                 if (op.type == FragmentTransaction.REMOVE) remove(op.fragment);
                 else {
                     if (op.type == FragmentTransaction.REPLACE) {
                         for (Fragment old : new ArrayList<>(added)) if (old.containerId == op.containerId) remove(old);
                     }
-                    add(op);
+                    if (alive()) add(op);
                 }
             }
-        } finally { executing = false; }
+        } finally { executionDepth--; }
     }
     private void add(FragmentTransaction.Op op) {
         Fragment f = op.fragment;
+        View target = host.findViewById(op.containerId);
+        if (!(target instanceof ViewGroup)) throw new IllegalArgumentException("Fragment container is not a ViewGroup: " + op.containerId);
         f.manager = this; f.activity = host; f.containerId = op.containerId; f.tag = op.tag;
-        f.container = (ViewGroup) host.findViewById(op.containerId);
+        f.container = (ViewGroup) target;
+        f.added = true;
+        f.creating = true;
         added.add(f);
         try {
+            f.state = Fragment.State.ATTACHED;
             f.onAttach(host);
+            if (!active(f)) return;
+            f.state = Fragment.State.CREATED;
             f.onCreate();
+            if (!active(f)) return;
             View view = f.onCreateView(LayoutInflater.from(host), f.container);
+            if (!active(f)) return;
             if (view != null) {
                 if (view.getParent() != null) throw new IllegalStateException("onCreateView must return an unattached View");
                 f.view = view;
+                f.state = Fragment.State.VIEW_CREATED;
                 ViewGroup.LayoutParams params = view.getLayoutParams();
                 if (params == null) params = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
                 f.container.addView(view, params);
+                if (!active(f)) return;
                 f.onViewCreated(view);
+                if (!active(f)) return;
             }
-            if (resumed) resume(f);
+            f.creating = false;
+            if (hostState == HostState.RESUMED) resume(f);
         } catch (RuntimeException | Error failure) {
-            try { remove(f); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            try { remove(f); } catch (RuntimeException | Error cleanup) { appendFailure(failure, cleanup); }
             throw failure;
+        } finally { f.creating = false; }
+    }
+    private void resume(Fragment f) {
+        if (active(f) && !f.creating && !f.isResumed()) { f.state = Fragment.State.RESUMED; f.onResume(); }
+    }
+    private void pause(Fragment f) {
+        if (f.isResumed()) {
+            f.state = f.view == null ? Fragment.State.CREATED : Fragment.State.VIEW_CREATED;
+            f.onPause();
         }
     }
-    private void resume(Fragment f) { if (!f.resumed) { f.resumed = true; f.onResume(); } }
-    private void pause(Fragment f) { if (f.resumed) { f.resumed = false; f.onPause(); } }
+    private static Throwable appendFailure(Throwable first, Throwable next) {
+        if (first == null) return next;
+        if (first != next) first.addSuppressed(next);
+        return first;
+    }
+    private static Throwable cleanup(Throwable failure, Runnable action) {
+        try { action.run(); }
+        catch (RuntimeException | Error next) { return appendFailure(failure, next); }
+        return failure;
+    }
+    private static void rethrow(Throwable failure) {
+        if (failure instanceof RuntimeException) throw (RuntimeException) failure;
+        if (failure instanceof Error) throw (Error) failure;
+    }
     private void remove(Fragment f) {
         if (!added.remove(f)) return;
-        try {
-            pause(f);
-        } finally {
-            try {
-                if (f.view != null) {
-                    if (f.view.getParent() instanceof ViewGroup) ((ViewGroup) f.view.getParent()).removeView(f.view);
-                    try { f.onDestroyView(); } finally { f.view = null; }
-                }
-            } finally {
-                try { f.onDestroy(); }
-                finally {
-                    try { f.onDetach(); }
-                    finally { f.activity = null; f.manager = null; f.container = null; }
-                }
-            }
+        f.added = false;
+        Throwable failure = cleanup(null, () -> pause(f));
+        View view = f.view;
+        if (view != null) {
+            failure = cleanup(failure, () -> {
+                if (view.getParent() instanceof ViewGroup) ((ViewGroup) view.getParent()).removeView(view);
+            });
+            failure = cleanup(failure, f::onDestroyView);
+            f.view = null;
         }
+        if (f.state.ordinal() >= Fragment.State.CREATED.ordinal()) {
+            f.state = Fragment.State.ATTACHED;
+            failure = cleanup(failure, f::onDestroy);
+        }
+        if (f.state == Fragment.State.ATTACHED) {
+            f.state = Fragment.State.DETACHED;
+            failure = cleanup(failure, f::onDetach);
+        }
+        f.activity = null; f.manager = null; f.container = null;
+        rethrow(failure);
     }
-    void dispatchResume() { dispatch(true); }
-    void dispatchPause() { dispatch(false); }
-    private void dispatch(boolean value) {
+    void dispatchResume() { dispatch(HostState.RESUMED); }
+    void dispatchPause() { dispatch(HostState.PAUSED); }
+    private void dispatch(HostState state) {
         checkThread();
-        resumed = value;
-        executing = true;
-        try { for (Fragment f : new ArrayList<>(added)) { if (value) resume(f); else pause(f); } }
-        finally { executing = false; }
+        if (hostState == HostState.DESTROYED) return;
+        hostState = state;
+        int version = ++lifecycleVersion;
+        executionDepth++;
+        try {
+            for (Fragment f : new ArrayList<>(added)) {
+                if (version != lifecycleVersion || hostState == HostState.DESTROYED) break;
+                if (f.manager != this || !f.added) continue;
+                if (state == HostState.RESUMED) resume(f); else pause(f);
+            }
+        } finally { executionDepth--; }
     }
     void dispatchDestroy() {
         checkThread();
-        destroyed = true; resumed = false; pending.clear();
-        if (handler != null) handler.removeMessages(0);
-        executing = true;
-        RuntimeException failure = null;
+        if (hostState == HostState.DESTROYED) return;
+        hostState = HostState.DESTROYED;
+        lifecycleVersion++;
+        pending.clear();
+        if (handler != null && scheduled) handler.removeMessages(0);
+        scheduled = false;
+        executionDepth++;
+        Throwable failure = null;
         try {
-            for (Fragment f : new ArrayList<>(added)) {
-                try { remove(f); } catch (RuntimeException e) { if (failure == null) failure = e; else failure.addSuppressed(e); }
-            }
-        } finally { executing = false; }
-        if (failure != null) throw failure;
+            for (Fragment f : new ArrayList<>(added)) failure = cleanup(failure, () -> remove(f));
+        } finally { executionDepth--; }
+        rethrow(failure);
     }
 }

@@ -160,6 +160,103 @@ public final class FragmentTest {
         check(!child.isPressed() && !child.isFocused() && child.getParent() == null && clicks[0] == 0, "Removal cancels input and clears focus");
         host.root.removeView(child); host.performDestroy();
     }
+    static void destructionDuringCallbacks() {
+        for (int phase = 0; phase < 4; phase++) {
+            final int destroyAt = phase;
+            Host host = new Host();
+            Page page = new Page() {
+                @Override public void onAttach(Context context) {
+                    super.onAttach(context);
+                    if (destroyAt == 0) host.performDestroy();
+                }
+                @Override public void onCreate() {
+                    super.onCreate();
+                    if (destroyAt == 1) host.performDestroy();
+                }
+                @Override public View onCreateView(LayoutInflater inflater, ViewGroup container) {
+                    View view = super.onCreateView(inflater, container);
+                    if (destroyAt == 2) host.performDestroy();
+                    return view;
+                }
+                @Override public void onViewCreated(View view) {
+                    super.onViewCreated(view);
+                    if (destroyAt == 3) host.performDestroy();
+                }
+            };
+            Page laterOperation = new Page();
+            FragmentManager manager = host.getFragmentManager();
+            manager.beginTransaction().add(100, page).add(100, laterOperation).commitNow();
+            check(host.isDestroyed() && manager.getFragments().isEmpty(), "Callback destruction membership: " + phase);
+            check(page.getView() == null && page.getActivity() == null && !page.isResumed()
+                    && host.root.getChildCount() == 0 && laterOperation.events.isEmpty(), "Callback destruction cleanup: " + phase);
+            if (phase < 2) check(!page.events.contains("createView"), "Creation continued after destruction");
+        }
+        Host host = new Host();
+        Page closer = new Page() {
+            @Override public void onResume() { super.onResume(); host.performDestroy(); }
+        };
+        Page follower = new Page();
+        host.getFragmentManager().beginTransaction().add(100, closer).add(100, follower).commitNow();
+        host.performResume();
+        check(!follower.isAdded() && !follower.isResumed() && !follower.events.contains("resume"), "Do not resume destroyed snapshot entries");
+
+        Host duringCreation = new Host();
+        Page creator = new Page() {
+            @Override public void onCreate() { super.onCreate(); duringCreation.performResume(); }
+        };
+        duringCreation.getFragmentManager().beginTransaction().add(100, creator).commitNow();
+        check(creator.events.equals(Arrays.asList("attach", "create", "createView", "viewCreated", "resume")), "Resume waits for view creation");
+        duringCreation.performDestroy();
+    }
+    static void removalFailures() {
+        Host host = new Host();
+        RuntimeException focusFailure = new IllegalStateException("focus");
+        RuntimeException destroyFailure = new IllegalArgumentException("destroyView");
+        Page page = new Page() {
+            @Override public View onCreateView(LayoutInflater inflater, ViewGroup container) {
+                return new View(host) { @Override public void clearFocus() { throw focusFailure; } };
+            }
+            @Override public void onDestroyView() { super.onDestroyView(); throw destroyFailure; }
+        };
+        FragmentManager manager = host.getFragmentManager();
+        manager.beginTransaction().add(100, page).commitNow();
+        View old = page.requireView();
+        try {
+            manager.beginTransaction().remove(page).commitNow();
+            throw new AssertionError("Expected focus exception");
+        } catch (RuntimeException failure) {
+            check(failure == focusFailure && Arrays.asList(failure.getSuppressed()).contains(destroyFailure), "Preserve cleanup exceptions");
+        }
+        check(old.getParent() == null && host.root.getChildCount() == 0 && page.getView() == null
+                && !page.isAdded() && page.getActivity() == null && manager.getFragments().isEmpty(), "Removal survives focus exception");
+        check(page.events.containsAll(Arrays.asList("destroyView", "destroy", "detach")), "All cleanup callbacks run");
+        host.performDestroy();
+
+        Host errors = new Host();
+        AssertionError shared = new AssertionError("shared cleanup error");
+        Page one = new Page() { @Override public void onDestroy() { throw shared; } };
+        Page two = new Page() { @Override public void onDestroy() { throw shared; } };
+        Page three = new Page();
+        errors.getFragmentManager().beginTransaction().add(100, one).add(100, two).add(100, three).commitNow();
+        expect(AssertionError.class, errors::performDestroy);
+        check(!one.isAdded() && !two.isAdded() && !three.isAdded() && three.getView() == null, "Errors must not interrupt other fragment cleanup");
+    }
+    static void boundedSynchronousDrain() {
+        Host host = new Host();
+        FragmentManager manager = host.getFragmentManager();
+        final int[] created = {0};
+        class Producer extends Fragment {
+            @Override public void onCreate() {
+                if (++created[0] < 5) manager.beginTransaction().add(100, new Producer()).commit();
+            }
+        }
+        manager.beginTransaction().add(100, new Producer()).commit();
+        manager.executePendingTransactions();
+        check(created[0] == 1, "Synchronous drain must defer callback submissions");
+        manager.executePendingTransactions();
+        check(created[0] == 2, "Deferred producer continues on next drain");
+        host.performDestroy();
+    }
     static void apk(String path) throws Exception {
         try (URLClassLoader loader = new URLClassLoader(new java.net.URL[] {new File(path).toURI().toURL()}, FragmentTest.class.getClassLoader())) {
             Host host = new Host(loader);
@@ -194,13 +291,24 @@ public final class FragmentTest {
         check(!headless.isAdded(), "Headless cleanup");
         Looper.prepareMainLooper();
         lifecycle(); transactions(); exceptionsAndReentrancy(); inputCleanup();
+        destructionDuringCallbacks(); removalFailures(); boundedSynchronousDrain();
         if (args.length > 0) apk(args[0]);
-        // Verify commit is actually delivered by Looper, not just by explicit draining.
-        Host host = new Host(); Page page = new Page();
-        host.getFragmentManager().beginTransaction().add(100, page).commit();
-        Handler end = new Handler(message -> {
-            check(page.isAdded(), "Looper did not execute transaction"); host.performDestroy(); throw new Done();
-        });
+        // Real Looper execution must yield to unrelated work between bounded batches.
+        Host host = new Host();
+        final int[] created = {0}, turns = {0};
+        for (int i = 0; i < 70; i++) {
+            host.getFragmentManager().beginTransaction().add(100, new Fragment() {
+                @Override public void onCreate() { created[0]++; }
+            }).commit();
+        }
+        Handler end = new Handler() {
+            @Override public void handleMessage(com.android.os.Message message) {
+                turns[0]++;
+                if (turns[0] == 1) check(created[0] > 0 && created[0] < 70, "Async drain must yield to other UI work");
+                if (created[0] < 70) sendMessage(obtainMessage(0, null));
+                else { host.performDestroy(); throw new Done(); }
+            }
+        };
         end.sendMessage(end.obtainMessage(0, null));
         try { Looper.loop(); } catch (Done done) { System.out.println("FragmentTest passed"); }
     }

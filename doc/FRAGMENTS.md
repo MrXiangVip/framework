@@ -53,7 +53,7 @@ getFragmentManager().beginTransaction()
 - `replace(id, fragment[, tag])`：移除该容器中管理的所有 Fragment，再添加新实例；保留普通子 View。
 - `commit()`：在宿主 UI 线程的 Looper 上排队执行，返回事务序号（不是返回栈索引）。
 - `commitNow()`：立即执行当前事务，不提前执行其他已排队事务。
-- `executePendingTransactions()`：同步执行所有待处理事务，返回是否执行过事务。
+- `executePendingTransactions()`：同步执行调用时已排队的事务，返回是否执行过事务；回调中新提交的事务留到下一轮。
 
 事务只能提交一次，提交后不可追加操作。同一实例不能重复添加或同时属于多个管理器。
 移除后可以重新添加，此时重新执行创建生命周期。
@@ -64,7 +64,8 @@ getFragmentManager().beginTransaction()
 
 每个事务先检查容器、实例归属及操作顺序，再更改界面；业务回调异常时清理正在添加的
 Fragment。事务不提供回调异常时的整体回滚，已经执行的操作会保留，异常继续向外传播。
-Activity 销毁后丢弃待执行事务，并拒绝新的事务。
+Activity 销毁后丢弃待执行事务，并拒绝新的事务。异步队列使用双端队列并合并调度消息，
+每轮最多执行 32 个事务，然后让其他 UI 消息有机会运行。
 
 ## 生命周期
 
@@ -83,6 +84,8 @@ onAttach(Context)
 - Activity 的 performResume/performPause/performDestroy 入口负责分发，应用不必在
   onResume/onPause/onDestroy 中调用 super 才能触发 Fragment 生命周期。
 - 添加时根据宿主当前状态决定是否调用 onResume；窗口最小化和恢复同步暂停与恢复。
+- 每次创建回调后检查宿主状态；回调中销毁 Activity 会停止后续创建和事务操作。
+  创建期间的恢复请求在 View 创建完成后执行，销毁后的实例不会继续收到 onResume。
 - onCreateView 返回的 View 必须没有父节点；管理器负责挂载。可以返回 null 创建无界面 Fragment，
   此时不调用 onViewCreated/onDestroyView。
 - onViewCreated 时已挂载容器；onDestroyView 时已从父节点移除，getView 仍可用于清理。

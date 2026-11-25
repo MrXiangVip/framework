@@ -192,16 +192,28 @@ public abstract  class ViewGroup extends View implements ViewParent {
     public void removeView(View child) {
         for (int i = 0; i < mChildrenCount; i++) {
             if (mChildren[i] != child) continue;
-            if (mTouchTarget == child) {
-                mTouchTarget = null;
-                child.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
-            }
-            child.clearFocus();
+            // Remove structural ownership before invoking application callbacks. Reentrant
+            // removal must not shift the child array a second time.
+            boolean cancel = mTouchTarget == child;
+            if (cancel) mTouchTarget = null;
             child.mParent = null;
             System.arraycopy(mChildren, i + 1, mChildren, i, mChildrenCount - i - 1);
             mChildren[--mChildrenCount] = null;
-            requestLayout();
-            invalidate();
+            Throwable failure = null;
+            try {
+                if (cancel) child.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_CANCEL, 0, 0));
+            } catch (RuntimeException | Error e) { failure = e; }
+            try {
+                child.clearFocus();
+            } catch (RuntimeException | Error e) {
+                if (failure == null) failure = e;
+                else if (failure != e) failure.addSuppressed(e);
+            } finally {
+                requestLayout();
+                invalidate();
+            }
+            if (failure instanceof RuntimeException) throw (RuntimeException) failure;
+            if (failure instanceof Error) throw (Error) failure;
             return;
         }
     }

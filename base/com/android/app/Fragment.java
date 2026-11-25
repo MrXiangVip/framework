@@ -13,7 +13,9 @@ public class Fragment {
     ViewGroup container;
     int containerId;
     String tag;
-    boolean resumed;
+    enum State { DETACHED, ATTACHED, CREATED, VIEW_CREATED, RESUMED }
+    State state = State.DETACHED;
+    boolean added, creating;
 
     public final Activity getActivity() { return activity; }
     public final Context getContext() { return activity; }
@@ -30,8 +32,8 @@ public class Fragment {
     }
     public final int getId() { return containerId; }
     public final String getTag() { return tag; }
-    public final boolean isAdded() { return activity != null; }
-    public final boolean isResumed() { return resumed; }
+    public final boolean isAdded() { return added; }
+    public final boolean isResumed() { return state == State.RESUMED; }
 
     public void onAttach(Context context) {}
     public void onCreate() {}
