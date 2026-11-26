@@ -10,6 +10,13 @@
     },
     {
       "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
+      "source": "Assets/Synty/PolygonGeneric/Models/SM_Gen_Env_Fern_01.fbx",
+      "output": "res/world/models/fern.fbx",
+      "source_sha256": "81159f9f66fa13db0e92ebd0bf9c2b3aef2ef7babad14be92b97b2aab7900b72",
+      "sha256": "81159f9f66fa13db0e92ebd0bf9c2b3aef2ef7babad14be92b97b2aab7900b72"
+    },
+    {
+      "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
       "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Env_Wildflowers_Patch_01.fbx",
       "output": "res/world/models/flowers.fbx",
       "source_sha256": "8995c27059d3316e4475b07d1c92567306ba340546b83edd84d07f8d88f16d13",
@@ -24,10 +31,24 @@
     },
     {
       "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
+      "source": "Assets/Synty/PolygonGeneric/Models/SM_Gen_Env_Lilypads_01.fbx",
+      "output": "res/world/models/lilypad.fbx",
+      "source_sha256": "5406a2f477c5420055e9c7e924248f77c233050f1f65e638a933c9d049f63d3e",
+      "sha256": "5406a2f477c5420055e9c7e924248f77c233050f1f65e638a933c9d049f63d3e"
+    },
+    {
+      "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
       "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Models/SM_Prop_Mushroom_Group_03.fbx",
       "output": "res/world/models/mushrooms.fbx",
       "source_sha256": "741c14d9e83da36481001b9ac3dda6456596ad4f6c9da373ff4eb06587777cd7",
       "sha256": "741c14d9e83da36481001b9ac3dda6456596ad4f6c9da373ff4eb06587777cd7"
+    },
+    {
+      "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
+      "source": "Assets/Synty/PolygonGeneric/Models/SM_Gen_Env_Tree_Pine_01.fbx",
+      "output": "res/world/models/pine.fbx",
+      "source_sha256": "0240c20f9b6494acc3fa68f8ebbd390ede9d36599c967ed4a68fcc0530b9ce32",
+      "sha256": "0240c20f9b6494acc3fa68f8ebbd390ede9d36599c967ed4a68fcc0530b9ce32"
     },
     {
       "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
@@ -80,6 +101,13 @@
     },
     {
       "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
+      "source": "Assets/Synty/PNB_Core/Textures/Bird_Wings_01.png",
+      "output": "res/world/textures/bird-wings.png",
+      "source_sha256": "b8e3cbcbd1296f22ac1d0515b564ca2dd88b2629fd6d3c787f34d93bd2a69155",
+      "sha256": "b8e3cbcbd1296f22ac1d0515b564ca2dd88b2629fd6d3c787f34d93bd2a69155"
+    },
+    {
+      "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
       "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Textures/Plants/Branches_01.tga",
       "output": "res/world/textures/branches.png",
       "source_sha256": "e57fdabb1ea6406fd61e19e699a51b47ac1a35353b9d324c34cf0ddba59187d9",
@@ -87,10 +115,24 @@
     },
     {
       "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
+      "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/FX/FX_Textures/Butterfly_01.png",
+      "output": "res/world/textures/butterfly.png",
+      "source_sha256": "fd100d51ac683e842b973dd78ae6f835c6a1cf12ffebb0453a3b2d1f95cd5fe9",
+      "sha256": "fd100d51ac683e842b973dd78ae6f835c6a1cf12ffebb0453a3b2d1f95cd5fe9"
+    },
+    {
+      "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
       "source": "Assets/Synty/PolygonNatureBiomes/PNB_Meadow_Forest/Textures/Plants/WildFlowers_01.tga",
       "output": "res/world/textures/flowers.png",
       "source_sha256": "3c69e82bccfb4b0d481214020ee8970255dff49e17255a35a9a0d68e7993005a",
       "sha256": "e0382a745ffd8e1ac882a9fea4954aaf26f2768c8a1fd708ce24401fdabb8972"
+    },
+    {
+      "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",
+      "source": "Assets/Synty/PolygonGeneric/Textures/Alts/Generic_01_A.png",
+      "output": "res/world/textures/generic-palette.png",
+      "source_sha256": "fb6eea4cbdd6d86962739d0bc384fdc605fba7651745c1fd950e1f031eece3f1",
+      "sha256": "fb6eea4cbdd6d86962739d0bc384fdc605fba7651745c1fd950e1f031eece3f1"
     },
     {
       "package": "external/unity/synty/POLYGON Meadow Forest - Nature Biomes - Low Poly 3D Art by Synty v1.10.3.unitypackage",

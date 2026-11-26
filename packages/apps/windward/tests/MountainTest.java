@@ -145,6 +145,27 @@ public final class MountainTest {
                 check(renderer.terrainSize()<700,"Planet GPU cache bounded after travelling");
             }
             check(org.lwjgl.opengl.GL11.glGetError()==0,"No GL errors at sphere seams/poles");
+            for(int i=0;i<3;i++){
+                world.reset();world.x=i==0?120:i==1?175:350;world.z=-130;world.y=world.floor();camera.reset();
+                camera.yaw=i==0?-Math.PI/2:i==1?.5:2;camera.pitch=i==0?.45:.3;camera.distance=i==0?15:9;
+                BufferedImage view=renderer.render(world,camera);ImageIO.write(view,"png",new File("out/windward-tests/landscape-"+i+".png"));
+                renderer.culling=false;BufferedImage reference=renderer.render(world,camera);renderer.culling=true;
+                BufferedImage culled=renderer.render(world,camera);
+                check(java.util.Arrays.equals(((java.awt.image.DataBufferInt)reference.getRaster().getDataBuffer()).getData(),((java.awt.image.DataBufferInt)culled.getRaster().getDataBuffer()).getData()),"Water and habitat culling preserves pixels "+i);
+                if(i==1){
+                    int blue=0;for(int y=200;y<550;y++)for(int x=100;x<800;x++){
+                        int rgb=view.getRGB(x,y),r=rgb>>16&255,g=rgb>>8&255,b=rgb&255;
+                        if(b>r*1.3&&g>r*1.3&&b>85)blue++;
+                    }
+                    check(blue>10000,"Lake water visibly covers the foreground, not just sky");
+                }
+            }
+            check(org.lwjgl.opengl.GL11.glGetError()==0,"No GL errors drawing water and habitat variations");
+            world.reset();world.x=4.2;world.z=8;world.y=world.floor();camera.reset();camera.distance=3;camera.pitch=.15;
+            ImageIO.write(renderer.render(world,camera),"png",new File("out/windward-tests/butterflies.png"));
+            world.x=19;world.z=-9;world.y=MountainWildlife.sample(new MountainWildlife.Spawn(0,-12,0,true),0,19,-9).y-1.35;
+            camera.reset();camera.distance=5;camera.pitch=.12;
+            ImageIO.write(renderer.render(world,camera),"png",new File("out/windward-tests/birds.png"));
             world.reset();camera.reset();
             long[] times=new long[30];
             for(int i=0;i<times.length;i++){long t=System.nanoTime();renderer.render(world,camera);times[i]=System.nanoTime()-t;}

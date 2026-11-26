@@ -64,6 +64,14 @@ def tga_png(data):
 def main():
     selections = {BASE+'Models/'+v: 'models/'+k+'.fbx' for k,v in MODELS.items()}
     selections.update({BASE+v: 'textures/'+k+'.png' for k,v in TEXTURES.items()})
+    selections.update({
+        'Assets/Synty/PolygonGeneric/Models/SM_Gen_Env_Tree_Pine_01.fbx':'models/pine.fbx',
+        'Assets/Synty/PolygonGeneric/Models/SM_Gen_Env_Fern_01.fbx':'models/fern.fbx',
+        'Assets/Synty/PolygonGeneric/Models/SM_Gen_Env_Lilypads_01.fbx':'models/lilypad.fbx',
+        'Assets/Synty/PolygonGeneric/Textures/Alts/Generic_01_A.png':'textures/generic-palette.png',
+        BASE+'FX/FX_Textures/Butterfly_01.png':'textures/butterfly.png',
+        'Assets/Synty/PNB_Core/Textures/Bird_Wings_01.png':'textures/bird-wings.png',
+    })
     guy = 'Assets/AnimeFantasyPack2/AnimeGuySwordsman/'
     fantasy = {guy+'Mesh/SK_Guy_Swordsman.fbx': 'models/traveller.fbx'}
     fantasy.update({guy+'Texture/'+name: 'textures/'+out+'.png' for name,out in {

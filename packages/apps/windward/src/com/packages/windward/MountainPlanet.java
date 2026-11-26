@@ -3,6 +3,8 @@ package com.packages.windward;
 /** A finite spherical world. Chart x/z are longitude/latitude times radius, y is radial altitude. */
 final class MountainPlanet {
     static final double RADIUS=1000, CIRCUMFERENCE=2*Math.PI*RADIUS;
+    static final double WATER=-2;
+    private static final Vec CAMP_LAKE=normal(150,-130);
     static final class Vec {
         final double x,y,z;
         Vec(double x,double y,double z){this.x=x;this.y=y;this.z=z;}
@@ -60,9 +62,24 @@ final class MountainPlanet {
         double x=longitude(n),z=latitude(n),d=Math.hypot(x,z);
         double authored=.9*Math.sin(x*.075)*Math.cos(z*.065)+9*Math.exp(-((x-15)*(x-15)+(z+25)*(z+25))/290);
         // Noise uses the 3D unit direction, so both longitude seams and poles share the same values.
-        double terrain=4*Math.sin(n.x*19+n.y*7)*Math.cos(n.z*17-n.y*4)
-                +2*Math.sin(n.x*43-n.z*29+n.y*11)+.7*Math.cos(n.x*93+n.y*71+n.z*57);
+        double continental=Math.sin(n.x*8+n.y*3)*Math.cos(n.z*7-n.y*2);
+        double ridge=Math.max(0,Math.sin(n.x*17-n.z*11+n.y*5));
+        double terrain=9+18*continental+25*ridge*ridge
+                +3*Math.sin(n.x*43-n.z*29+n.y*11)+.7*Math.cos(n.x*93+n.y*71+n.z*57);
+        // A reachable lake beyond the first valley, plus low continental basins worldwide.
+        double lakeDistance=n.sub(CAMP_LAKE).length()*RADIUS/95;
+        terrain-=42*Math.exp(-Math.pow(lakeDistance,4));
         double blend=MountainCamera.clamp((d-60)/50,0,1);blend=blend*blend*(3-2*blend);
         return authored*(1-blend)+terrain*blend;
+    }
+    static double moisture(Vec n){return .5+.5*Math.sin(n.x*15+n.z*11+n.y*4);}
+    static String region(double x,double z){
+        double h=PlanetTerrain.ground(x,z);
+        if(h<WATER-.9)return "碧水湖域";
+        if(h<WATER+2.5)return "浅滩沙岸";
+        if(Math.hypot(x,z)<65)return "风塔山谷";
+        if(Math.abs(normal(x,z).z)>.82)return "霜色高地";
+        if(h>27)return "风蚀岩岭";
+        return moisture(normal(x,z))>.55?"白桦林地":"晴风草甸";
     }
 }

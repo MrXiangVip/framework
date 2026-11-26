@@ -27,6 +27,7 @@ final class MountainRenderer implements AutoCloseable {
     }
     private final java.util.Map<PlanetTerrain.Tile,StaticDraw> terrain=new java.util.LinkedHashMap<>();
     private PlanetTerrain.Tile terrainAnchor;
+    private final MountainWildlife wildlife=new MountainWildlife();
     int terrainSize(){return terrain.size();}
     int sceneSize(){return scene.size()+terrain.size();}
     private static void surface(double x,double z){glMultMatrixd(MountainPlanet.frame(x,z).surface(x,z));}
@@ -79,7 +80,7 @@ final class MountainRenderer implements AutoCloseable {
         glLightModelfv(GL_LIGHT_MODEL_AMBIENT,new float[]{.45f,.48f,.47f,1});
         glLightfv(GL_LIGHT0,GL_DIFFUSE,new float[]{.55f,.53f,.48f,1});
         glEnable(GL_FOG);glFogi(GL_FOG_MODE,GL_LINEAR);glFogfv(GL_FOG_COLOR,new float[]{.65f,.83f,.87f,1});
-        glFogf(GL_FOG_START,40);glFogf(GL_FOG_END,125);
+        glFogf(GL_FOG_START,65);glFogf(GL_FOG_END,180);
         art=new MountainArt();art.open();
         landscape(world);
     }
@@ -97,6 +98,7 @@ final class MountainRenderer implements AutoCloseable {
         glLightfv(GL_LIGHT0,GL_POSITION,new float[]{-30,65,20,0});
         long begin=profile?stage():0;
         drawScene(w,camera);
+        drawWildlife(w);
         if(profile){glFinish();sceneMs=elapsed(begin);begin=stage();}
         glPushMatrix();surface(w.x,w.z);contactShadow(w);
         art.profile=profile;art.character(w);glPopMatrix();
@@ -104,6 +106,7 @@ final class MountainRenderer implements AutoCloseable {
         traversalObjects(w);
         combatObjects(w,art);
         if(MountainPlanet.distance(w.x,w.z,22,-25)<250){glPushMatrix();surface(22,-25);puzzleObjects(w);glPopMatrix();}
+        waterRipples(w);
         if(profile){glFinish();propsMs=elapsed(begin);begin=stage();}
         glReadPixels(0,0,WIDTH,HEIGHT,GL_BGRA,GL_UNSIGNED_INT_8_8_8_8_REV,pixels);
         if(profile){readMs=elapsed(begin);begin=System.nanoTime();}
@@ -215,20 +218,38 @@ final class MountainRenderer implements AutoCloseable {
         for(PlanetTerrain.Tile tile:wanted)if(!terrain.containsKey(tile)){
             int id=glGenLists(1);if(id==0)throw new IllegalStateException("Cannot allocate planet patch");
             MountainPlanet.Vec center=tile.center();
-            glNewList(id,GL_COMPILE);planetPatch(tile);
+            glNewList(id,GL_COMPILE);double radius=planetPatch(tile,center);
             if(tile.level==PlanetTerrain.DEPTH)for(PlanetTerrain.Prop prop:w.terrain.props(tile)){
                 glPushMatrix();surface(prop.x,prop.z);
-                art.model(prop.rock?"rock":"tree",prop.x,MountainWorld.ground(prop.x,prop.z),prop.z,prop.height,tile.hashCode()%360,prop.rock?prop.r:0);
+                boolean stone=prop.model.equals("rock")||prop.model.equals("roundrock");
+                double base=prop.model.equals("lilypad")?MountainPlanet.WATER+.02:MountainWorld.ground(prop.x,prop.z);
+                art.model(prop.model,prop.x,base,prop.z,prop.height,prop.angle,stone?prop.r:0);
+                radius=Math.max(radius,MountainPlanet.position(prop.x,base+prop.height/2,prop.z).sub(center).length()+art.radius(prop.model,prop.height,stone?prop.r:0));
                 glPopMatrix();
             }
-            glEndList();terrain.put(tile,new StaticDraw(id,center.x,center.y,center.z,tile.radius()+10));
+            glEndList();terrain.put(tile,new StaticDraw(id,center.x,center.y,center.z,radius+.1));
         }
+        wildlife.update(wanted,anchor);
         terrainAnchor=anchor;
     }
-    private void planetPatch(PlanetTerrain.Tile tile){
+    private void drawWildlife(MountainWorld w){
+        for(MountainWildlife.Spawn spawn:wildlife.active()){
+            MountainWildlife.Sample s=MountainWildlife.sample(spawn,w.time,w.x,w.z);
+            MountainPlanet.Vec p=MountainPlanet.position(s.x,s.y,s.z);
+            if(culling&&!frustum.visible(p.x,p.y,p.z,2))continue;
+            glPushMatrix();surface(s.x,s.z);glTranslated(s.x,s.y,s.z);glRotated(Math.toDegrees(s.heading),0,1,0);
+            art.flying(spawn.bird,s.flap);glPopMatrix();
+        }
+    }
+    private double planetPatch(PlanetTerrain.Tile tile,MountainPlanet.Vec center){
         int count=PlanetTerrain.SEGMENTS;double step=tile.size()/count;
         MountainPlanet.Vec[][] points=new MountainPlanet.Vec[count+1][count+1];
-        for(int z=0;z<=count;z++)for(int x=0;x<=count;x++)points[z][x]=PlanetTerrain.vertex(tile.face,tile.u()+x*step,tile.v()+z*step);
+        double radius=0;
+        for(int z=0;z<=count;z++)for(int x=0;x<=count;x++){
+            MountainPlanet.Vec p=PlanetTerrain.vertex(tile.face,tile.u()+x*step,tile.v()+z*step);points[z][x]=p;
+            radius=Math.max(radius,p.sub(center).length()+tile.skirt());
+            radius=Math.max(radius,p.unit().mul(MountainPlanet.RADIUS+MountainPlanet.WATER).sub(center).length()+.1);
+        }
         // The same finest-grid vertices feed collision. Coarser patches use subsets; skirts hide LOD edge cracks.
         for(int material=0;material<2;material++){
             art.groundTexture(material==1);glColor3f(1,1,1);glBegin(GL_TRIANGLES);
@@ -237,29 +258,107 @@ final class MountainRenderer implements AutoCloseable {
                 double px=MountainPlanet.longitude(n),pz=MountainPlanet.latitude(n);
                 boolean path=Math.abs(px)<50&&Math.abs(pz)<50&&(Math.abs(px-MountainWorld.pathX(pz))<1.8||(pz>-11&&pz<-3&&Math.abs(px-(-7*(-3-pz)/8))<1.3));
                 if(path!=(material==1))continue;
-                planetTriangle(points[z][x],points[z][x+1],points[z+1][x]);
-                planetTriangle(points[z+1][x+1],points[z+1][x],points[z][x+1]);
+                planetTriangle(points[z][x],points[z][x+1],points[z+1][x],path);
+                planetTriangle(points[z+1][x+1],points[z+1][x],points[z][x+1],path);
             }
             glEnd();
         }
+        // Blend soil/snow per vertex over the grass, rather than producing square habitat edges.
+        art.groundTexture(true);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(false);glEnable(GL_POLYGON_OFFSET_FILL);glPolygonOffset(-1,-1);glBegin(GL_TRIANGLES);
+        for(int z=0;z<count;z++)for(int x=0;x<count;x++){
+            planetTriangle(points[z][x],points[z][x+1],points[z+1][x],false,true);
+            planetTriangle(points[z+1][x+1],points[z+1][x],points[z][x+1],false,true);
+        }
+        glEnd();glDisable(GL_POLYGON_OFFSET_FILL);glDepthMask(true);glDisable(GL_BLEND);
         art.groundTexture(false);glBegin(GL_TRIANGLES);
         for(int side=0;side<4;side++)for(int i=0;i<count;i++){
             MountainPlanet.Vec a=side==0?points[0][i]:side==1?points[count][i]:side==2?points[i][0]:points[i][count];
             MountainPlanet.Vec b=side==0?points[0][i+1]:side==1?points[count][i+1]:side==2?points[i+1][0]:points[i+1][count];
             MountainPlanet.Vec c=a.mul(1-tile.skirt()/a.length()),d=b.mul(1-tile.skirt()/b.length());
-            planetTriangle(a,b,c);planetTriangle(b,d,c);
+            planetTriangle(a,b,c,false);planetTriangle(b,d,c,false);
         }
         glEnd();glDisable(GL_TEXTURE_2D);
+        // Opaque stylized water writes depth, so lake bottoms and submerged bodies stay hidden.
+        // Clip every surface triangle to its shoreline rather than covering dry land with a sphere.
+        glDisable(GL_LIGHTING);glBegin(GL_TRIANGLES);
+        for(int z=0;z<count;z++)for(int x=0;x<count;x++){
+            waterTriangle(points[z][x],points[z][x+1],points[z+1][x]);
+            waterTriangle(points[z+1][x+1],points[z+1][x],points[z][x+1]);
+        }
+        glEnd();glEnable(GL_LIGHTING);glColor3f(1,1,1);
+        return radius;
     }
-    private static void planetTriangle(MountainPlanet.Vec a,MountainPlanet.Vec b,MountainPlanet.Vec c){
+    private static void planetTriangle(MountainPlanet.Vec a,MountainPlanet.Vec b,MountainPlanet.Vec c,boolean path){
+        planetTriangle(a,b,c,path,false);
+    }
+    private static void planetTriangle(MountainPlanet.Vec a,MountainPlanet.Vec b,MountainPlanet.Vec c,boolean path,boolean overlay){
         MountainPlanet.Vec normal=b.sub(a).cross(c.sub(a));
         if(normal.dot(a)<0)normal=normal.mul(-1);
         glNormal3d(normal.x,normal.y,normal.z);
-        planetVertex(a);planetVertex(b);planetVertex(c);
+        planetVertex(a,path,overlay);planetVertex(b,path,overlay);planetVertex(c,path,overlay);
     }
-    private static void planetVertex(MountainPlanet.Vec p){
+    private static void planetVertex(MountainPlanet.Vec p,boolean path,boolean overlay){
+        MountainPlanet.Vec n=p.unit();double h=p.length()-MountainPlanet.RADIUS;
+        double wet=MountainPlanet.moisture(n);
+        int tint=wet>.55?0xa8c788:0xd5d896;
+        tint=mix(tint,0xd4bd8e,smooth((h-20)/16));
+        tint=mix(tint,0xf0eee1,smooth((Math.abs(n.z)-.76)/.13));
+        tint=mix(0xe7d5ad,tint,smooth((h-MountainPlanet.WATER)/3));
+        // Retain the authored valley's existing materials, including its path.
+        double start=MountainPlanet.distance(0,0,MountainPlanet.longitude(n),MountainPlanet.latitude(n));
+        double exterior=smooth((start-60)/50);
+        if(overlay){
+            double rock=smooth((h-24)/12),snow=smooth((Math.abs(n.z)-.76)/.13);
+            int soil=mix(mix(0xe7d5ad,0xbcb8ab,rock),0xf0eee1,snow);
+            glColor4d((soil>>16&255)/255.,(soil>>8&255)/255.,(soil&255)/255.,exterior*Math.max(1-smooth((h-MountainPlanet.WATER)/3),Math.max(rock,snow)));
+        }else color(path?0xffffff:mix(0xffffff,tint,exterior));
         // Continuous world-direction texturing; no resource allocation per rendered frame.
         glTexCoord2d((p.x+p.y*.37)/5,(p.z+p.y*.23)/5);glVertex3d(p.x,p.y,p.z);
+    }
+    private static double smooth(double t){t=MountainCamera.clamp(t,0,1);return t*t*(3-2*t);}
+    private static int mix(int a,int b,double t){
+        int r=(int)((a>>16&255)*(1-t)+(b>>16&255)*t),g=(int)((a>>8&255)*(1-t)+(b>>8&255)*t),bl=(int)((a&255)*(1-t)+(b&255)*t);
+        return r<<16|g<<8|bl;
+    }
+    private static final class WaterPoint {
+        final MountainPlanet.Vec point;final double depth;
+        WaterPoint(MountainPlanet.Vec p,double d){point=p.unit().mul(MountainPlanet.RADIUS+MountainPlanet.WATER);depth=d;}
+    }
+    private static void waterTriangle(MountainPlanet.Vec a,MountainPlanet.Vec b,MountainPlanet.Vec c){
+        double level=MountainPlanet.RADIUS+MountainPlanet.WATER;
+        double ah=a.length(),bh=b.length(),ch=c.length();
+        if(ah>=level&&bh>=level&&ch>=level)return;
+        MountainPlanet.Vec[] triangle={a,b,c};WaterPoint[] polygon=new WaterPoint[4];int count=0;
+        MountainPlanet.Vec previous=c;double ph=ch;
+        for(MountainPlanet.Vec next:triangle){
+            double nh=next.length();
+            if((ph<level)!=(nh<level)){
+                double t=(level-ph)/(nh-ph);polygon[count++]=new WaterPoint(previous.mul(1-t).add(next.mul(t)),0);
+            }
+            if(nh<level)polygon[count++]=new WaterPoint(next,level-nh);
+            previous=next;ph=nh;
+        }
+        for(int i=1;i<count-1;i++){waterVertex(polygon[0]);waterVertex(polygon[i]);waterVertex(polygon[i+1]);}
+    }
+    private static void waterVertex(WaterPoint v){
+        double depth=smooth(v.depth/12),variation=.025*Math.sin(v.point.x*.16+v.point.z*.11);
+        color(mix(0x8ddbc9,0x247fba,MountainCamera.clamp(depth+variation,0,1)));
+        glVertex3d(v.point.x,v.point.y,v.point.z);
+    }
+    private static void waterRipples(MountainWorld w){
+        if(!w.swimming())return;
+        glDisable(GL_LIGHTING);glDisable(GL_TEXTURE_2D);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glDepthMask(false);
+        for(int ring=0;ring<3;ring++){
+            double phase=(w.time*.5+ring/3.)%1,radius=.6+phase*2;
+            glColor4d(.8,.96,.96,(1-phase)*.45);glBegin(GL_LINE_LOOP);
+            for(int i=0;i<40;i++){
+                double angle=i*Math.PI/20;MountainPlanet.Move p=MountainPlanet.advance(w.x,w.z,Math.cos(angle)*radius,Math.sin(angle)*radius);
+                MountainPlanet.Vec v=MountainPlanet.position(p.x,MountainPlanet.WATER+.025,p.z);glVertex3d(v.x,v.y,v.z);
+            }
+            glEnd();
+        }
+        glDepthMask(true);glDisable(GL_BLEND);glEnable(GL_LIGHTING);glColor3f(1,1,1);
     }
     private void landscape(MountainWorld w){
         // The authored valley remains attached to its original small spherical region.

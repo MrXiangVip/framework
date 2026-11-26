@@ -28,13 +28,14 @@ public final class MountainView extends View implements AutoCloseable {
         final boolean paused,nearRune,runeRead,climbing,gliding;
         final double x,z,y,time,renderMs,targetDistance,stamina;
         final int terrainPatches;
-        final String device,objective,notice,traversalHint,enemyState;
+        final String device,objective,notice,traversalHint,enemyState,region;
         final int health,enemyHealth;
         final boolean enemyNearby,attacking,dodging,complete,summaryOpen,pushing,powered,treasure;
         final double completedAt,stoneZ;
         Frame(BufferedImage i,MountainWorld w,double ms,String d,int patches){
             terrainPatches=patches;
             image=i;paused=w.paused;x=w.x;z=w.z;y=w.y;time=w.time;renderMs=ms;device=d;
+            region=MountainPlanet.region(w.x,w.z);
             complete=w.journey.complete;summaryOpen=w.journey.summaryOpen;completedAt=w.journey.completedAt;treasure=w.journey.treasure;
             pushing=w.puzzle.pushing;powered=w.puzzle.powered;stoneZ=w.puzzle.stoneZ;
             health=w.combat.health;enemyHealth=w.combat.enemyHealth;enemyState=w.combat.state.name();
@@ -45,6 +46,7 @@ public final class MountainView extends View implements AutoCloseable {
             traversalHint=hint(w);targetDistance=MountainPlanet.distance(w.x,w.z,w.journey.guideX(w),w.journey.guideZ(w));
         }
         private static String hint(MountainWorld w){
+            if(w.swimming())return "浮水中 · 方向键移动  Shift 加速 · 靠近浅滩可上岸";
             String puzzle=w.puzzle.hint(w);if(!puzzle.isEmpty())return puzzle;
             if(w.climbing)return "攀爬中 · W/S 上下  A/D 横移  E 松手";
             if(w.gliding)return "滑翔中 · 方向键控制  空格收起";
@@ -103,7 +105,7 @@ public final class MountainView extends View implements AutoCloseable {
         if(f==null)text(canvas,scale,error.isEmpty()?"正在打开山谷…":error,44,180,20,0xffffedbd);
         else{
             panel(canvas,scale,932,24,244,76,0xd9234140);
-            text(canvas,scale,"球面探索 · 半径 1 km",948,55,18,0xffe4ead7);
+            text(canvas,scale,f.region+" · 1 km",948,55,18,0xffe4ead7);
             text(canvas,scale,String.format(java.util.Locale.ROOT,"目标距离 %.0f m",f.targetDistance),948,81,14,0xffb9d3c4);
             text(canvas,scale,String.format(java.util.Locale.ROOT,"经度 %.1f°  纬度 %.1f°",Math.toDegrees(f.x/MountainPlanet.RADIUS),-Math.toDegrees(f.z/MountainPlanet.RADIUS)),948,121,13,0xffe4ead7);
             if(Boolean.getBoolean("framework.windward.profile"))text(canvas,scale,String.format(java.util.Locale.ROOT,"GL / 读回 %.1f ms",f.renderMs),948,146,14,0xffe4ead7);

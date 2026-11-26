@@ -43,10 +43,12 @@ final class MountainWorld {
         for(Obstacle o:rocks)if(Math.hypot(px-o.x,pz-o.z)<o.r+RADIUS&&feet<ground(o.x,o.z)+o.height)return true;
         for(Obstacle o:props)if(Math.hypot(px-o.x,pz-o.z)<o.r+RADIUS&&feet<ground(o.x,o.z)+o.height)return true;
         for(PlanetTerrain.Prop p:terrain.nearby(px,pz))
-            if(MountainPlanet.distance(px,pz,p.x,p.z)<p.r+RADIUS&&feet<ground(p.x,p.z)+p.height)return true;
+            if(p.r>0&&MountainPlanet.distance(px,pz,p.x,p.z)<p.r+RADIUS&&feet<ground(p.x,p.z)+p.height)return true;
         return false;
     }
-    double floorAt(double px,double pz){return Math.max(MountainTraversal.floor(px,pz),puzzle.support(px,pz));}
+    // Simple buoyant support keeps the torso above deep water; shallow shores remain walkable.
+    double floorAt(double px,double pz){return Math.max(MountainPlanet.WATER-.9,Math.max(MountainTraversal.floor(px,pz),puzzle.support(px,pz)));}
+    boolean swimming(){return ground(x,z)<MountainPlanet.WATER-.9&&y<MountainPlanet.WATER+.1;}
     double floor(){return floorAt(x,z);}
     void interact(){
         if(paused||journey.summaryOpen||combat.health<=0)return;
@@ -83,7 +85,7 @@ final class MountainWorld {
                 distance+=travel;moving=travel>1e-7;
             }else if(length>0&&combat.attackTime<0){
                 horizontal/=Math.max(1,length);forward/=Math.max(1,length);
-                double speed=gliding?7:sprint?7:4.5;
+                double speed=swimming()?(sprint?3.2:2.2):gliding?7:sprint?7:4.5;
                 double dx=(horizontal*Math.cos(yaw)+forward*Math.sin(yaw))*speed*STEP;
                 double dz=(horizontal*Math.sin(yaw)-forward*Math.cos(yaw))*speed*STEP;
                 double oldTurn=headingTurn;

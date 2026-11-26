@@ -39,12 +39,13 @@ final class MountainArt implements AutoCloseable {
             }
             glDisable(GL_ALPHA_TEST);glDisable(GL_TEXTURE_2D);glEndList();
         }
-        texture("ground-grass");texture("ground-dirt");
+        texture("ground-grass");texture("ground-dirt");texture("butterfly");texture("bird-wings");
         traveller=TravellerRig.load(assets);
         for(TravellerRig.Mesh mesh:traveller.meshes){texture(characterTexture(mesh.material));skinBuffers.put(mesh,new SkinBuffer(mesh));}
         System.out.println("Windward: loaded "+models.size()+" Meadow models ("+modelTriangles+" triangles), Fantasy "+traveller.meshes.size()+" meshes / "+traveller.boneCount+" bone bindings");
     }
     private static String forestTexture(String name,MountainAssets.Part part){
+        if(name.equals("pine")||name.equals("fern")||name.equals("lilypad"))return "generic-palette";
         if(part.leaves)return name.equals("birch")?"birch-leaves":"leaves";
         if(name.equals("grass"))return "grass-blades";
         if(name.equals("flowers"))return "flowers";
@@ -88,6 +89,26 @@ final class MountainArt implements AutoCloseable {
         double cx=(model.minX+model.maxX)/2,cz=(model.minZ+model.maxZ)/2,horizontal=scale;
         if(radius>0){double maxRadius=0;for(MountainAssets.Part part:model.parts)for(int i=0;i<part.vertices.length;i+=8)maxRadius=Math.max(maxRadius,Math.hypot(part.vertices[i]-cx,part.vertices[i+2]-cz));horizontal=radius/maxRadius;}
         glPushMatrix();glTranslated(x,y,z);glRotated(angle,0,1,0);glScaled(horizontal,scale,horizontal);glTranslated(-cx,-model.minY,-cz);glCallList(lists.get(name));glPopMatrix();
+    }
+    /** Two hinged wings use the first atlas frame; motion is local, independent of Unity shaders. */
+    void flying(boolean bird,double flap){
+        glDisable(GL_LIGHTING);glEnable(GL_TEXTURE_2D);glEnable(GL_ALPHA_TEST);glAlphaFunc(GL_GREATER,.35f);
+        glBindTexture(GL_TEXTURE_2D,textures.get(bird?"bird-wings":"butterfly"));glColor3f(1,1,1);
+        double span=bird?.9:.24,length=bird?.52:.3,angle=Math.sin(flap)*(bird?.55:1.05)+.2;
+        glBegin(GL_QUADS);
+        for(int side=-1;side<=1;side+=2){
+            double x=side*Math.cos(angle)*span,y=Math.sin(angle)*span;
+            glTexCoord2d(.035,.999);glVertex3d(0,0,-length/2);
+            glTexCoord2d(.2,.999);glVertex3d(x,y,-length/2);
+            glTexCoord2d(.2,.875);glVertex3d(x,y,length/2);
+            glTexCoord2d(.035,.875);glVertex3d(0,0,length/2);
+        }
+        glEnd();glDisable(GL_ALPHA_TEST);glDisable(GL_TEXTURE_2D);
+        glColor3d(.17,.15,.12);glBegin(GL_TRIANGLES);
+        double body=bird?.6:.25,width=bird?.065:.018;
+        glVertex3d(0,.03,-body);glVertex3d(-width,0,body/2);glVertex3d(width,0,body/2);
+        glVertex3d(0,-.03,-body);glVertex3d(width,0,body/2);glVertex3d(-width,0,body/2);
+        glEnd();glEnable(GL_LIGHTING);glColor3f(1,1,1);
     }
     void character(MountainWorld world){
         long poseBegin=profile?System.nanoTime():0;skinMs=0;

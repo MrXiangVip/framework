@@ -69,8 +69,10 @@ final class PlanetTerrain {
         }else result.add(t);
     }
     static final class Prop {
-        final double x,z,r,height;final boolean rock;
-        Prop(double x,double z,double r,double height,boolean rock){this.x=x;this.z=z;this.r=r;this.height=height;this.rock=rock;}
+        final double x,z,r,height,angle;final String model;
+        Prop(double x,double z,double r,double height,String model,double angle){
+            this.x=x;this.z=z;this.r=r;this.height=height;this.model=model;this.angle=angle;
+        }
     }
     private final Map<Tile,List<Prop>> props=new LinkedHashMap<Tile,List<Prop>>(128,.75f,true){
         @Override protected boolean removeEldestEntry(Map.Entry<Tile,List<Prop>> e){return size()>128;}
@@ -80,9 +82,29 @@ final class PlanetTerrain {
         List<Prop> result=new ArrayList<>();
         long seed=0x57494e4457415244L+tile.face*73856093L+tile.x*19349663L+tile.z*83492791L;
         Random random=new Random(seed);
-        MountainPlanet.Vec n=direction(tile.face,tile.u()+tile.size()*(.2+.6*random.nextDouble()),tile.v()+tile.size()*(.2+.6*random.nextDouble()));
-        double x=MountainPlanet.longitude(n),z=MountainPlanet.latitude(n);
-        if(MountainPlanet.distance(0,0,x,z)>70){boolean rock=random.nextInt(4)==0;result.add(new Prop(x,z,rock?.8:.55,rock?1.5:4+random.nextDouble()*3,rock));}
+        // Vary both density and species by habitat, leaving meadows open and grouping woodland.
+        int count=1+random.nextInt(4);
+        for(int i=0;i<count;i++){
+            MountainPlanet.Vec n=direction(tile.face,tile.u()+tile.size()*(.15+.7*random.nextDouble()),tile.v()+tile.size()*(.15+.7*random.nextDouble()));
+            double x=MountainPlanet.longitude(n),z=MountainPlanet.latitude(n),h=ground(x,z),wet=MountainPlanet.moisture(n);
+            if(MountainPlanet.distance(0,0,x,z)<75)continue;
+            if(h<MountainPlanet.WATER+.35){
+                if(h<MountainPlanet.WATER-.2&&h>MountainPlanet.WATER-2.5&&random.nextDouble()<.65)
+                    result.add(new Prop(x,z,0,.15+random.nextDouble()*.12,"lilypad",random.nextDouble()*360));
+                continue;
+            }
+            boolean shore=h<MountainPlanet.WATER+3,high=h>27||Math.abs(n.z)>.82;
+            if(shore||high){
+                if(high&&h<42&&wet>.45&&random.nextDouble()<.35)
+                    result.add(new Prop(x,z,.5,6+random.nextDouble()*4,"pine",random.nextDouble()*360));
+                else if(i==0||random.nextDouble()<.25)result.add(new Prop(x,z,.7+random.nextDouble(),.8+random.nextDouble()*2.5,random.nextBoolean()?"rock":"roundrock",random.nextDouble()*360));
+            }else if(random.nextDouble()<wet*.85){
+                result.add(new Prop(x,z,.45+random.nextDouble()*.2,4+random.nextDouble()*5,wet>.65?"birch":"tree",random.nextDouble()*360));
+            }else{
+                String model=wet>.7?"fern":wet>.45&&random.nextInt(5)==0?"mushrooms":random.nextBoolean()?"flowers":"grass";
+                result.add(new Prop(x,z,0,model.equals("fern")?.65:model.equals("grass")?.45:model.equals("flowers")?.3:.35,model,random.nextDouble()*360));
+            }
+        }
         cached=Collections.unmodifiableList(result);props.put(tile,cached);return cached;
     }
     private final Map<Tile,List<Prop>> neighbours=new LinkedHashMap<Tile,List<Prop>>(128,.75f,true){

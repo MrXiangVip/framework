@@ -27,7 +27,7 @@ final class MountainCamera {
             for(MountainWorld.Obstacle o:w.trees)hit|=MountainPlanet.distance(px,pz,o.x,o.z)<o.r+.3&&py<MountainWorld.ground(o.x,o.z)+o.height+.3;
             for(MountainWorld.Obstacle o:w.rocks)hit|=MountainPlanet.distance(px,pz,o.x,o.z)<o.r+.3&&py<MountainWorld.ground(o.x,o.z)+o.height+.3;
             for(MountainWorld.Obstacle o:w.props)hit|=MountainPlanet.distance(px,pz,o.x,o.z)<o.r+.3&&py<MountainWorld.ground(o.x,o.z)+o.height+.3;
-            for(PlanetTerrain.Prop p:w.terrain.nearby(px,pz))hit|=MountainPlanet.distance(px,pz,p.x,p.z)<p.r+.3&&py<MountainWorld.ground(p.x,p.z)+p.height+.3;
+            for(PlanetTerrain.Prop p:w.terrain.nearby(px,pz))hit|=p.r>0&&MountainPlanet.distance(px,pz,p.x,p.z)<p.r+.3&&py<MountainWorld.ground(p.x,p.z)+p.height+.3;
             if(hit){allowed=Math.max(.1,t-.2);break;}
         }
         // Contract immediately for safety; recover with frame-rate independent damping.

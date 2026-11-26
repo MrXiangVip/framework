@@ -9,7 +9,7 @@ import static org.lwjgl.assimp.Assimp.*;
 
 /** Imports actual user-supplied FBX meshes. Arrays contain position, normal and UV. */
 final class MountainAssets {
-    static final String[] MODELS={"tree","birch","rock","roundrock","grass","flowers","mushrooms","tent","runestone"};
+    static final String[] MODELS={"tree","birch","rock","roundrock","grass","flowers","mushrooms","tent","runestone","pine","fern","lilypad"};
     static final class Part {
         final String material,name;final float[] vertices;final boolean leaves;
         Part(String material,String name,float[] vertices,boolean leaves){this.material=material;this.name=name;this.vertices=vertices;this.leaves=leaves;}

@@ -30,7 +30,7 @@ public final class AssetTest {
             for(float[] weights:mesh.weights){double sum=0;for(float weight:weights)sum+=weight;check(weights.length==0||Math.abs(sum-1)<1e-5,"Normalized skin weights");}
         }
         check(changed>rig.height()&&jumped>rig.height(),"Walk/jump change actual skeleton vertices");
-        for(String name:new String[]{"palette","leaves","birch-leaves","branches","grass-blades","flowers","ground-grass","ground-dirt","traveller-body","traveller-clothes","traveller-hair"}){
+        for(String name:new String[]{"palette","leaves","birch-leaves","branches","grass-blades","flowers","ground-grass","ground-dirt","generic-palette","butterfly","bird-wings","traveller-body","traveller-clothes","traveller-hair"}){
             try(InputStream input=assets.resource("textures/"+name+".png")){BufferedImage image=ImageIO.read(input);check(image!=null&&image.getWidth()>0,"Real PNG decode: "+name);}
         }
         System.out.println("PASS: "+MountainAssets.MODELS.length+" real forest models / "+triangles+" triangles, 15 Fantasy meshes, material maps, normalized skin weights and distinct idle/walk/jump poses");

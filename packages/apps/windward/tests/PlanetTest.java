@@ -89,5 +89,72 @@ public final class PlanetTest {
         near(MountainPlanet.frame(w.x,w.z).point(camera.eyeX-w.x,camera.eyeY,camera.eyeZ-w.z).length(),3000,1e-8,"Overview camera orbits sphere centre");
         camera.globe=false;camera.update(w);check(camera.eyeY<20,"Return to normal surface camera");
     }
-    public static void main(String[] args){topology();terrain();controller();System.out.println("PASS: spherical circuits, poles, radial gravity, collision seams and bounded deterministic terrain");}
+    static void waterAndHabitats(){
+        MountainWorld w=new MountainWorld();
+        check(MountainWorld.ground(175,-130)<MountainPlanet.WATER-8,"Reachable lake has a deep basin");
+        near(w.floor(),MountainWorld.ground(w.x,w.z),1e-9,"Camp remains dry and unchanged by buoyancy");
+        w.x=175;w.z=-130;w.y=w.floor();
+        near(w.y,MountainPlanet.WATER-.9,1e-9,"Deep water supports torso above surface");
+        double x=w.x,z=w.z;for(int i=0;i<120;i++)w.step(1,0,false,0);
+        check(w.swimming(),"Deep lake activates water movement");
+        near(MountainPlanet.distance(x,z,w.x,w.z),2.2,.001,"Water movement is slower than walking");
+        w.jump();for(int i=0;i<180;i++)w.step(0,0,false,0);
+        near(w.y,MountainPlanet.WATER-.9,1e-8,"Jumping falls back to buoyant water support");
+        MountainCamera camera=new MountainCamera();camera.update(w);
+        MountainPlanet.Vec eye=MountainPlanet.frame(w.x,w.z).point(camera.eyeX-w.x,camera.eyeY,camera.eyeZ-w.z);
+        check(eye.length()>MountainPlanet.RADIUS+MountainPlanet.WATER,"Surface camera stays above water");
+        w.x=120;w.z=-130;w.y=w.floor();boolean entered=false,exited=false;
+        for(int i=0;i<6000;i++){
+            w.step(1,0,false,0);entered|=w.swimming();
+            if(entered&&!w.swimming()&&MountainWorld.ground(w.x,w.z)>MountainPlanet.WATER+.5){exited=true;break;}
+            check(w.y>=w.floor()-1e-8,"Shore transition never sinks below support");
+        }
+        check(entered&&exited,"Controller walks down shore, crosses lake and leaves on opposite bank");
+        Set<String> models=new HashSet<>(),regions=new HashSet<>();double min=1e9,max=-1e9;int water=0,land=0,clearPlants=0;
+        for(int face=0;face<6;face++)for(int v=0;v<12;v++)for(int u=0;u<12;u++){
+            MountainPlanet.Vec n=PlanetTerrain.direction(face,-1+(u+.5)/6,-1+(v+.5)/6);
+            double px=MountainPlanet.longitude(n),pz=MountainPlanet.latitude(n),h=MountainWorld.ground(px,pz);
+            min=Math.min(min,h);max=Math.max(max,h);if(h<MountainPlanet.WATER)water++;else land++;
+            regions.add(MountainPlanet.region(px,pz));
+            for(PlanetTerrain.Prop p:w.terrain.props(PlanetTerrain.leaf(px,pz))){
+                models.add(p.model);
+                check(p.model.equals("lilypad")||MountainWorld.ground(p.x,p.z)>MountainPlanet.WATER,"Land vegetation never spawns underwater");
+                if(p.model.equals("lilypad"))check(MountainWorld.ground(p.x,p.z)<MountainPlanet.WATER&&p.r==0,"Water lilies occupy water and do not block movement");
+                if(p.r==0&&!p.model.equals("lilypad")){
+                    boolean clear=true;for(PlanetTerrain.Prop other:w.terrain.nearby(p.x,p.z))
+                        if(other.r>0&&MountainPlanet.distance(p.x,p.z,other.x,other.z)<other.r+MountainWorld.RADIUS)clear=false;
+                    if(clear){clearPlants++;check(!w.staticSolidAt(p.x,p.z,MountainWorld.ground(p.x,p.z)),"Isolated ground cover does not block player");}
+                }
+            }
+        }
+        check(min< -8&&max>35&&water>20&&land>200,"Global terrain contains water basins and substantial highland relief");
+        check(models.size()>=6&&regions.size()>=5,"Habitat changes affect model species and regional identity");
+        check(clearPlants>10,"Collision check samples isolated ground cover across the globe");
+        w.reset();check(!w.swimming(),"Restart leaves water and returns to dry camp");
+        System.out.println("PASS: lakes, buoyancy, water speed, shore entry/exit, habitat variety and dry vegetation");
+    }
+    static void wildlife(){
+        MountainWildlife wildlife=new MountainWildlife();
+        for(double[] location:new double[][]{{0,12},{150,-130},{1500,300},{-3140,0},{0,-1570}}){
+            PlanetTerrain.Tile leaf=PlanetTerrain.leaf(location[0],location[1]);
+            wildlife.update(PlanetTerrain.select(location[0],location[1]),leaf);
+            check(wildlife.active().size()<=MountainWildlife.MAX_ACTIVE,"Animals unload outside nearby area");
+            for(MountainWildlife.Spawn spawn:wildlife.active()){
+                MountainWildlife.Sample a=MountainWildlife.sample(spawn,0,location[0],location[1]);
+                MountainWildlife.Sample b=MountainWildlife.sample(spawn,2,location[0],location[1]);
+                MountainWildlife.Sample paused=MountainWildlife.sample(spawn,2,location[0],location[1]);
+                near(MountainPlanet.distance(b.x,b.z,paused.x,paused.z),0,1e-10,"Paused simulation freezes animal positions");
+                near(b.flap,paused.flap,0,"Paused simulation freezes wing animation");
+                check(MountainPlanet.distance(a.x,a.z,b.x,b.z)>.1,"Animals actively move through habitat");
+                check(b.y>Math.max(MountainWorld.ground(b.x,b.z),MountainPlanet.WATER)+.5,"Flying wildlife stays above terrain/water");
+                check(Double.isFinite(b.heading)&&Double.isFinite(b.flap),"Animal orientation is finite at seams/poles");
+            }
+        }
+        PlanetTerrain.Tile leaf=PlanetTerrain.leaf(0,12);wildlife.update(PlanetTerrain.select(0,12),leaf);
+        check(wildlife.active().stream().anyMatch(s->s.bird)&&wildlife.active().stream().anyMatch(s->!s.bird),"Camp has visible birds and butterflies");
+        List<MountainWildlife.Spawn> before=wildlife.active();wildlife.update(PlanetTerrain.select(0,12),leaf);
+        check(before==wildlife.active(),"Stationary camera does not recreate animal populations");
+        System.out.println("PASS: deterministic bounded wildlife, flight clearance, movement and pause");
+    }
+    public static void main(String[] args){topology();terrain();controller();waterAndHabitats();wildlife();System.out.println("PASS: spherical circuits, poles, radial gravity, collision seams and bounded deterministic terrain");}
 }
