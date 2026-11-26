@@ -26,10 +26,10 @@ public final class MountainTest {
     static void logic(){
         MountainWorld fw=new MountainWorld();fw.x=fw.z=fw.y=0;MountainCamera fc=new MountainCamera();fc.eyeX=0;fc.eyeY=1.35;fc.eyeZ=10;
         MountainFrustum frustum=new MountainFrustum();frustum.update(fw,fc);
-        check(frustum.visible(0,1.35,0,1),"Visible sphere kept");check(!frustum.visible(0,1.35,12,.1),"Behind camera culled");
-        check(!frustum.visible(100,1.35,0,1)&&!frustum.visible(0,1.35,-220,1),"Side and far spheres culled");
-        check(frustum.visible(10,1.35,0,1)&&frustum.visible(0,8.35,0,1),"Partially visible edge spheres retained");
-        check(frustum.visible(0,1.35,12,20),"Camera-enclosing bounds retained");
+        check(frustum.visible(0,1001.35,0,1),"Visible sphere kept");check(!frustum.visible(0,1001.35,12,.1),"Behind camera culled");
+        check(!frustum.visible(100,1001.35,0,1)&&!frustum.visible(0,1001.35,-220,1),"Side and far spheres culled");
+        check(frustum.visible(10,1001.35,0,1)&&frustum.visible(0,1008.35,0,1),"Partially visible edge spheres retained");
+        check(frustum.visible(0,1001.35,12,20),"Camera-enclosing bounds retained");
         MountainWorld w=new MountainWorld();
         double z=w.z;advance(w,120,0,1,false,0);near(z-w.z,4.5,.001,"Walking speed");
         near(w.y,MountainWorld.ground(w.x,w.z),1e-8,"Slope contact");
@@ -40,7 +40,7 @@ public final class MountainTest {
         double velocity=w.vy;w.jump();near(w.vy,velocity,1e-8,"Wing deploy does not add jump impulse");check(w.gliding,"Airborne press deploys wing");w.jump();check(!w.gliding,"Next press retracts wing");
         advance(w,180,0,0,false,0);near(w.y,floor,1e-8,"Jump lands exactly");check(w.grounded,"Ground state restored");
         w.reset();w.paused=true;w.jump();advance(w,120,1,1,true,0);near(w.z,12,1e-8,"Pause stops movement");near(w.time,0,1e-8,"Pause stops time");check(w.grounded,"Pause blocks jump");
-        w.reset();w.x=MountainWorld.LIMIT-.4;w.y=MountainWorld.ground(w.x,w.z);advance(w,240,1,0,true,0);check(w.x<=MountainWorld.LIMIT-MountainWorld.RADIUS,"World edge solid");
+        w.reset();w.x=47.6;w.y=MountainWorld.ground(w.x,w.z);advance(w,240,1,0,true,0);check(w.x>55,"Original map edge is traversable");
         w.reset();MountainWorld.Obstacle rock=w.rocks.get(0);w.x=rock.x;w.z=rock.z+rock.r+MountainWorld.RADIUS+.1;w.y=MountainWorld.ground(w.x,w.z);
         advance(w,240,0,1,true,0);check(w.z>=rock.z+rock.r+MountainWorld.RADIUS-.001,"Rock blocks traversal");
         MountainWorld.Obstacle tree=w.trees.get(0);w.x=tree.x;w.z=tree.z+tree.r+MountainWorld.RADIUS+.1;w.y=MountainWorld.ground(w.x,w.z);
@@ -133,6 +133,18 @@ public final class MountainTest {
             ImageIO.write(renderer.render(world,camera),"png",new File("out/windward-tests/tower-active.png"));
             world.x=0;world.z=12;world.y=world.floor();camera.reset();
             ImageIO.write(renderer.render(world,camera),"png",new File("out/windward-tests/tower-beacon.png"));
+            for(int i=0;i<4;i++){
+                world.reset();world.x=i==0?0:i==1?Math.PI*MountainPlanet.RADIUS-2:i==2?700:1400;
+                world.z=i==2?-Math.PI*MountainPlanet.RADIUS/2+.5:i==3?900:12;world.y=world.floor();camera.reset();
+                camera.globe=i==0;
+                BufferedImage planet=renderer.render(world,camera);
+                ImageIO.write(planet,"png",new File("out/windward-tests/planet-"+i+".png"));
+                renderer.culling=false;BufferedImage reference=renderer.render(world,camera);renderer.culling=true;
+                BufferedImage culled=renderer.render(world,camera);
+                check(java.util.Arrays.equals(((java.awt.image.DataBufferInt)reference.getRaster().getDataBuffer()).getData(),((java.awt.image.DataBufferInt)culled.getRaster().getDataBuffer()).getData()),"Spherical frustum preserves pixels at planet location "+i);
+                check(renderer.terrainSize()<700,"Planet GPU cache bounded after travelling");
+            }
+            check(org.lwjgl.opengl.GL11.glGetError()==0,"No GL errors at sphere seams/poles");
             world.reset();camera.reset();
             long[] times=new long[30];
             for(int i=0;i<times.length;i++){long t=System.nanoTime();renderer.render(world,camera);times[i]=System.nanoTime()-t;}

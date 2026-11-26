@@ -4,7 +4,9 @@ import java.util.*;
 
 /** Graphics-independent fixed-step character controller. All lengths are world metres. */
 final class MountainWorld {
-    static final double LIMIT=48, RADIUS=.36, STEP=1.0/120;
+    static final double RADIUS=.36, STEP=1.0/120;
+    final PlanetTerrain terrain=new PlanetTerrain();
+    double headingTurn;
     static final class Obstacle {
         final double x,z,r,height;
         Obstacle(double x,double z,double r,double height){this.x=x;this.z=z;this.r=r;this.height=height;}
@@ -29,26 +31,19 @@ final class MountainWorld {
         rocks.add(new Obstacle(29,-17,1.6,2.4));rocks.add(new Obstacle(-14,-13,2.2,3));
         reset();
     }
-    void reset(){x=0;z=12;y=ground(x,z);vy=0;facing=Math.PI;grounded=true;time=distance=0;paused=moving=false;gait=locomotion=runBlend=airBlend=landing=0;visualFacing=facing;stamina=100;climbing=gliding=false;journey.reset();combat.reset();puzzle.reset();}
+    void reset(){headingTurn=0;x=0;z=12;y=ground(x,z);vy=0;facing=Math.PI;grounded=true;time=distance=0;paused=moving=false;gait=locomotion=runBlend=airBlend=landing=0;visualFacing=facing;stamina=100;climbing=gliding=false;journey.reset();combat.reset();puzzle.reset();}
     static double pathX(double z){return MountainJourney.pathX(z);}
-    static double rawHeight(double x,double z){
-        double hill=9*Math.exp(-((x-15)*(x-15)+(z+25)*(z+25))/290);
-        return .9*Math.sin(x*.075)*Math.cos(z*.065)+hill;
-    }
-    // Exactly the same triangles as the rendered 2m mesh, avoiding floating/sinking on slopes.
-    static double ground(double x,double z){
-        double gx=Math.floor(x/2)*2,gz=Math.floor(z/2)*2,u=(x-gx)/2,v=(z-gz)/2;
-        double a=rawHeight(gx,gz),b=rawHeight(gx+2,gz),c=rawHeight(gx,gz+2),d=rawHeight(gx+2,gz+2);
-        return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v);
-    }
+    static double rawHeight(double x,double z){return MountainPlanet.height(MountainPlanet.normal(x,z));}
+    static double ground(double x,double z){return PlanetTerrain.ground(x,z);}
     boolean blocked(double px,double pz){return solidAt(px,pz,y);}
     boolean solidAt(double px,double pz,double feet){return puzzle.blocks(px,pz,feet,RADIUS)||staticSolidAt(px,pz,feet);}
     boolean staticSolidAt(double px,double pz,double feet){
-        if(Math.abs(px)>LIMIT-RADIUS||Math.abs(pz)>LIMIT-RADIUS)return true;
         if(MountainTraversal.inside(px,pz,RADIUS)&&feet<MountainTraversal.TOP-.05)return true;
         for(Obstacle o:trees)if(Math.hypot(px-o.x,pz-o.z)<o.r+RADIUS&&feet<ground(o.x,o.z)+o.height)return true;
         for(Obstacle o:rocks)if(Math.hypot(px-o.x,pz-o.z)<o.r+RADIUS&&feet<ground(o.x,o.z)+o.height)return true;
         for(Obstacle o:props)if(Math.hypot(px-o.x,pz-o.z)<o.r+RADIUS&&feet<ground(o.x,o.z)+o.height)return true;
+        for(PlanetTerrain.Prop p:terrain.nearby(px,pz))
+            if(MountainPlanet.distance(px,pz,p.x,p.z)<p.r+RADIUS&&feet<ground(p.x,p.z)+p.height)return true;
         return false;
     }
     double floorAt(double px,double pz){return Math.max(MountainTraversal.floor(px,pz),puzzle.support(px,pz));}
@@ -84,17 +79,16 @@ final class MountainWorld {
         }else{
             if(gliding){stamina=Math.max(0,stamina-22*STEP);if(stamina<=0)gliding=false;}
             if(combat.dodgeTime>=0){
-                double oldX=x,oldZ=z;move(x+combat.dodgeX*10*STEP,z);move(x,z+combat.dodgeZ*10*STEP);
-                distance+=Math.hypot(x-oldX,z-oldZ);moving=true;
+                double travel=Math.hypot(move(combat.dodgeX*10*STEP,0),move(0,combat.dodgeZ*10*STEP));
+                distance+=travel;moving=travel>1e-7;
             }else if(length>0&&combat.attackTime<0){
                 horizontal/=Math.max(1,length);forward/=Math.max(1,length);
                 double speed=gliding?7:sprint?7:4.5;
                 double dx=(horizontal*Math.cos(yaw)+forward*Math.sin(yaw))*speed*STEP;
                 double dz=(horizontal*Math.sin(yaw)-forward*Math.cos(yaw))*speed*STEP;
-                double oldX=x,oldZ=z;
-                move(x+dx,z);move(x,z+dz);
-                double travel=Math.hypot(x-oldX,z-oldZ);distance+=travel;
-                if(travel>1e-7){facing=Math.atan2(x-oldX,z-oldZ);moving=true;}
+                double oldTurn=headingTurn;
+                double travel=Math.hypot(move(dx,0),move(0,dz));distance+=travel;
+                if(travel>1e-7){facing=Math.atan2(dx,dz)+headingTurn-oldTurn;moving=true;}
             }
             double floor=floor();
             if(grounded&&y>floor+.15)grounded=false;
@@ -117,10 +111,17 @@ final class MountainWorld {
         double turn=Math.atan2(Math.sin(facing-visualFacing),Math.cos(facing-visualFacing));
         visualFacing+=turn*(1-Math.exp(-STEP*14));
     }
-    private void move(double nx,double nz){
-        if(blocked(nx,nz))return;
-        double rise=floorAt(nx,nz)-floor(),run=Math.hypot(nx-x,nz-z);
-        if(grounded&&rise>run*Math.tan(Math.toRadians(48)))return;
-        x=nx;z=nz;
+    /** Displacements are local tangent metres, never differences in longitude chart coordinates. */
+    private double move(double east,double south){
+        double run=Math.hypot(east,south);if(run<1e-14)return 0;
+        MountainPlanet.Move next=MountainPlanet.advance(x,z,east,south);
+        if(blocked(next.x,next.z))return 0;
+        double rise=floorAt(next.x,next.z)-floor();
+        if(grounded&&rise>run*Math.tan(Math.toRadians(48)))return 0;
+        x=next.x;z=next.z;headingTurn+=next.turn;facing+=next.turn;visualFacing+=next.turn;
+        double dx=combat.dodgeX,dz=combat.dodgeZ;
+        combat.dodgeX=dx*Math.cos(next.turn)+dz*Math.sin(next.turn);
+        combat.dodgeZ=dz*Math.cos(next.turn)-dx*Math.sin(next.turn);
+        return run;
     }
 }

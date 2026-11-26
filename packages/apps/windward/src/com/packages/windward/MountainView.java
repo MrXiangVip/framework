@@ -27,11 +27,13 @@ public final class MountainView extends View implements AutoCloseable {
         final BufferedImage image;
         final boolean paused,nearRune,runeRead,climbing,gliding;
         final double x,z,y,time,renderMs,targetDistance,stamina;
+        final int terrainPatches;
         final String device,objective,notice,traversalHint,enemyState;
         final int health,enemyHealth;
         final boolean enemyNearby,attacking,dodging,complete,summaryOpen,pushing,powered,treasure;
         final double completedAt,stoneZ;
-        Frame(BufferedImage i,MountainWorld w,double ms,String d){
+        Frame(BufferedImage i,MountainWorld w,double ms,String d,int patches){
+            terrainPatches=patches;
             image=i;paused=w.paused;x=w.x;z=w.z;y=w.y;time=w.time;renderMs=ms;device=d;
             complete=w.journey.complete;summaryOpen=w.journey.summaryOpen;completedAt=w.journey.completedAt;treasure=w.journey.treasure;
             pushing=w.puzzle.pushing;powered=w.puzzle.powered;stoneZ=w.puzzle.stoneZ;
@@ -40,7 +42,7 @@ public final class MountainView extends View implements AutoCloseable {
             attacking=w.combat.attackTime>=0;dodging=w.combat.dodgeTime>=0;
             objective=w.journey.objective(w);notice=w.time<w.journey.noticeUntil?w.journey.notice:"";
             nearRune=w.journey.nearRune(w);runeRead=w.journey.runeRead;climbing=w.climbing;gliding=w.gliding;stamina=w.stamina;
-            traversalHint=hint(w);targetDistance=Math.hypot(w.x-w.journey.guideX(w),w.z-w.journey.guideZ(w));
+            traversalHint=hint(w);targetDistance=MountainPlanet.distance(w.x,w.z,w.journey.guideX(w),w.journey.guideZ(w));
         }
         private static String hint(MountainWorld w){
             String puzzle=w.puzzle.hint(w);if(!puzzle.isEmpty())return puzzle;
@@ -65,11 +67,12 @@ public final class MountainView extends View implements AutoCloseable {
                         accumulated+=dt;
                         while(accumulated>=MountainWorld.STEP){
                             world.step(((state&8)!=0?1:0)-((state&4)!=0?1:0),((state&1)!=0?1:0)-((state&2)!=0?1:0),(state&16)!=0,camera.yaw);
+                            camera.transport(world);
                             accumulated-=MountainWorld.STEP;
                         }
                     }
                     long renderBegin=System.nanoTime();BufferedImage image=renderer.render(world,camera);
-                    frame=new Frame(image,world,(System.nanoTime()-renderBegin)/1e6,renderer.device);
+                    frame=new Frame(image,world,(System.nanoTime()-renderBegin)/1e6,renderer.device,renderer.terrainSize());
                     if(pending.compareAndSet(false,true))ui.sendMessage(ui.obtainMessage(0,null));
                     LockSupport.parkNanos(Math.max(0,(world.paused?100000000L:16666667L)-(System.nanoTime()-begin)));
                 }
@@ -96,13 +99,14 @@ public final class MountainView extends View implements AutoCloseable {
         text(canvas,scale,f==null?"山谷初行 · 寻找远处的风塔":f.objective,44,98,16,0xffd7e6d6);
         panel(canvas,scale,24,696,1152,80,0xe6234140);
         text(canvas,scale,"WASD / 方向键 移动    Shift 奔跑    空格 跳跃    按住鼠标右键 转动镜头    滚轮 缩放",44,726,17,0xfff2edda);
-        text(canvas,scale,"J / 左键 攻击    K 闪避    E 互动 / 攀爬    空中空格 滑翔    Esc 暂停    R 重新出发",44,754,15,0xffb9d3c4);
+        text(canvas,scale,"J / 左键 攻击    K 闪避    E 互动 / 攀爬    空中空格 滑翔    G 星球视角    Esc 暂停    R 重开",44,754,15,0xffb9d3c4);
         if(f==null)text(canvas,scale,error.isEmpty()?"正在打开山谷…":error,44,180,20,0xffffedbd);
         else{
             panel(canvas,scale,932,24,244,76,0xd9234140);
-            text(canvas,scale,"山路探索",948,55,18,0xffe4ead7);
+            text(canvas,scale,"球面探索 · 半径 1 km",948,55,18,0xffe4ead7);
             text(canvas,scale,String.format(java.util.Locale.ROOT,"目标距离 %.0f m",f.targetDistance),948,81,14,0xffb9d3c4);
-            if(Boolean.getBoolean("framework.windward.profile"))text(canvas,scale,String.format(java.util.Locale.ROOT,"GL / 读回 %.1f ms",f.renderMs),948,122,14,0xffe4ead7);
+            text(canvas,scale,String.format(java.util.Locale.ROOT,"经度 %.1f°  纬度 %.1f°",Math.toDegrees(f.x/MountainPlanet.RADIUS),-Math.toDegrees(f.z/MountainPlanet.RADIUS)),948,121,13,0xffe4ead7);
+            if(Boolean.getBoolean("framework.windward.profile"))text(canvas,scale,String.format(java.util.Locale.ROOT,"GL / 读回 %.1f ms",f.renderMs),948,146,14,0xffe4ead7);
             if(!f.notice.isEmpty()){panel(canvas,scale,260,154,680,58,0xe6234140);text(canvas,scale,f.notice,280,191,18,0xffffedbd);}
             panel(canvas,scale,24,144,196,38,0xd9234140);text(canvas,scale,String.format(java.util.Locale.ROOT,"体力 %.0f / 100",f.stamina),40,170,17,0xffffedbd);
             if(!f.traversalHint.isEmpty()&&!f.paused){panel(canvas,scale,320,610,560,48,0xe6234140);text(canvas,scale,f.traversalHint,340,642,18,0xffffedbd);}
@@ -130,6 +134,7 @@ public final class MountainView extends View implements AutoCloseable {
         if(event.getType()!=KeyEvent.DOWN)return false;
         if(!input.press(key))return true;
         if(key==KeyEvent.ESCAPE||key==KeyEvent.ENTER){input.clear();input.press(key);queue(()->{state=0;if(key==KeyEvent.ENTER&&world.journey.summaryOpen){world.journey.summaryOpen=false;world.paused=false;}else world.paused=!world.paused;});}
+        else if(key=='g')queue(()->camera.globe=!camera.globe);
         else if(key=='r'){input.clear();input.press(key);queue(()->{state=0;world.reset();camera.reset();});}
         else if(key==' ')queue(world::jump);
         else if(key=='j')queue(()->world.combat.attack(world));

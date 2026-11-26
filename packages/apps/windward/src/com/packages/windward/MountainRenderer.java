@@ -25,16 +25,24 @@ final class MountainRenderer implements AutoCloseable {
         final int id;final double x,y,z,radius;
         StaticDraw(int id,double x,double y,double z,double radius){this.id=id;this.x=x;this.y=y;this.z=z;this.radius=radius;}
     }
-    int sceneSize(){return scene.size();}
+    private final java.util.Map<PlanetTerrain.Tile,StaticDraw> terrain=new java.util.LinkedHashMap<>();
+    private PlanetTerrain.Tile terrainAnchor;
+    int terrainSize(){return terrain.size();}
+    int sceneSize(){return scene.size()+terrain.size();}
+    private static void surface(double x,double z){glMultMatrixd(MountainPlanet.frame(x,z).surface(x,z));}
     private void cache(double x,double y,double z,double radius,Runnable draw){
         int id=glGenLists(1);if(id==0)throw new IllegalStateException("Cannot cache static scene");
-        scene.add(new StaticDraw(id,x,y,z,radius));glNewList(id,GL_COMPILE);draw.run();glEndList();
+        MountainPlanet.Vec center=MountainPlanet.position(x,y,z);
+        scene.add(new StaticDraw(id,center.x,center.y,center.z,radius+.1));
+        glNewList(id,GL_COMPILE);glPushMatrix();surface(x,z);draw.run();glPopMatrix();glEndList();
     }
     private void cacheModel(String name,double x,double y,double z,double height,double angle,double radius){
         cache(x,y+height/2,z,art.radius(name,height,radius),()->art.model(name,x,y,z,height,angle,radius));
     }
     private void drawScene(MountainWorld w,MountainCamera camera){
+        streamTerrain(w);
         frustum.update(w,camera);sceneDraws=0;
+        for(StaticDraw draw:terrain.values())if(!culling||frustum.visible(draw.x,draw.y,draw.z,draw.radius)){glCallList(draw.id);sceneDraws++;}
         for(StaticDraw draw:scene)if(!culling||frustum.visible(draw.x,draw.y,draw.z,draw.radius)){glCallList(draw.id);sceneDraws++;}
         glDisable(GL_TEXTURE_2D);glDisable(GL_ALPHA_TEST);glColor3f(1,1,1);
     }
@@ -80,19 +88,22 @@ final class MountainRenderer implements AutoCloseable {
         glBindFramebuffer(GL_FRAMEBUFFER,fbo);glViewport(0,0,WIDTH,HEIGHT);
         glClearColor(.65f,.83f,.92f,1);glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         glMatrixMode(GL_PROJECTION);glLoadIdentity();
-        double top=.1*Math.tan(Math.toRadians(65)/2);glFrustum(-top*WIDTH/HEIGHT,top*WIDTH/HEIGHT,-top,top,.1,220);
+        double top=.1*Math.tan(Math.toRadians(65)/2);glFrustum(-top*WIDTH/HEIGHT,top*WIDTH/HEIGHT,-top,top,.1,camera.farClip());
         glMatrixMode(GL_MODELVIEW);glLoadIdentity();
-        lookAt(camera.eyeX,camera.eyeY,camera.eyeZ,w.x,w.y+1.35,w.z);
+        // Camera-relative tangent frame keeps render coordinates small and local up radial.
+        lookAt(camera.eyeX-w.x,camera.eyeY,camera.eyeZ-w.z,0,camera.targetAltitude(w),0);
+        if(camera.globe)glDisable(GL_FOG);else glEnable(GL_FOG);
+        glMultMatrixd(MountainPlanet.frame(w.x,w.z).inverse());
         glLightfv(GL_LIGHT0,GL_POSITION,new float[]{-30,65,20,0});
         long begin=profile?stage():0;
         drawScene(w,camera);
         if(profile){glFinish();sceneMs=elapsed(begin);begin=stage();}
-        contactShadow(w);
-        art.profile=profile;art.character(w);
+        glPushMatrix();surface(w.x,w.z);contactShadow(w);
+        art.profile=profile;art.character(w);glPopMatrix();
         if(profile){glFinish();characterMs=elapsed(begin);skinMs=art.skinMs;begin=stage();}
         traversalObjects(w);
         combatObjects(w,art);
-        puzzleObjects(w);
+        if(MountainPlanet.distance(w.x,w.z,22,-25)<250){glPushMatrix();surface(22,-25);puzzleObjects(w);glPopMatrix();}
         if(profile){glFinish();propsMs=elapsed(begin);begin=stage();}
         glReadPixels(0,0,WIDTH,HEIGHT,GL_BGRA,GL_UNSIGNED_INT_8_8_8_8_REV,pixels);
         if(profile){readMs=elapsed(begin);begin=System.nanoTime();}
@@ -135,6 +146,8 @@ final class MountainRenderer implements AutoCloseable {
     }
     private static void combatObjects(MountainWorld w,MountainArt art){
         MountainCombat c=w.combat;double floor=MountainWorld.ground(c.x,c.z);
+        if(MountainPlanet.distance(w.x,w.z,c.x,c.z)<250){
+        glPushMatrix();surface(c.x,c.z);
         if(c.enemyHealth>0){
             glPushMatrix();glTranslated(c.x,floor,c.z);glRotated(Math.toDegrees(c.facing),0,1,0);
             int stone=c.enemyHurt>0?0xffe9b4:0x879d9b;
@@ -152,8 +165,9 @@ final class MountainRenderer implements AutoCloseable {
                 glEnd();glDepthMask(true);glDisable(GL_BLEND);glEnable(GL_LIGHTING);
             }
         }else{cylinder(c.x,floor,c.z,.65,.25,.45,0x879d9b,6);box(c.x+.5,floor+.23,c.z+.3,.25,.2,.25,0x879d9b);}
+        glPopMatrix();}
         if(w.grounded&&!w.climbing&&!w.gliding&&!w.puzzle.pushing&&c.health>0){
-            glPushMatrix();glTranslated(w.x,w.y,w.z);glRotated(Math.toDegrees(w.visualFacing),0,1,0);
+            glPushMatrix();surface(w.x,w.z);glTranslated(w.x,w.y,w.z);glRotated(Math.toDegrees(w.visualFacing),0,1,0);
             double slash=c.attackTime<0?0:Math.sin(Math.min(1,c.attackTime/.5)*Math.PI);
             glTranslated(art.handX,art.handY,art.handZ);glRotated(-35+slash*140,0,1,0);glRotated(65-slash*55,1,0,0);
             box(0,-.12,0,.055,.16,.055,0x66513a);box(0,.04,0,.19,.04,.06,0xc7ab63);box(0,.6,0,.07,.52,.035,0xd6eff0);
@@ -162,10 +176,12 @@ final class MountainRenderer implements AutoCloseable {
     }
     private static void traversalObjects(MountainWorld w){
         double y=MountainWorld.ground(MountainJourney.CACHE_X,MountainJourney.CACHE_Z);
+        glPushMatrix();surface(MountainJourney.CACHE_X,MountainJourney.CACHE_Z);
         box(MountainJourney.CACHE_X,y+.35,MountainJourney.CACHE_Z,.65,.35,.45,0x82704a);
         box(MountainJourney.CACHE_X,y+(w.journey.treasure?.98:.75),MountainJourney.CACHE_Z,.7,.10,.48,w.journey.treasure?0x738f80:0xe6c56b);
+        glPopMatrix();
         if(w.gliding){
-            glPushMatrix();glTranslated(w.x,w.y,w.z);glRotated(Math.toDegrees(w.visualFacing),0,1,0);
+            glPushMatrix();surface(w.x,w.z);glTranslated(w.x,w.y,w.z);glRotated(Math.toDegrees(w.visualFacing),0,1,0);
             glDisable(GL_CULL_FACE);
             tri(-2,2.8,.5,0,3.25,-.65,2,2.8,.5,0x58b6b4);
             tri(-2,2.8,.5,2,2.8,.5,0,2.9,1.1,0xe5d6a1);
@@ -178,7 +194,9 @@ final class MountainRenderer implements AutoCloseable {
         double floor=w.floor(),air=Math.max(0,w.y-floor),radius=.42+air*.08;
         glDisable(GL_LIGHTING);glEnable(GL_BLEND);glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);glDepthMask(false);
         glColor4d(.08,.14,.12,.24/(1+air));glBegin(GL_TRIANGLE_FAN);glVertex3d(w.x,floor+.025,w.z);
-        for(int i=0;i<=24;i++){double a=i*Math.PI/12,x=w.x+Math.cos(a)*radius,z=w.z+Math.sin(a)*radius;glColor4d(.08,.14,.12,0);glVertex3d(x,w.floorAt(x,z)+.025,z);}
+        for(int i=0;i<=24;i++){double a=i*Math.PI/12,dx=Math.cos(a)*radius,dz=Math.sin(a)*radius;
+            MountainPlanet.Move p=MountainPlanet.advance(w.x,w.z,dx,dz);
+            glColor4d(.08,.14,.12,0);glVertex3d(w.x+dx,w.floorAt(p.x,p.z)+.025,w.z+dz);}
         glEnd();glDepthMask(true);glDisable(GL_BLEND);glEnable(GL_LIGHTING);
     }
     private static void lookAt(double ex,double ey,double ez,double tx,double ty,double tz){
@@ -187,32 +205,64 @@ final class MountainRenderer implements AutoCloseable {
         double ux=-sz*fy,uy=sz*fx-sx*fz,uz=sx*fy;
         glMultMatrixd(new double[]{sx,ux,-fx,0,0,uy,-fy,0,sz,uz,-fz,0,0,0,0,1});glTranslated(-ex,-ey,-ez);
     }
+    private void streamTerrain(MountainWorld w){
+        PlanetTerrain.Tile anchor=PlanetTerrain.leaf(w.x,w.z);
+        if(anchor.equals(terrainAnchor))return;
+        MountainPlanet.Vec n=PlanetTerrain.direction(anchor.face,anchor.u()+anchor.size()/2,anchor.v()+anchor.size()/2);
+        java.util.Set<PlanetTerrain.Tile> wanted=PlanetTerrain.select(MountainPlanet.longitude(n),MountainPlanet.latitude(n));
+        java.util.Iterator<java.util.Map.Entry<PlanetTerrain.Tile,StaticDraw>> it=terrain.entrySet().iterator();
+        while(it.hasNext()){java.util.Map.Entry<PlanetTerrain.Tile,StaticDraw> e=it.next();if(!wanted.contains(e.getKey())){glDeleteLists(e.getValue().id,1);it.remove();}}
+        for(PlanetTerrain.Tile tile:wanted)if(!terrain.containsKey(tile)){
+            int id=glGenLists(1);if(id==0)throw new IllegalStateException("Cannot allocate planet patch");
+            MountainPlanet.Vec center=tile.center();
+            glNewList(id,GL_COMPILE);planetPatch(tile);
+            if(tile.level==PlanetTerrain.DEPTH)for(PlanetTerrain.Prop prop:w.terrain.props(tile)){
+                glPushMatrix();surface(prop.x,prop.z);
+                art.model(prop.rock?"rock":"tree",prop.x,MountainWorld.ground(prop.x,prop.z),prop.z,prop.height,tile.hashCode()%360,prop.rock?prop.r:0);
+                glPopMatrix();
+            }
+            glEndList();terrain.put(tile,new StaticDraw(id,center.x,center.y,center.z,tile.radius()+10));
+        }
+        terrainAnchor=anchor;
+    }
+    private void planetPatch(PlanetTerrain.Tile tile){
+        int count=PlanetTerrain.SEGMENTS;double step=tile.size()/count;
+        MountainPlanet.Vec[][] points=new MountainPlanet.Vec[count+1][count+1];
+        for(int z=0;z<=count;z++)for(int x=0;x<=count;x++)points[z][x]=PlanetTerrain.vertex(tile.face,tile.u()+x*step,tile.v()+z*step);
+        // The same finest-grid vertices feed collision. Coarser patches use subsets; skirts hide LOD edge cracks.
+        for(int material=0;material<2;material++){
+            art.groundTexture(material==1);glColor3f(1,1,1);glBegin(GL_TRIANGLES);
+            for(int z=0;z<count;z++)for(int x=0;x<count;x++){
+                MountainPlanet.Vec n=PlanetTerrain.direction(tile.face,tile.u()+(x+.5)*step,tile.v()+(z+.5)*step);
+                double px=MountainPlanet.longitude(n),pz=MountainPlanet.latitude(n);
+                boolean path=Math.abs(px)<50&&Math.abs(pz)<50&&(Math.abs(px-MountainWorld.pathX(pz))<1.8||(pz>-11&&pz<-3&&Math.abs(px-(-7*(-3-pz)/8))<1.3));
+                if(path!=(material==1))continue;
+                planetTriangle(points[z][x],points[z][x+1],points[z+1][x]);
+                planetTriangle(points[z+1][x+1],points[z+1][x],points[z][x+1]);
+            }
+            glEnd();
+        }
+        art.groundTexture(false);glBegin(GL_TRIANGLES);
+        for(int side=0;side<4;side++)for(int i=0;i<count;i++){
+            MountainPlanet.Vec a=side==0?points[0][i]:side==1?points[count][i]:side==2?points[i][0]:points[i][count];
+            MountainPlanet.Vec b=side==0?points[0][i+1]:side==1?points[count][i+1]:side==2?points[i+1][0]:points[i+1][count];
+            MountainPlanet.Vec c=a.mul(1-tile.skirt()/a.length()),d=b.mul(1-tile.skirt()/b.length());
+            planetTriangle(a,b,c);planetTriangle(b,d,c);
+        }
+        glEnd();glDisable(GL_TEXTURE_2D);
+    }
+    private static void planetTriangle(MountainPlanet.Vec a,MountainPlanet.Vec b,MountainPlanet.Vec c){
+        MountainPlanet.Vec normal=b.sub(a).cross(c.sub(a));
+        if(normal.dot(a)<0)normal=normal.mul(-1);
+        glNormal3d(normal.x,normal.y,normal.z);
+        planetVertex(a);planetVertex(b);planetVertex(c);
+    }
+    private static void planetVertex(MountainPlanet.Vec p){
+        // Continuous world-direction texturing; no resource allocation per rendered frame.
+        glTexCoord2d((p.x+p.y*.37)/5,(p.z+p.y*.23)/5);glVertex3d(p.x,p.y,p.z);
+    }
     private void landscape(MountainWorld w){
-        // Cache terrain in 10m tiles; keep the original 2m triangles and texture coordinates.
-        for(int z=-50;z<50;z+=10)for(int x=-50;x<50;x+=10){
-            final int tx=x,tz=z;double min=Double.POSITIVE_INFINITY,max=-min;
-            for(int vz=z;vz<=z+10;vz+=2)for(int vx=x;vx<=x+10;vx+=2){double h=MountainWorld.rawHeight(vx,vz);min=Math.min(min,h);max=Math.max(max,h);}
-            cache(x+5,(min+max)/2,z+5,Math.sqrt(50+(max-min)*(max-min)/4)+.05,()->{
-                // Two opaque texture batches per tile, rather than a bind/begin per triangle.
-                for(int material=0;material<2;material++){
-                    art.groundTexture(material==1);glBegin(GL_TRIANGLES);
-                    for(int gz=tz;gz<tz+10;gz+=2)for(int gx=tx;gx<tx+10;gx+=2){
-                        double mx=gx+1,mz=gz+1;
-                        boolean path=Math.abs(mx-MountainWorld.pathX(mz))<1.8||(mz>-11&&mz<-3&&Math.abs(mx-(-7*(-3-mz)/8))<1.3);
-                        if(path!=(material==1))continue;
-                        emitTri(gx,MountainWorld.rawHeight(gx,gz),gz,gx,MountainWorld.rawHeight(gx,gz+2),gz+2,gx+2,MountainWorld.rawHeight(gx+2,gz),gz,0xffffff);
-                        emitTri(gx+2,MountainWorld.rawHeight(gx+2,gz+2),gz+2,gx+2,MountainWorld.rawHeight(gx+2,gz),gz,gx,MountainWorld.rawHeight(gx,gz+2),gz+2,0xffffff);
-                    }
-                    glEnd();
-                }
-                glDisable(GL_TEXTURE_2D);
-            });
-        }
-        for(int i=0;i<15;i++){
-            double angle=i*Math.PI*2/15,px=Math.cos(angle)*90,pz=Math.sin(angle)*90,h=24+i%4*7;
-            int tint=i%2==0?0x8caaa0:0x779c94;
-            cache(px,-8+h/2,pz,Math.hypot(20,h/2)+.05,()->cylinder(px,-8,pz,20,h,0,tint,5));
-        }
+        // The authored valley remains attached to its original small spherical region.
         // The rails and terminal pedestal never change during a journey.
         double railZ=(MountainPuzzle.MIN_Z+MountainPuzzle.MAX_Z)/2;
         double railY=MountainWorld.ground(MountainPuzzle.X,railZ),railRadius=0;
@@ -287,6 +337,7 @@ final class MountainRenderer implements AutoCloseable {
     @Override public void close(){
         if(window!=0){
             glfwMakeContextCurrent(window);
+            for(StaticDraw draw:terrain.values())glDeleteLists(draw.id,1);terrain.clear();terrainAnchor=null;
             for(StaticDraw draw:scene)glDeleteLists(draw.id,1);scene.clear();if(art!=null)art.close();if(depth!=0)glDeleteRenderbuffers(depth);if(color!=0)glDeleteTextures(color);if(fbo!=0)glDeleteFramebuffers(fbo);
             GL.setCapabilities(null);glfwDestroyWindow(window);window=0;
         }

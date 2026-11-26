@@ -22,7 +22,7 @@ public final class CombatTest {
         w=duel();steps(w,1800);check(w.combat.health==0,"Repeated unavoided strikes exhaust player");double time=w.time,z=w.z;w.step(0,1,true,0);w.jump();w.interact();w.combat.attack(w);w.combat.dodge(w,1,0,0);check(w.time==time&&w.z==z&&!w.combat.busy(),"Downed player cannot move or act");w.reset();check(w.combat.health==100,"R can recover from defeat");
         w=new MountainWorld();w.combat.x+=2;steps(w,600);check(Math.hypot(w.combat.x-MountainCombat.HOME_X,w.combat.z-MountainCombat.HOME_Z)<.11,"Disengaged guard returns home");
         MountainWorld.Obstacle rock=w.rocks.get(0);w.y=MountainWorld.ground(rock.x,rock.z);check(!MountainCombat.clear(w,rock.x-3,rock.z,rock.x+3,rock.z),"Melee cannot pass through rock");
-        w.reset();w.x=MountainWorld.LIMIT-.4;w.y=w.floor();w.facing=Math.PI/2;w.combat.dodge(w,0,0,0);steps(w,40);check(w.x<=MountainWorld.LIMIT-MountainWorld.RADIUS,"Dodge respects world boundary");
+        w.reset();w.x=47.6;w.y=w.floor();w.facing=Math.PI/2;w.combat.dodge(w,0,0,0);steps(w,40);check(w.x>48,"Dodge crosses old map boundary");
         System.out.println("PASS: melee timing/arc/range, telegraph/recovery, dodge cost/iframes/solids, defeat, leash and pause/reset");
     }
 }
