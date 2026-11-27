@@ -91,6 +91,25 @@ public final class WindowTest {
                 ImageIO.write(ViewRootImpl.renderToImage(decor,1200,800),"png",new File("out/windward-tests/completion-window.png"));
                 key(view,KeyEvent.DOWN,KeyEvent.ENTER);key(view,KeyEvent.UP,KeyEvent.ENTER);pump(150);check(!(boolean)field(field(game,"frame"),"summaryOpen")&&(double)field(field(game,"frame"),"time")>completedTime,"Enter continues free exploration");
                 key(view,KeyEvent.DOWN,'r');key(view,KeyEvent.UP,'r');pump(150);check(!(boolean)field(field(game,"frame"),"complete")&&!(boolean)field(field(game,"frame"),"powered")&&(double)field(field(game,"frame"),"stoneZ")==-19,"R resets completed region and puzzle");
+                key(view,KeyEvent.DOWN,0xffe1);key(view,KeyEvent.DOWN,'w');pump(650);
+                ImageIO.write(ViewRootImpl.renderToImage(decor,1200,800),"png",new File("out/windward-tests/running-window.png"));
+                key(view,KeyEvent.UP,'w');key(view,KeyEvent.UP,0xffe1);
+                queue(game,()->{try{
+                    Object w=field(game,"world");Method reset=w.getClass().getDeclaredMethod("reset");reset.setAccessible(true);reset.invoke(w);
+                    set(w,"x",175.0);set(w,"z",-130.0);Method floor=w.getClass().getDeclaredMethod("floor");floor.setAccessible(true);set(w,"y",floor.invoke(w));
+                    Object c=field(game,"camera");set(c,"yaw",1.2);set(c,"distance",5.0);set(c,"pitch",.25);
+                }catch(Exception e){throw new RuntimeException(e);}});pump(800);
+                check((boolean)field(field(game,"frame"),"swimming")&&((String)field(field(game,"frame"),"traversalHint")).startsWith("踩水中"),"Deep water presents animated treading state");
+                key(view,KeyEvent.DOWN,'j');key(view,KeyEvent.UP,'j');key(view,KeyEvent.DOWN,'k');key(view,KeyEvent.UP,'k');pump(100);
+                check(!(boolean)field(field(game,"frame"),"attacking")&&!(boolean)field(field(game,"frame"),"dodging"),"Water input cannot attack or land-dodge");
+                key(view,KeyEvent.DOWN,'w');pump(500);
+                check(((String)field(field(game,"frame"),"traversalHint")).startsWith("游泳中"),"Directional input switches to swimming");
+                ImageIO.write(ViewRootImpl.renderToImage(decor,1200,800),"png",new File("out/windward-tests/swimming-window.png"));
+                key(view,KeyEvent.UP,'w');key(view,KeyEvent.DOWN,'r');key(view,KeyEvent.UP,'r');pump(150);
+                // Returning across regions rebuilds static terrain before publishing the next frame.
+                long restartDeadline=System.nanoTime()+5000000000L;
+                while((boolean)field(field(game,"frame"),"swimming")&&System.nanoTime()<restartDeadline)pump(30);
+                check(!(boolean)field(field(game,"frame"),"swimming"),"Restart returns from swimming to dry camp");
                 view.dispatchTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN,400,300));
                 key(view,KeyEvent.DOWN,'w');view.clearFocus();pump(150);check((boolean)field(field(game,"frame"),"paused"),"Focus loss pauses");
                 a.getWindow().setLayout(800,600);pump(150);
@@ -100,6 +119,6 @@ public final class WindowTest {
                 a.getWindowManager().removeView(decor);a.performDestroy();Thread worker=(Thread)field(game,"worker");if(worker!=null){worker.join(5000);check(!worker.isAlive(),"Destruction releases render worker");}
             }
         }
-        System.out.println("PASS: isolated APK, framework X11 window, input, combat keys/mouse, traversal, push/tower/summary, pause, restart, camera drag, focus, resize and GL cleanup");
+        System.out.println("PASS: isolated APK, framework X11 window, input, running/swimming, combat keys/mouse, traversal, push/tower/summary, pause, restart, camera drag, focus, resize and GL cleanup");
     }
 }

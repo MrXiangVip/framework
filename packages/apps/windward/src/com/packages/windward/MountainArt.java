@@ -76,6 +76,20 @@ final class MountainArt implements AutoCloseable {
         return id;
     }
     void groundTexture(boolean path){glEnable(GL_TEXTURE_2D);glBindTexture(GL_TEXTURE_2D,textures.get(path?"ground-dirt":"ground-grass"));glColor3f(1,1,1);}
+    PlantedMesh plant(String name,double x,double y,double z,double height,double angle,double radius){
+        return PlantedMesh.supports(name)?new PlantedMesh(models.get(name),x,y,z,height,angle,radius):null;
+    }
+    void planted(String name,PlantedMesh mesh){
+        glEnable(GL_TEXTURE_2D);glEnable(GL_ALPHA_TEST);glAlphaFunc(GL_GREATER,.35f);glColor3f(1,1,1);
+        MountainAssets.Model model=models.get(name);
+        for(int p=0;p<mesh.parts.size();p++){
+            glBindTexture(GL_TEXTURE_2D,textures.get(forestTexture(name,model.parts.get(p))));glBegin(GL_TRIANGLES);
+            float[] v=mesh.parts.get(p);
+            for(int i=0;i<v.length;i+=8){glNormal3f(v[i+3],v[i+4],v[i+5]);glTexCoord2f(v[i+6],v[i+7]);glVertex3f(v[i],v[i+1],v[i+2]);}
+            glEnd();
+        }
+        glDisable(GL_ALPHA_TEST);glDisable(GL_TEXTURE_2D);
+    }
     double radius(String name,double height,double horizontalRadius){
         MountainAssets.Model model=models.get(name);
         if(horizontalRadius<=0){
@@ -112,7 +126,7 @@ final class MountainArt implements AutoCloseable {
     }
     void character(MountainWorld world){
         long poseBegin=profile?System.nanoTime():0;skinMs=0;
-        double[][] globals=traveller.pose(world.gait,world.locomotion,world.runBlend,world.airBlend,world.landing,world.time,world.vy,world.climbing,world.gliding,world.combat.attackTime,world.combat.dodgeTime,world.puzzle.pushing);
+        double[][] globals=traveller.pose(world.gait,world.locomotion,world.runBlend,world.airBlend,world.landing,world.time,world.vy,world.climbing,world.gliding,world.combat.attackTime,world.combat.dodgeTime,world.puzzle.pushing,world.swimBlend,world.swimPhase);
         if(profile)skinMs=(System.nanoTime()-poseBegin)/1e6;
         glPushMatrix();glTranslated(world.x,world.y,world.z);glRotated(Math.toDegrees(world.visualFacing),0,1,0);
         double scale=1.85/traveller.height();

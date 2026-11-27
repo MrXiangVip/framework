@@ -28,7 +28,7 @@ final class TravellerRig {
     final List<Node> nodes=new ArrayList<>();final List<Mesh> meshes=new ArrayList<>();
     final Map<String,Integer> nodeIds=new HashMap<>();
     double minX=Double.POSITIVE_INFINITY,minY=minX,minZ=minX,maxX=-minX,maxY=-minX,maxZ=-minX;
-    int boneCount; final Map<String,double[]> restDirections=new HashMap<>();
+    int boneCount; final Map<String,double[]> restDirections=new HashMap<>(),armLocalDirections=new HashMap<>();
     static TravellerRig load(MountainAssets assets)throws IOException{
         TravellerRig rig=new TravellerRig();
         try(Scene source=open(assets,"models/traveller.fbx")){
@@ -50,6 +50,7 @@ final class TravellerRig {
         for(String side:new String[]{"l","r"}){
             int shoulder=rig.required("upperarm_"+side),hand=rig.required("hand_"+side);
             rig.restDirections.put(side,new double[]{globals[hand][3]-globals[shoulder][3],globals[hand][7]-globals[shoulder][7],globals[hand][11]-globals[shoulder][11]});
+            rig.armLocalDirections.put(side,inverseDirection(globals[shoulder],rig.restDirections.get(side)));
             rig.required("thigh_"+side);rig.required("calf_"+side);
         }
         return rig;
@@ -143,47 +144,68 @@ final class TravellerRig {
         return pose(phase,move,run,air,landing,time,velocityY,climbing,gliding,attack,dodge,false);
     }
     double[][] pose(double phase,double move,double run,double air,double landing,double time,double velocityY,boolean climbing,boolean gliding,double attack,double dodge,boolean pushing){
+        return pose(phase,move,run,air,landing,time,velocityY,climbing,gliding,attack,dodge,pushing,0,0);
+    }
+    double[][] pose(double phase,double move,double run,double air,double landing,double time,double velocityY,boolean climbing,boolean gliding,double attack,double dodge,boolean pushing,double swim,double swimPhase){
         double slash=attack<0?0:Math.sin(Math.min(1,attack/.5)*Math.PI);
         double evade=dodge<0?0:Math.sin(Math.min(1,dodge/.32)*Math.PI);
         double[][] out=new double[nodes.size()][16];double[] local=new double[16];
-        double stride=move*(1-air),wave=Math.sin(phase);
+        double stride=move*(1-air)*(1-swim),wave=Math.sin(phase);
         double breath=Math.sin(time*2.1)*(1-move)*.012;
         double crouch=landing*.28+evade*.5;
         for(int i=0;i<nodes.size();i++){
             Node node=nodes.get(i);compose(node.bind,local);
             if(node.parent<0)System.arraycopy(local,0,out[i],0,16);else multiply(out[node.parent],local,out[i]);
             if(node.name.equals("pelvis")){
-                out[i][7]+=height()*(breath*.15+stride*.012*(1-Math.cos(phase*2))-landing*.035);
+                out[i][7]+=height()*(breath*.15+stride*(.012+run*.012)*(1-Math.cos(phase*2))-landing*.035+swim*.008*Math.sin(swimPhase*2));
+                rotateWorld(out[i],axisX(stride*run*.08+swim*(.2+move*.95)));
                 rotateWorld(out[i],axisY(wave*stride*.045));
+                rotateWorld(out[i],axisZ(Math.sin(swimPhase)*swim*move*.09));
             }
             if(node.name.equals("spine_01")){
-                rotateWorld(out[i],axisX(-stride*(.045+run*.08)+crouch*.28+breath));
+                rotateWorld(out[i],axisX(stride*(.045+run*.16)+crouch*.28+breath));
                 rotateWorld(out[i],axisY(-wave*stride*.09-slash*.45));
             }
+            if(node.name.equals("head"))rotateWorld(out[i],axisX(-swim*(.1+move*.5)));
             for(String side:new String[]{"l","r"}){
                 double sign=side.equals("l")?1:-1;
                 double cycle=phase+(sign<0?Math.PI:0),leg=Math.sin(cycle);
                 double recovery=Math.pow(Math.max(0,-leg),1.3);
-                double thigh=leg*stride*(.48+run*.22)+air*(velocityY>0?.38:.18)+crouch;
+                double thigh=leg*stride*(.48+run*.42)+air*(velocityY>0?.38:.18)+crouch;
                 if(climbing)thigh=.35+.25*Math.sin(cycle);
                 if(gliding)thigh=.12;
-                double knee=-recovery*stride*(.85+run*.45)-air*(velocityY>0?.95:.45)-crouch*1.7;
+                double knee=-recovery*stride*(.85+run*.8)-air*(velocityY>0?.95:.45)-crouch*1.7;
                 if(climbing)knee=-.7-.25*Math.sin(cycle);
                 if(gliding)knee=-.35;
+                double stroke=swimPhase+(sign<0?Math.PI:0),kick=Math.sin(swimPhase*2+(sign<0?Math.PI:0));
+                thigh=thigh*(1-swim)+swim*(.12+kick*(.15+move*.08));
+                knee=knee*(1-swim)-swim*(.18+Math.max(0,-kick)*.35);
                 if(node.name.equals("upperarm_"+side)){
-                    rotateWorld(out[i],align(restDirections.get(side),pushing?new double[]{sign*.35,-.1,.9}:attack>=0&&side.equals("r")?new double[]{-.45+slash*.9,-.25,.55+slash*.5}:climbing?new double[]{sign*.35,.65+.2*Math.sin(cycle),.45}:gliding?new double[]{sign*.55,.9,0}:new double[]{sign*(.13+air*.22),-1,leg*stride*(.42+run*.2)-air*.28}));
+                    double[] target=pushing?new double[]{sign*.35,-.1,.9}:attack>=0&&side.equals("r")?new double[]{-.45+slash*.9,-.25,.55+slash*.5}:climbing?new double[]{sign*.35,.65+.2*Math.sin(cycle),.45}:gliding?new double[]{sign*.55,.9,0}:new double[]{sign*(.13+air*.22),-1+run*stride*.25,leg*stride*(.42+run*.5)-air*.28};
+                    double[] water={sign*(.7*(1-move)+move*.35),-.2*(1-move)+move*.1+(.15+move*.3)*Math.sin(stroke),(.25+move*.65)*Math.cos(stroke)};
+                    for(int axis=0;axis<3;axis++)target[axis]=target[axis]*(1-swim)+water[axis]*swim;
+                    // Aim from the current inherited arm direction, including the swimming torso tilt.
+                    rotateWorld(out[i],align(direction(out[i],armLocalDirections.get(side)),target));
                 }
-                if(node.name.equals("lowerarm_"+side))rotateWorld(out[i],axisX(.18+stride*(.2+run*.35)+air*.45));
-                if(node.name.equals("hand_"+side))rotateWorld(out[i],axisX(-.08-stride*.06));
+                if(node.name.equals("lowerarm_"+side))rotateWorld(out[i],axisX((.18+stride*(.2+run*.65)+air*.45)*(1-swim)+swim*(.25+.45*Math.max(0,Math.sin(stroke)))));
+                if(node.name.equals("hand_"+side))rotateWorld(out[i],axisX(-.08-stride*.06-swim*.1));
                 if(node.name.equals("thigh_"+side))rotateWorld(out[i],axisX(thigh));
                 if(node.name.equals("calf_"+side))rotateWorld(out[i],axisX(knee));
-                if(node.name.equals("foot_"+side))rotateWorld(out[i],axisX(-thigh-knee*.65-air*.18));
+                if(node.name.equals("foot_"+side))rotateWorld(out[i],axisX((-thigh-knee*.65-air*.18)*(1-swim)-swim*.3));
             }
         }
         return out;
     }
     private static double[] axisY(double a){double c=Math.cos(a),s=Math.sin(a);return new double[]{c,0,s,0,0,1,0,0,-s,0,c,0,0,0,0,1};}
     private static double[] axisX(double a){double c=Math.cos(a),s=Math.sin(a);return new double[]{1,0,0,0,0,c,-s,0,0,s,c,0,0,0,0,1};}
+    private static double[] axisZ(double a){double c=Math.cos(a),s=Math.sin(a);return new double[]{c,-s,0,0,s,c,0,0,0,0,1,0,0,0,0,1};}
+    private static double[] direction(double[] m,double[] v){return new double[]{m[0]*v[0]+m[1]*v[1]+m[2]*v[2],m[4]*v[0]+m[5]*v[1]+m[6]*v[2],m[8]*v[0]+m[9]*v[1]+m[10]*v[2]};}
+    private static double[] inverseDirection(double[] m,double[] v){
+        double a=m[5]*m[10]-m[6]*m[9],b=m[6]*m[8]-m[4]*m[10],c=m[4]*m[9]-m[5]*m[8],d=m[0]*a+m[1]*b+m[2]*c;
+        return new double[]{(a*v[0]+(m[2]*m[9]-m[1]*m[10])*v[1]+(m[1]*m[6]-m[2]*m[5])*v[2])/d,
+            (b*v[0]+(m[0]*m[10]-m[2]*m[8])*v[1]+(m[2]*m[4]-m[0]*m[6])*v[2])/d,
+            (c*v[0]+(m[1]*m[8]-m[0]*m[9])*v[1]+(m[0]*m[5]-m[1]*m[4])*v[2])/d};
+    }
     private static double[] align(double[] from,double[] to){
         double al=Math.sqrt(from[0]*from[0]+from[1]*from[1]+from[2]*from[2]),bl=Math.sqrt(to[0]*to[0]+to[1]*to[1]+to[2]*to[2]);
         double ax=from[0]/al,ay=from[1]/al,az=from[2]/al,bx=to[0]/bl,by=to[1]/bl,bz=to[2]/bl;

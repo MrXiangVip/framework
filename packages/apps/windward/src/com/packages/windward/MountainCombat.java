@@ -13,11 +13,11 @@ final class MountainCombat {
     boolean busy(){return attackTime>=0||dodgeTime>=0;}
     boolean vulnerable(){return !(dodgeTime>=.04&&dodgeTime<.26)&&hurt<=0;}
     void attack(MountainWorld w){
-        if(w.paused||w.journey.summaryOpen||health<=0||!w.grounded||w.climbing||w.gliding||w.puzzle.pushing||busy())return;
+        if(w.paused||w.journey.summaryOpen||health<=0||!w.grounded||w.swimming()||w.climbing||w.gliding||w.puzzle.pushing||busy())return;
         attackTime=0;swingHit=false;
     }
     void dodge(MountainWorld w,double horizontal,double forward,double yaw){
-        if(w.paused||w.journey.summaryOpen||health<=0||!w.grounded||w.climbing||w.gliding||w.puzzle.pushing||busy()||dodgeCooldown>0||w.stamina<25)return;
+        if(w.paused||w.journey.summaryOpen||health<=0||!w.grounded||w.swimming()||w.climbing||w.gliding||w.puzzle.pushing||busy()||dodgeCooldown>0||w.stamina<25)return;
         double len=Math.hypot(horizontal,forward);
         if(len>.01){dodgeX=(horizontal*Math.cos(yaw)+forward*Math.sin(yaw))/len;dodgeZ=(horizontal*Math.sin(yaw)-forward*Math.cos(yaw))/len;}
         else{dodgeX=Math.sin(w.facing);dodgeZ=Math.cos(w.facing);}

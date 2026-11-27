@@ -38,7 +38,9 @@ final class MountainRenderer implements AutoCloseable {
         glNewList(id,GL_COMPILE);glPushMatrix();surface(x,z);draw.run();glPopMatrix();glEndList();
     }
     private void cacheModel(String name,double x,double y,double z,double height,double angle,double radius){
-        cache(x,y+height/2,z,art.radius(name,height,radius),()->art.model(name,x,y,z,height,angle,radius));
+        PlantedMesh plant=art.plant(name,x,y,z,height,angle,radius);
+        cache(x,y+height/2,z,plant==null?art.radius(name,height,radius):plant.radius,
+                ()->{if(plant==null)art.model(name,x,y,z,height,angle,radius);else art.planted(name,plant);});
     }
     private void drawScene(MountainWorld w,MountainCamera camera){
         streamTerrain(w);
@@ -169,7 +171,7 @@ final class MountainRenderer implements AutoCloseable {
             }
         }else{cylinder(c.x,floor,c.z,.65,.25,.45,0x879d9b,6);box(c.x+.5,floor+.23,c.z+.3,.25,.2,.25,0x879d9b);}
         glPopMatrix();}
-        if(w.grounded&&!w.climbing&&!w.gliding&&!w.puzzle.pushing&&c.health>0){
+        if(w.grounded&&!w.swimming()&&w.swimBlend<.1&&!w.climbing&&!w.gliding&&!w.puzzle.pushing&&c.health>0){
             glPushMatrix();surface(w.x,w.z);glTranslated(w.x,w.y,w.z);glRotated(Math.toDegrees(w.visualFacing),0,1,0);
             double slash=c.attackTime<0?0:Math.sin(Math.min(1,c.attackTime/.5)*Math.PI);
             glTranslated(art.handX,art.handY,art.handZ);glRotated(-35+slash*140,0,1,0);glRotated(65-slash*55,1,0,0);
@@ -223,8 +225,9 @@ final class MountainRenderer implements AutoCloseable {
                 glPushMatrix();surface(prop.x,prop.z);
                 boolean stone=prop.model.equals("rock")||prop.model.equals("roundrock");
                 double base=prop.model.equals("lilypad")?MountainPlanet.WATER+.02:MountainWorld.ground(prop.x,prop.z);
-                art.model(prop.model,prop.x,base,prop.z,prop.height,prop.angle,stone?prop.r:0);
-                radius=Math.max(radius,MountainPlanet.position(prop.x,base+prop.height/2,prop.z).sub(center).length()+art.radius(prop.model,prop.height,stone?prop.r:0));
+                PlantedMesh plant=art.plant(prop.model,prop.x,base,prop.z,prop.height,prop.angle,stone?prop.r:0);
+                if(plant==null)art.model(prop.model,prop.x,base,prop.z,prop.height,prop.angle,stone?prop.r:0);else art.planted(prop.model,plant);
+                radius=Math.max(radius,MountainPlanet.position(prop.x,base+prop.height/2,prop.z).sub(center).length()+(plant==null?art.radius(prop.model,prop.height,stone?prop.r:0):plant.radius));
                 glPopMatrix();
             }
             glEndList();terrain.put(tile,new StaticDraw(id,center.x,center.y,center.z,radius+.1));

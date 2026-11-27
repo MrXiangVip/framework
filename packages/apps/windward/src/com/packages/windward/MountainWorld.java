@@ -19,7 +19,7 @@ final class MountainWorld {
     final List<Obstacle> props=Arrays.asList(tent,rune);
     double x,z,y,vy,facing,time,distance;
     double stamina=100;boolean climbing,gliding;
-    double gait,locomotion,runBlend,airBlend,landing,visualFacing;
+    double gait,locomotion,runBlend,airBlend,landing,visualFacing,swimBlend,swimPhase;
     boolean grounded=true,paused,moving;
     MountainWorld(){
         for(int i=0;i<65;i++){
@@ -31,7 +31,7 @@ final class MountainWorld {
         rocks.add(new Obstacle(29,-17,1.6,2.4));rocks.add(new Obstacle(-14,-13,2.2,3));
         reset();
     }
-    void reset(){headingTurn=0;x=0;z=12;y=ground(x,z);vy=0;facing=Math.PI;grounded=true;time=distance=0;paused=moving=false;gait=locomotion=runBlend=airBlend=landing=0;visualFacing=facing;stamina=100;climbing=gliding=false;journey.reset();combat.reset();puzzle.reset();}
+    void reset(){headingTurn=0;x=0;z=12;y=ground(x,z);vy=0;facing=Math.PI;grounded=true;time=distance=0;paused=moving=false;gait=locomotion=runBlend=airBlend=landing=swimBlend=swimPhase=0;visualFacing=facing;stamina=100;climbing=gliding=false;journey.reset();combat.reset();puzzle.reset();}
     static double pathX(double z){return MountainJourney.pathX(z);}
     static double rawHeight(double x,double z){return MountainPlanet.height(MountainPlanet.normal(x,z));}
     static double ground(double x,double z){return PlanetTerrain.ground(x,z);}
@@ -97,6 +97,7 @@ final class MountainWorld {
             if(grounded){y=floor;vy=0;}
             else{vy=gliding?Math.max(-2.5,vy-8*STEP):vy-20*STEP;y+=vy*STEP;if(y<=floor){y=floor;vy=0;grounded=true;gliding=false;}}
         }
+        if(swimming()){combat.attackTime=-1;combat.dodgeTime=-1;}
         combat.tick(this);
         if(combat.health<=0)puzzle.pushing=false;
         puzzle.update(this);
@@ -104,9 +105,12 @@ final class MountainWorld {
         // Animation is driven by simulation time, never by render-frame frequency.
         double travel=distance-oldDistance;
         locomotion+=(moving?1-locomotion:-locomotion)*(1-Math.exp(-STEP*12));
-        runBlend+=((moving&&sprint?1:0)-runBlend)*(1-Math.exp(-STEP*8));
+        boolean water=swimming();
+        runBlend+=((moving&&sprint&&grounded&&!water&&!climbing&&!puzzle.pushing&&combat.dodgeTime<0?1:0)-runBlend)*(1-Math.exp(-STEP*8));
+        swimBlend+=((water?1:0)-swimBlend)*(1-Math.exp(-STEP*8));
+        if(water||swimBlend>.001)swimPhase+=STEP*(1.6+locomotion*(sprint?5.2:3.5));
         airBlend+=((grounded?0:1)-airBlend)*(1-Math.exp(-STEP*16));
-        gait+=grounded?travel*(2.7-runBlend*.65):0;
+        gait+=grounded?travel*(2.7-runBlend*.45)*(1-swimBlend):0;
         landing*=Math.exp(-STEP*11);
         if(!wasGrounded&&grounded)landing=Math.min(1,Math.abs(impact)/9);
         journey.update(this);

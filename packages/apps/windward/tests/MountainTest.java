@@ -167,6 +167,21 @@ public final class MountainTest {
             camera.reset();camera.distance=5;camera.pitch=.12;
             ImageIO.write(renderer.render(world,camera),"png",new File("out/windward-tests/birds.png"));
             world.reset();camera.reset();
+            advance(world,90,0,1,true,0);camera.yaw=1.3;camera.distance=4;camera.pitch=.25;
+            for(int i=0;i<4;i++){
+                world.gait=i*Math.PI/2;
+                ImageIO.write(renderer.render(world,camera),"png",new File("out/windward-tests/running-"+i+".png"));
+            }
+            world.reset();world.x=175;world.z=-130;world.y=world.floor();advance(world,120,0,0,false,0);
+            camera.reset();camera.yaw=1.2;camera.distance=5;camera.pitch=.25;
+            ImageIO.write(renderer.render(world,camera),"png",new File("out/windward-tests/treading-water.png"));
+            advance(world,90,0,1,false,0);
+            for(int i=0;i<4;i++){
+                world.swimPhase=i*Math.PI/2;
+                ImageIO.write(renderer.render(world,camera),"png",new File("out/windward-tests/swimming-"+i+".png"));
+            }
+            check(org.lwjgl.opengl.GL11.glGetError()==0,"Running and swimming pose cycles have no GL errors");
+            world.reset();camera.reset();
             long[] times=new long[30];
             for(int i=0;i<times.length;i++){long t=System.nanoTime();renderer.render(world,camera);times[i]=System.nanoTime()-t;}
             java.util.Arrays.sort(times);

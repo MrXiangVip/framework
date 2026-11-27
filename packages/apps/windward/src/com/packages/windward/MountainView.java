@@ -25,7 +25,7 @@ public final class MountainView extends View implements AutoCloseable {
     private final Handler ui=new Handler(m->{pending.set(false);if(!closed)invalidate();return true;});
     static final class Frame {
         final BufferedImage image;
-        final boolean paused,nearRune,runeRead,climbing,gliding;
+        final boolean paused,nearRune,runeRead,climbing,gliding,swimming;
         final double x,z,y,time,renderMs,targetDistance,stamina;
         final int terrainPatches;
         final String device,objective,notice,traversalHint,enemyState,region;
@@ -36,6 +36,7 @@ public final class MountainView extends View implements AutoCloseable {
             terrainPatches=patches;
             image=i;paused=w.paused;x=w.x;z=w.z;y=w.y;time=w.time;renderMs=ms;device=d;
             region=MountainPlanet.region(w.x,w.z);
+            swimming=w.swimming();
             complete=w.journey.complete;summaryOpen=w.journey.summaryOpen;completedAt=w.journey.completedAt;treasure=w.journey.treasure;
             pushing=w.puzzle.pushing;powered=w.puzzle.powered;stoneZ=w.puzzle.stoneZ;
             health=w.combat.health;enemyHealth=w.combat.enemyHealth;enemyState=w.combat.state.name();
@@ -46,7 +47,7 @@ public final class MountainView extends View implements AutoCloseable {
             traversalHint=hint(w);targetDistance=MountainPlanet.distance(w.x,w.z,w.journey.guideX(w),w.journey.guideZ(w));
         }
         private static String hint(MountainWorld w){
-            if(w.swimming())return "浮水中 · 方向键移动  Shift 加速 · 靠近浅滩可上岸";
+            if(w.swimming())return w.moving?"游泳中 · 方向键划水  Shift 加速 · 靠近浅滩可上岸":"踩水中 · 方向键游泳  Shift 加速 · 靠近浅滩可上岸";
             String puzzle=w.puzzle.hint(w);if(!puzzle.isEmpty())return puzzle;
             if(w.climbing)return "攀爬中 · W/S 上下  A/D 横移  E 松手";
             if(w.gliding)return "滑翔中 · 方向键控制  空格收起";
